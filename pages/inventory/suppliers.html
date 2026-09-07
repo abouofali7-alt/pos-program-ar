@@ -47,7 +47,15 @@
                 <div class="form-item"><label>الاسم *</label><input id="sName"></div>
                 <div class="form-item"><label>الهاتف</label><input id="sPhone"></div>
                 <div class="form-item"><label>الرصيد الافتتاحي (دائن / له)</label><input type="number" id="sOpeningBalance" placeholder="0.00" step="0.01"></div>
-                <div class="form-item" style="grid-column:1/-1;"><label>العنوان</label><input id="sAddress"></div>
+                <div class="form-item" style="grid-column:1/-1;">
+                    <label>العنوان</label>
+                    <div style="display:flex;gap:8px;">
+                        <input id="sAddress" style="flex:1;">
+                        <button type="button" class="btn btn-secondary" onclick="pickSupMapLocation()" style="padding:8px 12px;font-size:0.82rem;white-space:nowrap;"><i class="fa-solid fa-map-location-dot" style="color:var(--accent-cyan);"></i> الخريطة / GPS</button>
+                    </div>
+                </div>
+                <input type="hidden" id="sLat">
+                <input type="hidden" id="sLng">
                 <div class="form-item" style="grid-column:1/-1;"><label>الملاحظات</label><input id="sNote"></div>
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -95,7 +103,9 @@
                 const currentBal = openBal + purBal - retBal - payBal;
                 grandTotalPayable += currentBal;
 
-                return '<tr><td><b>' + s.name + '</b></td>' +
+                const mapLink = (s.lat && s.lng) ? ' <a href="https://www.google.com/maps?q=' + s.lat + ',' + s.lng + '" target="_blank" class="badge badge-blue" style="font-size:0.75rem;text-decoration:none;"><i class="fa-solid fa-location-dot"></i> GPS</a>' : '';
+
+                return '<tr><td><b>' + s.name + '</b>' + mapLink + '</td>' +
                 '<td class="num">' + (s.phone || '—') + '</td>' +
                 '<td>' + (s.address || '—') + '</td>' +
                 '<td class="num">' + UI.money(openBal) + '</td>' +
@@ -108,10 +118,30 @@
             document.getElementById('supBalance').innerHTML = UI.money(grandTotalPayable);
         }
 
+        function pickSupMapLocation() {
+            const curLat = document.getElementById('sLat').value;
+            const curLng = document.getElementById('sLng').value;
+            const curAddr = document.getElementById('sAddress').value;
+            const initial = (curLat && curLng) ? { lat: parseFloat(curLat), lng: parseFloat(curLng) } : curAddr;
+
+            if (typeof ARLocation !== 'undefined') {
+                ARLocation.openMapModal(initial, (res) => {
+                    if (res) {
+                        if (res.address) document.getElementById('sAddress').value = res.address;
+                        document.getElementById('sLat').value = res.lat;
+                        document.getElementById('sLng').value = res.lng;
+                        UI.toast('تم تحديد موقع المورد بنجاح', 'ok');
+                    }
+                });
+            } else {
+                UI.toast('تعذر تحميل خريطة تحديد الموقع', 'warn');
+            }
+        }
+
         function openSupModal() {
             editingSid = null;
             document.getElementById('supModalTitle').textContent = 'إضافة مورد';
-            ['sName','sPhone','sOpeningBalance','sAddress','sNote'].forEach(i => document.getElementById(i).value = '');
+            ['sName','sPhone','sOpeningBalance','sAddress','sLat','sLng','sNote'].forEach(i => document.getElementById(i).value = '');
             document.getElementById('supModal').style.visibility = 'visible';
             document.getElementById('supModal').style.opacity = '1';
         }
@@ -128,6 +158,8 @@
             document.getElementById('sPhone').value = s.phone || '';
             document.getElementById('sOpeningBalance').value = s.openingBalance || 0;
             document.getElementById('sAddress').value = s.address || '';
+            document.getElementById('sLat').value = s.lat || '';
+            document.getElementById('sLng').value = s.lng || '';
             document.getElementById('sNote').value = s.note || '';
             document.getElementById('supModal').style.visibility = 'visible';
             document.getElementById('supModal').style.opacity = '1';
@@ -139,6 +171,8 @@
                 name,
                 phone: document.getElementById('sPhone').value.trim(),
                 address: document.getElementById('sAddress').value.trim(),
+                lat: document.getElementById('sLat').value ? parseFloat(document.getElementById('sLat').value) : null,
+                lng: document.getElementById('sLng').value ? parseFloat(document.getElementById('sLng').value) : null,
                 openingBalance: Number(document.getElementById('sOpeningBalance').value) || 0,
                 note: document.getElementById('sNote').value.trim()
             };

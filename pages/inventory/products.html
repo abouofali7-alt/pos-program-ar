@@ -46,9 +46,15 @@
                 <div class="form-item"><label>سعر البيع</label><input type="number" id="pPrice" step="0.01" min="0"></div>
                 <div class="form-item"><label>الرصيد الابتدائي (الكمية الحالية)</label><input type="number" id="pInitialStock" step="1" min="0" placeholder="0"></div>
                 <div class="form-item"><label>حد أدنى للمخزون</label><input type="number" id="pMinStock" step="1" min="0"></div>
-                <div class="form-item" style="grid-column:1/-1;display:flex;align-items:center;gap:10px;margin-top:6px;">
-                    <input type="checkbox" id="pHasSerials" style="width:18px;height:18px;cursor:pointer;">
-                    <label for="pHasSerials" style="margin:0;cursor:pointer;font-weight:600;color:var(--accent-cyan);"><i class="fa-solid fa-barcode"></i> تتبع الأرقام التسلسلية (S/N) لهذا المنتج</label>
+                <div class="form-item" style="grid-column:1/-1;display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="checkbox" id="pHasSerials" onchange="toggleSerialsInput()" style="width:18px;height:18px;cursor:pointer;">
+                        <label for="pHasSerials" style="margin:0;cursor:pointer;font-weight:600;color:var(--accent-cyan);"><i class="fa-solid fa-barcode"></i> تتبع الأرقام التسلسلية (S/N) لهذا المنتج</label>
+                    </div>
+                    <div id="pSerialsWrap" style="display:none;margin-top:8px;">
+                        <label style="font-size:0.82rem;color:var(--text-secondary);display:block;margin-bottom:4px;">الأرقام التسلسلية (S/N) الأولية (مفصولة بسطر جديد أو فاصلة):</label>
+                        <textarea id="pSerialsInput" rows="3" placeholder="SN100293&#10;SN100294&#10;SN100295..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--accent-purple);background:var(--card-dark);color:var(--text-primary);font-size:0.85rem;"></textarea>
+                    </div>
                 </div>
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -60,14 +66,24 @@
 
     <!-- modal عرض واستعراض السريالات الخاص بالمنتج -->
     <div id="serialsModal" class="modal-mask" style="visibility:hidden;opacity:0;">
-        <div class="modal-box" style="width:min(680px,94vw);">
+        <div class="modal-box" style="width:min(720px,94vw);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <h3 id="serialsModalTitle" style="margin:0;"><i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> الأرقام التسلسلية للمنتج</h3>
                 <button class="icon-btn" onclick="closeSerialsModal()"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="table-scroll" style="max-height:360px;">
+
+            <!-- نموذج سريع لإضافة سريالات من داخل النافذة -->
+            <div style="background:var(--card-hover);padding:12px;border-radius:10px;border:1px solid var(--border-color);margin-bottom:14px;">
+                <div style="font-size:0.85rem;font-weight:700;margin-bottom:6px;color:var(--accent-cyan);"><i class="fa-solid fa-plus-circle"></i> إضافة أرقام تسلسلية جديدة للمخزن:</div>
+                <div style="display:flex;gap:8px;">
+                    <input id="quickSerialInput" placeholder="أدخل الرقم التسلسلي S/N أو أكثر مفصولة بفاصلة..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-dark);color:var(--text-primary);font-size:0.85rem;" onkeydown="if(event.key==='Enter')addQuickSerials()">
+                    <button class="btn btn-primary-soft" onclick="addQuickSerials()" style="padding:8px 14px;font-size:0.85rem;"><i class="fa-solid fa-plus"></i> إضافة</button>
+                </div>
+            </div>
+
+            <div class="table-scroll" style="max-height:340px;">
                 <table class="data-table">
-                    <thead><tr><th>الرقم التسلسلي S/N</th><th>الحالة</th><th>تاريخ الشراء</th><th>تاريخ البيع</th></tr></thead>
+                    <thead><tr><th>الرقم التسلسلي S/N</th><th>الحالة</th><th>تاريخ الشراء</th><th>تاريخ البيع</th><th>إجراء</th></tr></thead>
                     <tbody id="serialsBody"></tbody>
                 </table>
             </div>
@@ -83,11 +99,17 @@
     <script src="../../js/app.js"></script>
     <script>
         let editingPid = null;
+        let activeViewerPid = null;
 
         function stockOf(products, movements, pid) {
             let q = 0;
             movements.forEach(m => { if (m.productId === pid) q += (m.quantity || 0) * (m.direction === 'in' ? 1 : -1); });
             return q;
+        }
+
+        function toggleSerialsInput() {
+            const chk = document.getElementById('pHasSerials').checked;
+            document.getElementById('pSerialsWrap').style.display = chk ? 'block' : 'none';
         }
 
         async function load() {
@@ -122,9 +144,10 @@
         function openProductModal() {
             editingPid = null;
             document.getElementById('prodModalTitle').textContent = 'إضافة منتج';
-            ['pName','pBarcode','pUnit','pCost','pPrice','pInitialStock','pMinStock'].forEach(id => document.getElementById(id).value = '');
+            ['pName','pBarcode','pUnit','pCost','pPrice','pInitialStock','pMinStock','pSerialsInput'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('pCategory').value = '';
             document.getElementById('pHasSerials').checked = false;
+            toggleSerialsInput();
             document.getElementById('prodModal').style.visibility = 'visible';
             document.getElementById('prodModal').style.opacity = '1';
         }
@@ -146,13 +169,23 @@
             document.getElementById('pInitialStock').value = '';
             document.getElementById('pMinStock').value = p.minStock || 0;
             document.getElementById('pHasSerials').checked = !!p.hasSerials;
+            document.getElementById('pSerialsInput').value = '';
+            toggleSerialsInput();
             document.getElementById('prodModal').style.visibility = 'visible';
             document.getElementById('prodModal').style.opacity = '1';
         }
+
         async function saveProduct() {
             const name = document.getElementById('pName').value.trim();
             if (!name) { UI.toast('اسم المنتج مطلوب', 'warn'); return; }
             const initialStock = Number(document.getElementById('pInitialStock').value) || 0;
+            const hasSerials = document.getElementById('pHasSerials').checked;
+            const rawSerials = document.getElementById('pSerialsInput').value.trim();
+            let parsedSerials = [];
+            if (hasSerials && rawSerials) {
+                parsedSerials = rawSerials.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+            }
+
             const rec = {
                 name,
                 barcode: document.getElementById('pBarcode').value.trim(),
@@ -161,29 +194,51 @@
                 cost: Number(document.getElementById('pCost').value) || 0,
                 price: Number(document.getElementById('pPrice').value) || 0,
                 minStock: Number(document.getElementById('pMinStock').value) || 0,
-                hasSerials: document.getElementById('pHasSerials').checked
+                hasSerials
             };
+
+            let targetPid = editingPid;
             if (editingPid) {
                 rec.id = editingPid;
                 await ARDB.put('products', rec);
                 UI.toast('تم التعديل', 'ok');
             } else {
-                const newId = await ARDB.add('products', rec);
-                if (initialStock > 0) {
+                targetPid = await ARDB.add('products', rec);
+                const finalQty = parsedSerials.length > 0 ? Math.max(initialStock, parsedSerials.length) : initialStock;
+                if (finalQty > 0) {
                     await ARDB.add('stockMovements', {
                         date: Date.now(),
-                        productId: newId,
+                        productId: targetPid,
                         direction: 'in',
                         type: 'initial',
-                        quantity: initialStock,
+                        quantity: finalQty,
                         note: 'رصيد أول المدة'
                     });
                 }
                 UI.toast('تمت الإضافة', 'ok');
             }
+
+            // حفظ السريالات المضافة مباشرة في نموذج المنتج
+            if (hasSerials && parsedSerials.length > 0 && targetPid) {
+                for (const sn of parsedSerials) {
+                    try {
+                        await ARDB.add('serials', {
+                            productId: targetPid,
+                            serialNumber: sn,
+                            status: 'available',
+                            purchaseDate: Date.now(),
+                            createdAt: Date.now()
+                        });
+                    } catch(e) {
+                        console.warn('سريال مكرر:', sn);
+                    }
+                }
+            }
+
             closeProductModal();
             load();
         }
+
         async function delProduct(id) {
             const ok = await UI.confirmBox('حذف المنتج؟ (لن تُحذف الحركات المرتبطة)');
             if (!ok) return;
@@ -193,15 +248,24 @@
         }
 
         async function viewSerials(pid) {
+            activeViewerPid = pid;
             const p = await ARDB.getById('products', pid);
             if (!p) return;
             document.getElementById('serialsModalTitle').innerHTML = '<i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> السريالات: ' + p.name;
+            document.getElementById('quickSerialInput').value = '';
+            await renderSerialsTable();
+            document.getElementById('serialsModal').style.visibility = 'visible';
+            document.getElementById('serialsModal').style.opacity = '1';
+        }
+
+        async function renderSerialsTable() {
+            if (!activeViewerPid) return;
             const allSerials = await ARDB.getAll('serials');
-            const prodSerials = (allSerials || []).filter(s => s.productId === pid);
+            const prodSerials = (allSerials || []).filter(s => s.productId === activeViewerPid);
             
             const tbody = document.getElementById('serialsBody');
             if (!prodSerials.length) {
-                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">لا توجد أرقام تسلسلية مسجلة لهذا المنتج</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">لا توجد أرقام تسلسلية مسجلة لهذا المنتج</td></tr>';
             } else {
                 tbody.innerHTML = prodSerials.map(s => {
                     let stBadge = '<span class="badge badge-green">متاح بالمخزن</span>';
@@ -213,18 +277,69 @@
                         '<td>' + stBadge + '</td>' +
                         '<td>' + (s.purchaseDate ? UI.date(s.purchaseDate) : '—') + '</td>' +
                         '<td>' + (s.invoiceDate ? UI.date(s.invoiceDate) : '—') + '</td>' +
+                        '<td style="text-align:left;">' +
+                            '<button class="btn btn-sm btn-danger" onclick="deleteSerial(' + s.id + ')"><i class="fa-solid fa-trash"></i></button>' +
+                        '</td>' +
                         '</tr>';
                 }).join('');
             }
+        }
 
-            document.getElementById('serialsModal').style.visibility = 'visible';
-            document.getElementById('serialsModal').style.opacity = '1';
+        async function addQuickSerials() {
+            if (!activeViewerPid) return;
+            const raw = document.getElementById('quickSerialInput').value.trim();
+            if (!raw) return UI.toast('أدخل الرقم التسلسلي', 'warn');
+            const list = raw.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+            
+            let count = 0;
+            for (const sn of list) {
+                try {
+                    await ARDB.add('serials', {
+                        productId: activeViewerPid,
+                        serialNumber: sn,
+                        status: 'available',
+                        purchaseDate: Date.now(),
+                        createdAt: Date.now()
+                    });
+                    count++;
+                } catch(e) {
+                    UI.toast('السريال ' + sn + ' مكرر مسبقاً', 'warn');
+                }
+            }
+
+            if (count > 0) {
+                // إضافة الحركة المخزنية للرصيد
+                await ARDB.add('stockMovements', {
+                    date: Date.now(),
+                    productId: activeViewerPid,
+                    direction: 'in',
+                    type: 'initial',
+                    quantity: count,
+                    note: 'إضافة سريالات من شاشة السريالات'
+                });
+                UI.toast('تمت إضافة ' + count + ' سريال بنجاح', 'ok');
+                document.getElementById('quickSerialInput').value = '';
+                await renderSerialsTable();
+                load();
+            }
+        }
+
+        async function deleteSerial(sid) {
+            const ok = await UI.confirmBox('حذف هذا الرقم التسلسلي؟');
+            if (!ok) return;
+            await ARDB.remove('serials', sid);
+            UI.toast('تم الحذف', 'ok');
+            await renderSerialsTable();
+            load();
         }
 
         function closeSerialsModal() {
             document.getElementById('serialsModal').style.visibility = 'hidden';
             document.getElementById('serialsModal').style.opacity = '0';
         }
+
+        load();
+    </script>
 
         load();
     </script>

@@ -104,7 +104,9 @@
                 const currentBal = openBal + invBal - retBal - payBal;
                 grandTotalDebt += currentBal;
 
-                return '<tr><td><b>' + c.name + '</b></td>' +
+                const mapLink = (c.lat && c.lng) ? ' <a href="https://www.google.com/maps?q=' + c.lat + ',' + c.lng + '" target="_blank" class="badge badge-blue" style="font-size:0.75rem;text-decoration:none;"><i class="fa-solid fa-location-dot"></i> GPS</a>' : '';
+
+                return '<tr><td><b>' + c.name + '</b>' + mapLink + '</td>' +
                 '<td class="num">' + (c.phone || '—') + '</td>' +
                 '<td>' + (c.address || '—') + '</td>' +
                 '<td class="num">' + UI.money(openBal) + '</td>' +
@@ -120,16 +122,20 @@
         function pickMapLocation() {
             const addrVal = document.getElementById('cuAddress').value.trim();
             const coordsVal = document.getElementById('cuCoords').value.trim();
-            const query = addrVal || coordsVal;
+            const query = coordsVal || addrVal;
 
             if (typeof ARLocation !== 'undefined') {
                 ARLocation.openMapModal(query, (res) => {
-                    document.getElementById('cuCoords').value = `${res.lat}, ${res.lng}`;
-                    if (res.address && !document.getElementById('cuAddress').value.trim()) {
-                        document.getElementById('cuAddress').value = res.address;
+                    if (res) {
+                        document.getElementById('cuCoords').value = `${res.lat}, ${res.lng}`;
+                        if (res.address && !document.getElementById('cuAddress').value.trim()) {
+                            document.getElementById('cuAddress').value = res.address;
+                        }
+                        UI.toast('تم تحديد موقع العميل على الخريطة بنجاح', 'ok');
                     }
-                    UI.toast('تم تحديد موقع العميل على الخريطة بنجاح', 'ok');
                 });
+            } else {
+                UI.toast('تعذر تحميل خريطة تحديد الموقع', 'warn');
             }
         }
 
@@ -152,6 +158,7 @@
             document.getElementById('cuName').value = c.name || '';
             document.getElementById('cuPhone').value = c.phone || '';
             document.getElementById('cuAddress').value = c.address || '';
+            document.getElementById('cuCoords').value = (c.lat && c.lng) ? `${c.lat}, ${c.lng}` : '';
             document.getElementById('cuOpeningBalance').value = c.openingBalance || 0;
             document.getElementById('cuNote').value = c.note || '';
             document.getElementById('custModal').style.visibility = 'visible';
@@ -160,10 +167,21 @@
         async function saveCust() {
             const name = document.getElementById('cuName').value.trim();
             if (!name) { UI.toast('الاسم مطلوب', 'warn'); return; }
+
+            const coordsStr = document.getElementById('cuCoords').value.trim();
+            let lat = null, lng = null;
+            if (coordsStr && coordsStr.includes(',')) {
+                const parts = coordsStr.split(',');
+                lat = parseFloat(parts[0].trim());
+                lng = parseFloat(parts[1].trim());
+            }
+
             const rec = {
                 name,
                 phone: document.getElementById('cuPhone').value.trim(),
                 address: document.getElementById('cuAddress').value.trim(),
+                lat,
+                lng,
                 openingBalance: Number(document.getElementById('cuOpeningBalance').value) || 0,
                 note: document.getElementById('cuNote').value.trim()
             };

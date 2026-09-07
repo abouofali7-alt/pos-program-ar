@@ -25,7 +25,7 @@
             <div class="table-head">فواتير البيع</div>
             <div class="table-scroll">
                 <table class="data-table">
-                    <thead><tr><th>الرقم</th><th>التاريخ</th><th>العميل</th><th>عدد الأصناف</th><th>طريقة الدفع</th><th>الإجمالي</th><th></th></tr></thead>
+                    <thead><tr><th>الرقم</th><th>التاريخ</th><th>العميل</th><th>عدد الأصناف</th><th>الموقع</th><th>طريقة الدفع</th><th>الإجمالي</th><th></th></tr></thead>
                     <tbody id="invBody"></tbody>
                 </table>
             </div>
@@ -37,7 +37,7 @@
             <h3>فاتورة بيع جديدة</h3>
             <div class="form-grid">
                 <div class="form-item"><label>التاريخ</label><input type="date" id="invDate"></div>
-                <div class="form-item"><label>العميل</label><select id="invCustomer"></select></div>
+                <div class="form-item"><label>العميل</label><select id="invCustomer" onchange="onInvCustChange()"></select></div>
                 <div class="form-item"><label>طريقة الدفع</label>
                     <select id="invPayType">
                         <option value="cash">نقداً (كاش)</option>
@@ -45,6 +45,13 @@
                     </select>
                 </div>
                 <div class="form-item"><label>ملاحظة</label><input id="invNote"></div>
+                <div class="form-item" style="grid-column: 1 / -1;">
+                    <label><i class="fa-solid fa-location-dot"></i> موقع التسليم / الجغرافيا</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="invLocation" placeholder="تحديد موقع التسليم على الخريطة..." readonly style="flex:1;">
+                        <button type="button" class="btn btn-secondary" onclick="pickInvLocation()"><i class="fa-solid fa-map-pin"></i> الخريطة</button>
+                    </div>
+                </div>
             </div>
             <div style="margin-bottom:10px;"><button class="btn btn-sm" onclick="addInvLine()"><i class="fa-solid fa-plus"></i> إضافة صنف</button></div>
             <div class="table-scroll" style="margin-bottom:12px;">
@@ -68,26 +75,61 @@
     <script src="../../js/app.js"></script>
     <script>
         let invLineCount = 0;
+        let _invLocation = null;
+        let _allCustomers = [];
 
         async function load() {
             const [customers, invoices, products] = await Promise.all([ARDB.getAll('customers'), ARDB.getAll('invoices'), ARDB.getAll('products')]);
+            _allCustomers = customers || [];
             const custById = {}; customers.forEach(c => custById[c.id] = c);
             const sel = document.getElementById('invCustomer');
-            sel.innerHTML = '<option value="">— بدون عميل —' + '</option>' + customers.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+            sel.innerHTML = '<option value="">— بدون عميل —</option>' + customers.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
 
             const sorted = invoices.sort((a, b) => (b.date || 0) - (a.date || 0));
             document.getElementById('invBody').innerHTML = sorted.map(inv => {
                 const isCredit = inv.paymentType === 'credit';
+                const locBadge = inv.location && (inv.location.lat || inv.location.address)
+                    ? '<a href="https://maps.google.com/?q=' + (inv.location.lat || '') + ',' + (inv.location.lng || '') + '" target="_blank" class="badge badge-purple" style="text-decoration:none;"><i class="fa-solid fa-location-dot"></i> ' + (inv.location.address ? inv.location.address.slice(0, 14) + '...' : 'الخريطة') + '</a>'
+                    : '<span style="color:var(--text-muted);">—</span>';
                 return '<tr><td class="num" style="font-weight:700;">' + inv.number + '</td>' +
                 '<td>' + UI.date(inv.date) + '</td>' +
                 '<td>' + (inv.customerId && custById[inv.customerId] ? custById[inv.customerId].name : '—') + '</td>' +
                 '<td class="num">' + inv.items.length + '</td>' +
+                '<td>' + locBadge + '</td>' +
                 '<td><span class="badge ' + (isCredit ? 'badge-amber' : 'badge-green') + '">' + (isCredit ? 'آجل' : 'نقداً') + '</span></td>' +
                 '<td class="num" style="font-weight:700;color:var(--success);">' + UI.money(inv.total) + '</td>' +
                 '<td style="text-align:left;white-space:nowrap;">' +
                 '<button class="btn btn-sm" onclick="printInvoice(' + inv.id + ')"><i class="fa-solid fa-print"></i></button> ' +
                 '<button class="btn btn-sm btn-danger" onclick="delInvoice(' + inv.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
-            }).join('') || '<tr><td colspan="7" class="empty-state">لا توجد فواتير</td></tr>';
+            }).join('') || '<tr><td colspan="8" class="empty-state">لا توجد فواتير</td></tr>';
+        }
+
+        function onInvCustChange() {
+            const cid = Number(document.getElementById('invCustomer').value);
+            if (cid) {
+                const cust = _allCustomers.find(c => c.id === cid);
+                if (cust && (cust.lat || cust.address)) {
+                    _invLocation = { lat: cust.lat, lng: cust.lng, address: cust.address };
+                    document.getElementById('invLocation').value = cust.address || `${cust.lat}, ${cust.lng}`;
+                }
+            } else {
+                _invLocation = null;
+                document.getElementById('invLocation').value = '';
+            }
+        }
+
+        function pickInvLocation() {
+            if (typeof ARLocation !== 'undefined') {
+                ARLocation.openMapModal(_invLocation, (res) => {
+                    if (res) {
+                        _invLocation = res;
+                        document.getElementById('invLocation').value = res.address || `${res.lat}, ${res.lng}`;
+                        UI.toast('تم تحديد موقع التسليم بنجاح', 'ok');
+                    }
+                });
+            } else {
+                UI.toast('تعذر تحميل الخريطة', 'warn');
+            }
         }
 
         async function addInvLine() {
@@ -167,6 +209,8 @@
             document.getElementById('invDate').value = UI.todayInput();
             document.getElementById('invNote').value = '';
             document.getElementById('invPayType').value = 'cash';
+            _invLocation = null;
+            document.getElementById('invLocation').value = '';
             document.getElementById('invLinesBody').innerHTML = '';
             invLineCount = 0;
             recalcInv();
@@ -237,7 +281,7 @@
             }
 
             const number = await ARDB.nextSeq('invoice', 'INV-', 6);
-            const invId = await ARDB.add('invoices', { number, date, customerId, paymentType, items, total, note, createdAt: Date.now() });
+            const invId = await ARDB.add('invoices', { number, date, customerId, paymentType, location: _invLocation, items, total, note, createdAt: Date.now() });
 
             // تحديث حالة السريالات المباعة
             for (const it of items) {

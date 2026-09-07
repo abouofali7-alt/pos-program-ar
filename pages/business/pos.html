@@ -61,7 +61,10 @@
 
                 <div style="margin:10px 0;">
                     <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:4px;">العميل:</label>
-                    <select id="posCustomer" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-dark);color:var(--text-primary);"></select>
+                    <select id="posCustomer" onchange="onPosCustomerChange()" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-dark);color:var(--text-primary);"></select>
+                    <button id="posLocBtn" type="button" class="btn btn-secondary" onclick="pickPOSLocation()" style="width:100%;margin-top:6px;font-size:0.8rem;padding:6px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;">
+                        <i class="fa-solid fa-location-dot" style="color:var(--accent-cyan);"></i> <span id="posLocText">تحديد موقع الفاتورة / التسليم (GPS)</span>
+                    </button>
                 </div>
 
                 <div class="cart-items" id="cartItems">
@@ -94,6 +97,7 @@
         let _customers = [];
         let _cart = [];
         let _selectedCat = null;
+        let _posLocation = null;
 
         async function initPOS() {
             _allProducts = await ARDB.getAll('products');
@@ -107,12 +111,50 @@
 
             renderCategories();
             renderProducts();
-            renderProducts();
 
             document.getElementById('barcodeSearch').addEventListener('input', (e) => {
                 const q = e.target.value.trim().toLowerCase();
                 renderProducts(q);
             });
+        }
+
+        function onPosCustomerChange() {
+            const cid = Number(document.getElementById('posCustomer').value);
+            if (cid) {
+                const cust = _customers.find(c => c.id === cid);
+                if (cust && (cust.lat || cust.address)) {
+                    _posLocation = { lat: cust.lat, lng: cust.lng, address: cust.address };
+                    updatePosLocText();
+                }
+            } else {
+                _posLocation = null;
+                updatePosLocText();
+            }
+        }
+
+        function pickPOSLocation() {
+            if (typeof ARLocation !== 'undefined') {
+                ARLocation.openMapModal(_posLocation, (res) => {
+                    if (res) {
+                        _posLocation = res;
+                        updatePosLocText();
+                        UI.toast('تم تحديد موقع الفاتورة / الكاشير', 'ok');
+                    }
+                });
+            } else {
+                UI.toast('تعذر تحميل الخريطة', 'warn');
+            }
+        }
+
+        function updatePosLocText() {
+            const txt = document.getElementById('posLocText');
+            if (!txt) return;
+            if (_posLocation && (_posLocation.address || _posLocation.lat)) {
+                const desc = _posLocation.address ? _posLocation.address.slice(0, 22) + '...' : `${_posLocation.lat}, ${_posLocation.lng}`;
+                txt.innerHTML = `<span style="color:var(--success);"><i class="fa-solid fa-location-check"></i> ${desc}</span>`;
+            } else {
+                txt.textContent = 'تحديد موقع الفاتورة / التسليم (GPS)';
+            }
         }
 
         function renderCategories() {
@@ -280,6 +322,7 @@
                 items: _cart,
                 paymentMethod: payMethod || 'cash',
                 paymentType: payMethod === 'credit' ? 'credit' : 'cash',
+                location: _posLocation,
                 type: 'pos'
             };
             const invId = await ARDB.add('invoices', invoice);

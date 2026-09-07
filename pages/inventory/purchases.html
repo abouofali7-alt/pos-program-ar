@@ -44,7 +44,14 @@
                         <option value="cash">نقداً (كاش)</option>
                     </select>
                 </div>
-                <div class="form-item"><label>ملاحظة</label><input id="purNote"></div>
+                <div class="form-item" style="grid-column:1/-1;"><label>ملاحظة</label><input id="purNote"></div>
+                <div class="form-item" style="grid-column:1/-1;">
+                    <label>موقع الاستلام والتوريد (GPS)</label>
+                    <div style="display:flex;gap:8px;">
+                        <input id="purLocation" placeholder="موقع استلام الشحنة..." style="flex:1;">
+                        <button type="button" class="btn btn-secondary" onclick="pickPurLocation()" style="padding:8px 12px;font-size:0.82rem;white-space:nowrap;"><i class="fa-solid fa-map-location-dot" style="color:var(--accent-cyan);"></i> الخريطة</button>
+                    </div>
+                </div>
             </div>
             <div style="margin-bottom:10px;"><button class="btn btn-sm" onclick="addPurLine()"><i class="fa-solid fa-plus"></i> إضافة صنف</button></div>
             <div class="table-scroll" style="margin-bottom:12px;">
@@ -68,17 +75,22 @@
     <script src="../../js/app.js"></script>
     <script>
         let purLineCount = 0;
+        let _allSuppliers = [];
 
         async function load() {
             const [suppliers, purchases, products] = await Promise.all([ARDB.getAll('suppliers'), ARDB.getAll('purchases'), ARDB.getAll('products')]);
+            _allSuppliers = suppliers;
             const supById = {}; suppliers.forEach(s => supById[s.id] = s);
             const sel = document.getElementById('purSupplier');
             sel.innerHTML = '<option value="">— اختر المورد —</option>' + suppliers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+            sel.onchange = onPurSupplierChange;
 
             const sorted = purchases.sort((a, b) => (b.date || 0) - (a.date || 0));
             document.getElementById('purBody').innerHTML = sorted.map(p => {
                 const isCredit = p.paymentType !== 'cash';
-                return '<tr><td class="num">' + p.number + '</td>' +
+                const locBadge = (p.location && p.location.lat) ? ' <a href="https://www.google.com/maps?q=' + p.location.lat + ',' + p.location.lng + '" target="_blank" class="badge badge-blue" style="font-size:0.75rem;text-decoration:none;"><i class="fa-solid fa-location-dot"></i> GPS</a>' : '';
+
+                return '<tr><td class="num">' + p.number + locBadge + '</td>' +
                 '<td>' + UI.date(p.date) + '</td>' +
                 '<td>' + (p.supplierId && supById[p.supplierId] ? supById[p.supplierId].name : '—') + '</td>' +
                 '<td class="num">' + p.items.length + '</td>' +
@@ -86,6 +98,32 @@
                 '<td class="num" style="font-weight:700;">' + UI.money(p.total) + '</td>' +
                 '<td style="text-align:left;"><button class="btn btn-sm btn-danger" onclick="delPurchase(' + p.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
             }).join('') || '<tr><td colspan="7" class="empty-state">لا توجد فواتير شراء</td></tr>';
+        }
+
+        function onPurSupplierChange() {
+            const sid = Number(document.getElementById('purSupplier').value);
+            if (sid) {
+                const s = _allSuppliers.find(x => x.id === sid);
+                if (s && (s.address || s.lat)) {
+                    document.getElementById('purLocation').value = s.address || `${s.lat}, ${s.lng}`;
+                }
+            }
+        }
+
+        function pickPurLocation() {
+            const curVal = document.getElementById('purLocation').value.trim();
+            if (typeof ARLocation !== 'undefined') {
+                ARLocation.openMapModal(curVal, (res) => {
+                    if (res) {
+                        document.getElementById('purLocation').value = res.address || `${res.lat}, ${res.lng}`;
+                        document.getElementById('purLocation').dataset.lat = res.lat;
+                        document.getElementById('purLocation').dataset.lng = res.lng;
+                        UI.toast('تم تحديد موقع التوريد بنجاح', 'ok');
+                    }
+                });
+            } else {
+                UI.toast('تعذر تحميل خريطة تحديد الموقع', 'warn');
+            }
         }
 
         async function addPurLine() {
@@ -145,6 +183,9 @@
             document.getElementById('purModal').style.opacity = '1';
             document.getElementById('purDate').value = UI.todayInput();
             document.getElementById('purNote').value = '';
+            document.getElementById('purLocation').value = '';
+            document.getElementById('purLocation').dataset.lat = '';
+            document.getElementById('purLocation').dataset.lng = '';
             document.getElementById('purPayType').value = 'credit';
             document.getElementById('purLinesBody').innerHTML = '';
             purLineCount = 0;
@@ -161,6 +202,13 @@
             const supplierId = Number(document.getElementById('purSupplier').value);
             const paymentType = document.getElementById('purPayType').value || 'credit';
             const note = document.getElementById('purNote').value.trim();
+            const locInput = document.getElementById('purLocation');
+            const location = {
+                address: locInput.value.trim(),
+                lat: locInput.dataset.lat ? parseFloat(locInput.dataset.lat) : null,
+                lng: locInput.dataset.lng ? parseFloat(locInput.dataset.lng) : null
+            };
+
             if (!supplierId) { UI.toast('اختر المورد', 'warn'); return; }
 
             const items = [];
@@ -203,7 +251,7 @@
             if (!items.length) { UI.toast('أضف على الأقل صنفًا واحدًا', 'warn'); return; }
 
             const number = await ARDB.nextSeq('purchase', 'PUR-', 6);
-            const purId = await ARDB.add('purchases', { number, date, supplierId, paymentType, items, total, note });
+            const purId = await ARDB.add('purchases', { number, date, supplierId, paymentType, items, total, note, location });
 
             // حفظ السريالات في قاعدة البيانات
             for (const it of items) {
