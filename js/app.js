@@ -216,13 +216,24 @@
         ).join('');
     }
 
+    function getStoredUser() {
+        try {
+            const s = localStorage.getItem('ar_session');
+            return s ? JSON.parse(s) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
     async function requireAuth() {
         await loadScript(assetUrl('js/db.js'));
-        const user = (typeof ARDB !== 'undefined') ? ARDB.currentUser() : null;
+        const user = getStoredUser();
         const p = window.location.pathname;
-        if (!user && !p.endsWith('login.html')) {
+        const isLoginPage = p.endsWith('login.html');
+
+        if (!user && !isLoginPage) {
             window.location.href = relPrefix() + 'pages/login.html';
-        } else if (user && p.endsWith('login.html')) {
+        } else if (user && isLoginPage) {
             window.location.href = relPrefix() + 'index.html';
         }
         return { dbReady: true, user };
@@ -293,7 +304,7 @@
         const host = document.getElementById('appHeaderHost');
         if (!host) return;
         const prefix = relPrefix();
-        const user = ARDB.currentUser();
+        const user = getStoredUser();
 
         if (typeof ARI18n !== 'undefined') {
             ARI18n.applyLang();
@@ -381,7 +392,7 @@
         });
 
         const lb = document.getElementById('logoutBtn');
-        if (lb) lb.addEventListener('click', () => { ARDB.clearSession(); window.location.href = prefix + 'pages/login.html'; });
+        if (lb) lb.addEventListener('click', () => { localStorage.removeItem('ar_session'); if (typeof ARDB !== 'undefined') ARDB.clearSession(); window.location.href = prefix + 'pages/login.html'; });
     }
 
     async function initApp() {
