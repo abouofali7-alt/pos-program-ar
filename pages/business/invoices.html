@@ -323,12 +323,16 @@
             const pById = {}; products.forEach(p => pById[p.id] = p);
             const cust = inv.customerId ? customers.find(c => c.id === inv.customerId) : null;
 
-            const rows = inv.items.map(it =>
-                '<tr><td>' + (pById[it.productId] ? pById[it.productId].name : 'صنف ' + it.productId) + '</td>' +
-                '<td>' + it.quantity + '</td>' +
+            const rows = inv.items.map(it => {
+                const pid = it.productId || it.id;
+                const pName = it.name || (pById[pid] ? pById[pid].name : 'صنف ' + pid);
+                const qty = it.quantity || it.qty || 1;
+                const serialsTag = (it.serials && it.serials.length) ? '<div style="font-size:11px;color:#666;">S/N: ' + it.serials.join(', ') + '</div>' : '';
+                return '<tr><td style="text-align:right;">' + pName + serialsTag + '</td>' +
+                '<td>' + qty + '</td>' +
                 '<td>' + UI.money(it.price) + '</td>' +
-                '<td>' + UI.money(it.total) + '</td></tr>'
-            ).join('');
+                '<td>' + UI.money(it.total || (it.price * qty)) + '</td></tr>';
+            }).join('');
 
             const win = window.open('', '_blank', 'width=800,height=640');
             if (!win) { UI.toast('اسمح بالنوافذ المنبثقة للطباعة', 'warn'); return; }

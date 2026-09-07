@@ -93,7 +93,7 @@
             const list = invoices.filter(i => {
                 if (i.date < from || i.date > to) return false;
                 if (custF && i.customerId !== custF) return false;
-                if (prodF && !i.items.some(it => it.productId === prodF)) return false;
+                if (prodF && !i.items.some(it => (it.productId || it.id) === prodF)) return false;
                 return true;
             });
 
@@ -102,31 +102,36 @@
             list.forEach(inv => {
                 count++;
                 const invTotal = inv.items.reduce((s, it) => {
-                    if (prodF && it.productId !== prodF) return s;
-                    const pid = it.productId;
-                    if (!prodMap[pid]) prodMap[pid] = { name: (pById[pid] ? pById[pid].name : 'صنف ' + pid), qty: 0, amount: 0, returns: 0, retAmt: 0 };
-                    prodMap[pid].qty += it.quantity;
-                    prodMap[pid].amount += it.total;
-                    qtyTotal += it.quantity;
-                    return s + it.total;
+                    const pid = it.productId || it.id;
+                    const q = it.quantity || it.qty || 1;
+                    const t = it.total || ((it.price || 0) * q);
+                    if (prodF && pid !== prodF) return s;
+                    if (!prodMap[pid]) prodMap[pid] = { name: (it.name || (pById[pid] ? pById[pid].name : 'صنف ' + pid)), qty: 0, amount: 0, returns: 0, retAmt: 0 };
+                    prodMap[pid].qty += q;
+                    prodMap[pid].amount += t;
+                    qtyTotal += q;
+                    return s + t;
                 }, 0);
                 net += invTotal;
             });
 
             const retList = returns.filter(r => {
                 if (r.date < from || r.date > to) return false;
-                if (prodF && !r.items.some(it => it.productId === prodF)) return false;
+                if (prodF && !r.items.some(it => (it.productId || it.id) === prodF)) return false;
                 return true;
             });
             let retTotal = 0;
             retList.forEach(r => {
                 r.items.forEach(it => {
-                    if (prodF && it.productId !== prodF) return;
-                    if (prodMap[it.productId]) {
-                        prodMap[it.productId].returns += it.quantity;
-                        prodMap[it.productId].retAmt += it.total;
+                    const pid = it.productId || it.id;
+                    const q = it.quantity || it.qty || 1;
+                    const t = it.total || ((it.price || 0) * q);
+                    if (prodF && pid !== prodF) return;
+                    if (prodMap[pid]) {
+                        prodMap[pid].returns += q;
+                        prodMap[pid].retAmt += t;
                     }
-                    retTotal += it.total;
+                    retTotal += t;
                 });
             });
 

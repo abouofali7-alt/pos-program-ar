@@ -198,62 +198,84 @@
             const prod = _allProducts.find(p => p.id === prodId);
             if (!prod) return;
 
+            let existing = _cart.find(c => c.productId === prodId);
+
             if (prod.hasSerials) {
                 const allSerials = await ARDB.getAll('serials');
                 const avail = (allSerials || []).filter(s => s.productId === prodId && s.status === 'available');
-                if (!avail.length) {
-                    UI.toast('لا توجد سريالات متاحة في المخزن لهذا المنتج!', 'warn');
+                
+                // تصفية السريالات المضافة بالسلة حالياً
+                const usedSerialIds = _cart.flatMap(c => c.serialIds || []);
+                const unselectedAvail = avail.filter(s => !usedSerialIds.includes(s.id));
+
+                if (!unselectedAvail.length) {
+                    UI.toast('لا توجد سريالات إضافية متاحة في المخزن لهذا المنتج!', 'warn');
                     return;
                 }
                 
                 // عرض نافذة اختيار السريال
-                let sOptions = avail.map(s => s.serialNumber).join('\n');
-                let pick = prompt('أدخل الرقم التسلسلي (S/N) للقطعة أو اختر من المتاح:\n' + sOptions, avail[0].serialNumber);
+                let sOptions = unselectedAvail.map(s => s.serialNumber).join('\n');
+                let pick = prompt('أدخل الرقم التسلسلي (S/N) للقطعة أو اختر من المتاح:\n' + sOptions, unselectedAvail[0].serialNumber);
                 if (!pick) return;
                 pick = pick.trim();
 
-                const matched = avail.find(s => s.serialNumber.toLowerCase() === pick.toLowerCase());
+                const matched = unselectedAvail.find(s => s.serialNumber.toLowerCase() === pick.toLowerCase());
                 if (!matched) {
                     UI.toast('الرقم التسلسلي غير موجود أو غير متاح!', 'error');
                     return;
                 }
 
-                // التحقق من أن السريال غير مضاف بالسلة سابقاً
-                const alreadyInCart = _cart.some(c => c.serialIds && c.serialIds.includes(matched.id));
-                if (alreadyInCart) {
-                    UI.toast('هذا الرقم التسلسلي مضاف في السلة بالفعل!', 'warn');
-                    return;
-                }
-
-                _cart.push({
-                    id: prod.id,
-                    name: prod.name + ' (' + matched.serialNumber + ')',
-                    price: prod.price || 0,
-                    qty: 1,
-                    serialIds: [matched.id],
-                    serials: [matched.serialNumber]
-                });
-            } else {
-                const existing = _cart.find(c => c.id === prodId && (!c.serialIds || !c.serialIds.length));
                 if (existing) {
-                    existing.qty += 1;
+                    existing.quantity += 1;
+                    existing.serialIds.push(matched.id);
+                    existing.serials.push(matched.serialNumber);
                 } else {
-                    _cart.push({ id: prod.id, name: prod.name, price: prod.price || 0, qty: 1 });
+                    _cart.push({
+                        productId: prod.id,
+                        productName: prod.name,
+                        price: prod.price || 0,
+                        quantity: 1,
+                        serialIds: [matched.id],
+                        serials: [matched.serialNumber]
+                    });
+                }
+            } else {
+                if (existing) {
+                    existing.quantity += 1;
+                } else {
+                    _cart.push({
+                        productId: prod.id,
+                        productName: prod.name,
+                        price: prod.price || 0,
+                        quantity: 1,
+                        serialIds: [],
+                        serials: []
+                    });
                 }
             }
             renderCart();
         }
 
         function updateQty(prodId, delta) {
-            const item = _cart.find(c => c.id === prodId);
+            const item = _cart.find(c => c.productId === prodId);
             if (!item) return;
-            if (item.serialIds && item.serialIds.length && delta > 0) {
-                UI.toast('لإضافة قطعة تسلسلية أخرى، اختر المنتج وحدد السريال الخفيف الخاص بها', 'info');
-                return;
-            }
-            item.qty += delta;
-            if (item.qty <= 0) {
-                _cart = _cart.filter(c => c !== item);
+
+            if (delta > 0) {
+                const prod = _allProducts.find(p => p.id === prodId);
+                if (prod && prod.hasSerials) {
+                    addToCart(prodId);
+                    return;
+                }
+                item.quantity += 1;
+            } else {
+                item.quantity -= 1;
+                if (item.serials && item.serials.length) {
+                    item.serialIds.pop();
+                    item.serials.pop();
+                }
+                if (item.quantity <= 0) {
+                    _cart = _cart.filter(c => c !== item);
+                }
             }
             renderCart();
         }
@@ -273,20 +295,24 @@
             }
 
             let total = 0;
-            container.innerHTML = _cart.map((item, idx) => {
-                const itemTotal = item.price * item.qty;
+            container.innerHTML = _cart.map((item) => {
+                const itemTotal = item.price * item.quantity;
                 total += itemTotal;
+                const serialsTag = (item.serials && item.serials.length)
+                    ? `<div style="font-size:0.75rem;color:var(--accent-purple);margin-top:2px;"><i class="fa-solid fa-barcode"></i> S/N: ${item.serials.join(', ')}</div>`
+                    : '';
                 return `
-                    <div class="cart-row">
+                    <div class="cart-row" style="padding:10px 0;border-bottom:1px solid var(--border-color);">
                         <div style="flex:1;">
-                            <div style="font-weight:600;font-size:0.85rem;">${item.name}</div>
-                            <div style="font-size:0.75rem;color:var(--text-secondary);">${UI.money(item.price)} × ${item.qty}</div>
+                            <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary);">${item.productName}</div>
+                            ${serialsTag}
+                            <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px;">${UI.money(item.price)} × ${item.quantity}</div>
                         </div>
                         <div style="display:flex;align-items:center;gap:6px;">
-                            <button onclick="updateQty(${item.id}, -1)" class="icon-btn" style="width:22px;height:22px;">-</button>
-                            <span style="font-size:0.85rem;font-weight:700;">${item.qty}</span>
-                            <button onclick="updateQty(${item.id}, 1)" class="icon-btn" style="width:22px;height:22px;">+</button>
-                            <b style="min-width:65px;text-align:left;font-size:0.85rem;">${UI.money(itemTotal)}</b>
+                            <button onclick="updateQty(${item.productId}, -1)" class="icon-btn" style="width:24px;height:24px;">-</button>
+                            <span style="font-size:0.85rem;font-weight:700;min-width:18px;text-align:center;">${item.quantity}</span>
+                            <button onclick="updateQty(${item.productId}, 1)" class="icon-btn" style="width:24px;height:24px;">+</button>
+                            <b style="min-width:65px;text-align:left;font-size:0.85rem;color:var(--success);">${UI.money(itemTotal)}</b>
                         </div>
                     </div>
                 `;
@@ -298,7 +324,7 @@
 
         async function checkout() {
             if (!_cart.length) return UI.toast('السلة فارغة!', 'warn');
-            const total = _cart.reduce((s, c) => s + (c.price * c.qty), 0);
+            const total = _cart.reduce((s, c) => s + (c.price * c.quantity), 0);
 
             if (typeof ARPayments !== 'undefined') {
                 ARPayments.openCheckoutModal(total, async (payRes) => {
@@ -314,12 +340,24 @@
         async function finalizeInvoice(total, payMethod) {
             const invNumber = await ARDB.nextSeq('invoice_seq', 'POS-', 5);
             const customerId = document.getElementById('posCustomer') && document.getElementById('posCustomer').value ? Number(document.getElementById('posCustomer').value) : null;
+            
+            // تجهيز عناصر الفاتورة بالشكل المعياري القياسي للنظام
+            const invItems = _cart.map(c => ({
+                productId: c.productId,
+                name: c.productName,
+                quantity: c.quantity,
+                price: c.price,
+                total: c.price * c.quantity,
+                serialIds: c.serialIds || [],
+                serials: c.serials || []
+            }));
+
             const invoice = {
                 number: invNumber,
                 date: Date.now(),
                 customerId: customerId,
                 total: total,
-                items: _cart,
+                items: invItems,
                 paymentMethod: payMethod || 'cash',
                 paymentType: payMethod === 'credit' ? 'credit' : 'cash',
                 location: _posLocation,
@@ -328,7 +366,7 @@
             const invId = await ARDB.add('invoices', invoice);
             
             // تحديث السريالات المباعة عبر الكاشير
-            for (const item of _cart) {
+            for (const item of invItems) {
                 if (item.serialIds && item.serialIds.length) {
                     for (const sid of item.serialIds) {
                         await ARDB.update('serials', sid, { status: 'sold', invoiceId: invId, invoiceDate: Date.now() });
@@ -337,13 +375,13 @@
             }
 
             // خصم المخزون حركياً لكل منتج مباع في الكاشير
-            for (const item of _cart) {
+            for (const item of invItems) {
                 await ARDB.add('stockMovements', {
                     date: Date.now(),
-                    productId: item.id,
+                    productId: item.productId,
                     direction: 'out',
                     type: 'pos',
-                    quantity: item.qty || 1,
+                    quantity: item.quantity || 1,
                     note: 'بيع كاشير POS ' + invNumber
                 });
             }
@@ -381,7 +419,7 @@
                         <p>التاريخ: ${new Date().toLocaleString('ar-EG')}</p>
                         <hr>
                         <table style="width:100%;text-align:right;font-size:11px;">
-                            ${_cart.map(c => `<tr><td>${c.name} (x${c.qty})</td><td style="text-align:left;">${c.price * c.qty}</td></tr>`).join('')}
+                            ${invItems.map(c => `<tr><td>${c.name} ${(c.serials && c.serials.length) ? '(S/N: ' + c.serials.join(',') + ')' : ''} (x${c.quantity})</td><td style="text-align:left;">${c.total}</td></tr>`).join('')}
                         </table>
                         <hr>
                         <h3 style="margin-top:10px;">الإجمالي: ${total} ج.م</h3>
