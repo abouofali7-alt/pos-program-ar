@@ -33,6 +33,7 @@
     <script src="../../js/app.js"></script>
     <script>
         async function loadAccounts() {
+            try { await ARDB.seed(); } catch (e) {}
             const accounts = await ARDB.getAll('accounts');
             const sel = document.getElementById('accountSel');
             sel.innerHTML = '<option value="">— اختر حسابًا —</option>' + accounts

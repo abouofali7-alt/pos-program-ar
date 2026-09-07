@@ -34,14 +34,31 @@
     <script src="../../js/app.js"></script>
     <script>
         async function load() {
-            const [accounts, entries] = await Promise.all([ARDB.getAll('accounts'), ARDB.getAll('journalEntries')]);
+            try { await ARDB.seed(); } catch (e) {}
+
+            const [accounts, entries, invoices, expenses] = await Promise.all([
+                ARDB.getAll('accounts'),
+                ARDB.getAll('journalEntries'),
+                ARDB.getAll('invoices'),
+                ARDB.getAll('expenses')
+            ]);
             const credits = {}, debits = {};
-            entries.forEach(en => (en.lines || []).forEach(l => {
+            (entries || []).forEach(en => (en.lines || []).forEach(l => {
                 if (!credits[l.accountId]) credits[l.accountId] = 0;
                 if (!debits[l.accountId]) debits[l.accountId] = 0;
                 credits[l.accountId] += (l.credit || 0);
                 debits[l.accountId] += (l.debit || 0);
             }));
+
+            // تجميع تشغيلي إن لم تكن القيود الصريحة منشأة
+            if (!entries || !entries.length) {
+                (invoices || []).forEach(inv => {
+                    if (inv.total > 0) credits[11] = (credits[11] || 0) + inv.total; // 11: مبيعات
+                });
+                (expenses || []).forEach(exp => {
+                    if (exp.amount > 0) debits[13] = (debits[13] || 0) + exp.amount; // 13: مصروفات
+                });
+            }
 
             let income = 0, expense = 0;
             const rows = [];
