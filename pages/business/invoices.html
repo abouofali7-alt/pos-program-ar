@@ -95,14 +95,52 @@
             const products = await ARDB.getAll('products');
             const tr = document.createElement('tr');
             tr.innerHTML =
-                '<td><select id="ilProd_' + i + '" class="il-prod" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);">' +
-                '<option value="">— اختر —</option>' +
-                products.map(p => '<option value="' + p.id + '" data-price="' + (p.price || 0) + '">' + p.name + '</option>').join('') + '</select></td>' +
+                '<td>' +
+                    '<select id="ilProd_' + i + '" class="il-prod" onchange="onInvProdChange(' + i + ')" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);">' +
+                    '<option value="">— اختر —</option>' +
+                    products.map(p => '<option value="' + p.id + '" data-price="' + (p.price || 0) + '" data-serials="' + (p.hasSerials ? '1' : '0') + '">' + p.name + (p.hasSerials ? ' (S/N)' : '') + '</option>').join('') +
+                    '</select>' +
+                    '<div id="ilSerialWrap_' + i + '" style="display:none;margin-top:6px;">' +
+                        '<div style="font-size:0.75rem;color:var(--accent-cyan);margin-bottom:4px;">اختر السريالات المتاحة (S/N):</div>' +
+                        '<select id="ilSerials_' + i + '" multiple style="width:100%;height:65px;padding:4px;font-size:0.8rem;border-radius:6px;border:1px solid var(--accent-purple);background:var(--card-dark);color:var(--text-primary);" onchange="onInvSerialsChange(' + i + ')"></select>' +
+                    '</div>' +
+                '</td>' +
                 '<td><input id="ilQty_' + i + '" type="number" step="1" min="0" value="1" style="width:70px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcInv()"></td>' +
                 '<td><input id="ilPrice_' + i + '" type="number" step="0.01" min="0" style="width:90px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcInv()"></td>' +
                 '<td class="num" id="ilSub_' + i + '" style="font-weight:700;">0.00</td>' +
                 '<td><button class="btn btn-sm btn-danger" onclick="this.closest(\'tr\').remove();recalcInv();"><i class="fa-solid fa-xmark"></i></button></td>';
             document.getElementById('invLinesBody').appendChild(tr);
+        }
+
+        async function onInvProdChange(i) {
+            const sel = document.getElementById('ilProd_' + i);
+            const wrap = document.getElementById('ilSerialWrap_' + i);
+            const serialsSel = document.getElementById('ilSerials_' + i);
+            if (!sel || !wrap) return;
+            const opt = sel.options[sel.selectedIndex];
+            if (opt && opt.dataset.serials === '1') {
+                wrap.style.display = 'block';
+                const pid = Number(sel.value);
+                const allSerials = await ARDB.getAll('serials');
+                const avail = (allSerials || []).filter(s => s.productId === pid && s.status === 'available');
+                serialsSel.innerHTML = avail.map(s => '<option value="' + s.id + '" data-sn="' + s.serialNumber + '">' + s.serialNumber + '</option>').join('');
+                if (!avail.length) {
+                    serialsSel.innerHTML = '<option value="" disabled>لا توجد سريالات متاحة في المخزن</option>';
+                }
+            } else {
+                wrap.style.display = 'none';
+            }
+            recalcInv();
+        }
+
+        function onInvSerialsChange(i) {
+            const serialsSel = document.getElementById('ilSerials_' + i);
+            const qtyInput = document.getElementById('ilQty_' + i);
+            if (serialsSel && qtyInput) {
+                const selectedCount = Array.from(serialsSel.selectedOptions).filter(o => !o.disabled).length;
+                if (selectedCount > 0) qtyInput.value = selectedCount;
+            }
+            recalcInv();
         }
 
         async function recalcInv() {
@@ -148,23 +186,42 @@
             const items = [];
             let total = 0;
             const qtyCheck = {};
-            document.querySelectorAll('#invLinesBody tr').forEach(tr => {
+            const rows = document.querySelectorAll('#invLinesBody tr');
+            for (let tr of rows) {
                 const sel = tr.querySelector('select[id^="ilProd_"]');
-                const qty = tr.querySelector('input[id^="ilQty_"]');
-                const price = tr.querySelector('input[id^="ilPrice_"]');
+                const qtyInput = tr.querySelector('input[id^="ilQty_"]');
+                const priceInput = tr.querySelector('input[id^="ilPrice_"]');
+                const serialsSel = tr.querySelector('select[id^="ilSerials_"]');
+
                 if (sel) {
                     const pid = Number(sel.value);
                     if (pid) {
-                        const q = Number(qty.value) || 0;
-                        const p = Number(price.value) || 0;
+                        const opt = sel.options[sel.selectedIndex];
+                        const requiresSerials = opt && opt.dataset.serials === '1';
+                        const q = Number(qtyInput.value) || 0;
+                        const p = Number(priceInput.value) || 0;
+
+                        let selectedSerialIds = [];
+                        let selectedSerialSNs = [];
+                        if (requiresSerials && serialsSel) {
+                            const selOpts = Array.from(serialsSel.selectedOptions).filter(o => !o.disabled);
+                            selectedSerialIds = selOpts.map(o => Number(o.value));
+                            selectedSerialSNs = selOpts.map(o => o.dataset.sn);
+
+                            if (selectedSerialIds.length !== q) {
+                                UI.toast('عدد السريالات المحددة (' + selectedSerialIds.length + ') لا يطابق الكمية المباعة (' + q + ')', 'warn');
+                                return;
+                            }
+                        }
+
                         if (q > 0) {
-                            items.push({ productId: pid, quantity: q, price: p, total: q * p });
+                            items.push({ productId: pid, quantity: q, price: p, total: q * p, serialIds: selectedSerialIds, serials: selectedSerialSNs });
                             total += q * p;
                             qtyCheck[pid] = (qtyCheck[pid] || 0) + q;
                         }
                     }
                 }
-            });
+            }
             if (!items.length) { UI.toast('أضف على الأقل صنفًا واحدًا', 'warn'); return; }
 
             // التحقق من توفر المخزون
@@ -180,7 +237,16 @@
             }
 
             const number = await ARDB.nextSeq('invoice', 'INV-', 6);
-            await ARDB.add('invoices', { number, date, customerId, paymentType, items, total, note, createdAt: Date.now() });
+            const invId = await ARDB.add('invoices', { number, date, customerId, paymentType, items, total, note, createdAt: Date.now() });
+
+            // تحديث حالة السريالات المباعة
+            for (const it of items) {
+                if (it.serialIds && it.serialIds.length) {
+                    for (const sid of it.serialIds) {
+                        await ARDB.update('serials', sid, { status: 'sold', invoiceId: invId, invoiceDate: date });
+                    }
+                }
+            }
 
             for (const it of items) {
                 await ARDB.add('stockMovements', { date, productId: it.productId, direction: 'out', type: 'sale', quantity: it.quantity, note: 'فاتورة ' + number });

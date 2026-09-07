@@ -149,6 +149,15 @@
             const number = await ARDB.nextSeq('purchaseReturn', 'PURR-', 6);
             await ARDB.add('purchaseReturns', { number, date, purchaseId: pickedPurchase.id, purchaseNumber: pickedPurchase.number, supplierId: pickedPurchase.supplierId, items, total, note, createdAt: Date.now() });
 
+            // تحديث حالة السريالات المرتجعة للمورد
+            const allSerials = await ARDB.getAll('serials');
+            for (const it of items) {
+                const recs = (allSerials || []).filter(s => s.productId === it.productId && s.purchaseId === pickedPurchase.id && s.status === 'available');
+                for (let k = 0; k < Math.min(it.quantity, recs.length); k++) {
+                    await ARDB.update('serials', recs[k].id, { status: 'purchase_returned' });
+                }
+            }
+
             // خصم الأصناف المرتجعة من المخزون
             for (const it of items) {
                 await ARDB.add('stockMovements', { date, productId: it.productId, direction: 'out', type: 'return_purchase', quantity: it.quantity, note: 'مرتجع ' + number });

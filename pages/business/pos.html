@@ -152,14 +152,52 @@
             `).join('');
         }
 
-        function addToCart(prodId) {
+        async function addToCart(prodId) {
             const prod = _allProducts.find(p => p.id === prodId);
             if (!prod) return;
-            const existing = _cart.find(c => c.id === prodId);
-            if (existing) {
-                existing.qty += 1;
+
+            if (prod.hasSerials) {
+                const allSerials = await ARDB.getAll('serials');
+                const avail = (allSerials || []).filter(s => s.productId === prodId && s.status === 'available');
+                if (!avail.length) {
+                    UI.toast('لا توجد سريالات متاحة في المخزن لهذا المنتج!', 'warn');
+                    return;
+                }
+                
+                // عرض نافذة اختيار السريال
+                let sOptions = avail.map(s => s.serialNumber).join('\n');
+                let pick = prompt('أدخل الرقم التسلسلي (S/N) للقطعة أو اختر من المتاح:\n' + sOptions, avail[0].serialNumber);
+                if (!pick) return;
+                pick = pick.trim();
+
+                const matched = avail.find(s => s.serialNumber.toLowerCase() === pick.toLowerCase());
+                if (!matched) {
+                    UI.toast('الرقم التسلسلي غير موجود أو غير متاح!', 'error');
+                    return;
+                }
+
+                // التحقق من أن السريال غير مضاف بالسلة سابقاً
+                const alreadyInCart = _cart.some(c => c.serialIds && c.serialIds.includes(matched.id));
+                if (alreadyInCart) {
+                    UI.toast('هذا الرقم التسلسلي مضاف في السلة بالفعل!', 'warn');
+                    return;
+                }
+
+                _cart.push({
+                    id: prod.id,
+                    name: prod.name + ' (' + matched.serialNumber + ')',
+                    price: prod.price || 0,
+                    qty: 1,
+                    serialIds: [matched.id],
+                    serials: [matched.serialNumber]
+                });
             } else {
-                _cart.push({ id: prod.id, name: prod.name, price: prod.price || 0, qty: 1 });
+                const existing = _cart.find(c => c.id === prodId && (!c.serialIds || !c.serialIds.length));
+                if (existing) {
+                    existing.qty += 1;
+                } else {
+                    _cart.push({ id: prod.id, name: prod.name, price: prod.price || 0, qty: 1 });
+                }
             }
             renderCart();
         }
@@ -167,9 +205,13 @@
         function updateQty(prodId, delta) {
             const item = _cart.find(c => c.id === prodId);
             if (!item) return;
+            if (item.serialIds && item.serialIds.length && delta > 0) {
+                UI.toast('لإضافة قطعة تسلسلية أخرى، اختر المنتج وحدد السريال الخفيف الخاص بها', 'info');
+                return;
+            }
             item.qty += delta;
             if (item.qty <= 0) {
-                _cart = _cart.filter(c => c.id !== prodId);
+                _cart = _cart.filter(c => c !== item);
             }
             renderCart();
         }
@@ -189,7 +231,7 @@
             }
 
             let total = 0;
-            container.innerHTML = _cart.map(item => {
+            container.innerHTML = _cart.map((item, idx) => {
                 const itemTotal = item.price * item.qty;
                 total += itemTotal;
                 return `
@@ -240,8 +282,17 @@
                 paymentType: payMethod === 'credit' ? 'credit' : 'cash',
                 type: 'pos'
             };
-            await ARDB.add('invoices', invoice);
+            const invId = await ARDB.add('invoices', invoice);
             
+            // تحديث السريالات المباعة عبر الكاشير
+            for (const item of _cart) {
+                if (item.serialIds && item.serialIds.length) {
+                    for (const sid of item.serialIds) {
+                        await ARDB.update('serials', sid, { status: 'sold', invoiceId: invId, invoiceDate: Date.now() });
+                    }
+                }
+            }
+
             // خصم المخزون حركياً لكل منتج مباع في الكاشير
             for (const item of _cart) {
                 await ARDB.add('stockMovements', {

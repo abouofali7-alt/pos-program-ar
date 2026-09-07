@@ -218,8 +218,14 @@
 
     async function requireAuth() {
         await loadScript(assetUrl('js/db.js'));
-        const cfg = { dbReady: true };
-        return cfg;
+        const user = (typeof ARDB !== 'undefined') ? ARDB.currentUser() : null;
+        const p = window.location.pathname;
+        if (!user && !p.endsWith('login.html')) {
+            window.location.href = relPrefix() + 'pages/login.html';
+        } else if (user && p.endsWith('login.html')) {
+            window.location.href = relPrefix() + 'index.html';
+        }
+        return { dbReady: true, user };
     }
 
     /* ---------- عارض التنقل (Mobile drawer) ---------- */

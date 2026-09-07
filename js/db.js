@@ -5,7 +5,7 @@
 
 const ARDB = (function () {
     const DB_NAME = 'ar_program_erp';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
 
     let _db = null;
 
@@ -25,6 +25,7 @@ const ARDB = (function () {
             case 'suppliers': return { key: 'id', auto: true };
             case 'categories': return { key: 'id', auto: true };
             case 'products': return { key: 'id', auto: true, idx: [{ name: 'barcode', key: 'barcode' }, { name: 'categoryId', key: 'categoryId' }] };
+            case 'serials': return { key: 'id', auto: true, idx: [{ name: 'productId', key: 'productId' }, { name: 'serialNumber', key: 'serialNumber', unique: true }, { name: 'status', key: 'status' }, { name: 'purchaseId', key: 'purchaseId' }, { name: 'invoiceId', key: 'invoiceId' }] };
             case 'warehouses': return { key: 'id', auto: true };
             case 'stockMovements': return { key: 'id', auto: true, idx: [{ name: 'productId', key: 'productId' }, { name: 'date', key: 'date' }] };
             case 'invoices': return { key: 'id', auto: true, idx: [{ name: 'number', key: 'number', unique: true }, { name: 'customerId', key: 'customerId' }, { name: 'date', key: 'date' }] };
@@ -53,7 +54,7 @@ const ARDB = (function () {
                 Object.keys(schemaFor('settings')).length; // تعطيل تحسينات غير مستخدمة
                 const STORES = [
                     'settings','sequences','roles','users','departments','employees','attendance','payroll','leaveRequests',
-                    'customers','suppliers','categories','products','warehouses','stockMovements',
+                    'customers','suppliers','categories','products','serials','warehouses','stockMovements',
                     'invoices','invoiceReturns','purchases','purchaseReturns','payments','expenses','quotations','offers',
                     'accounts','journalEntries','projects','tasks'
                 ];

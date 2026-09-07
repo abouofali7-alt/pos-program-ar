@@ -149,6 +149,25 @@
             const number = await ARDB.nextSeq('invoiceReturn', 'RET-', 6);
             await ARDB.add('invoiceReturns', { number, date, invoiceId: pickedInvoice.id, invoiceNumber: pickedInvoice.number, customerId: pickedInvoice.customerId, items, total, note, createdAt: Date.now() });
 
+            // إعادة حالة السريالات للمخزون (متاح)
+            const allSerials = await ARDB.getAll('serials');
+            for (const it of items) {
+                if (it.serials && it.serials.length) {
+                    for (const sn of it.serials) {
+                        const rec = (allSerials || []).find(s => s.productId === it.productId && s.serialNumber === sn);
+                        if (rec) {
+                            await ARDB.update('serials', rec.id, { status: 'available', invoiceId: null });
+                        }
+                    }
+                } else {
+                    // إذا كان هناك سريالات مرتبطة بنفس الفاتورة لهذا المنتج
+                    const recs = (allSerials || []).filter(s => s.productId === it.productId && s.invoiceId === pickedInvoice.id && s.status === 'sold');
+                    for (let k = 0; k < Math.min(it.quantity, recs.length); k++) {
+                        await ARDB.update('serials', recs[k].id, { status: 'available', invoiceId: null });
+                    }
+                }
+            }
+
             // إعادة الأصناف للمخزون
             for (const it of items) {
                 await ARDB.add('stockMovements', { date, productId: it.productId, direction: 'in', type: 'return_sale', quantity: it.quantity, note: 'مرتجع ' + number });
