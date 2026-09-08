@@ -157,8 +157,23 @@ const API = (function () {
                     _lastSyncTimestamp = json.lastUpdated || cloudResetTs;
                     await ARDB.clearAllData();
                     await ARDB.seed();
+
+                    const cloudData = json.data || {};
+                    let updatedAny = false;
+                    for (const s of Object.keys(cloudData)) {
+                        const items = cloudData[s] || [];
+                        if (!items || !items.length) continue;
+                        for (const item of items) {
+                            if (!item) continue;
+                            try {
+                                await ARDB.localPut(s, item);
+                                updatedAny = true;
+                            } catch(e){}
+                        }
+                    }
+
                     if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: {} }));
+                        window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: cloudData }));
                     }
                     return true;
                 }
@@ -167,16 +182,6 @@ const API = (function () {
                     _lastSyncTimestamp = json.lastUpdated;
                     const cloudData = json.data || {};
                     const cloudDeleted = json.deleted || {};
-
-                    // أمر التصفير الشامل عند مسح الداتا بيز أونلاين
-                    if (json.reset) {
-                        await ARDB.clearAllData();
-                        await ARDB.seed();
-                        if (typeof window !== 'undefined') {
-                            window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: {} }));
-                        }
-                        return true;
-                    }
 
                     let updatedAny = false;
 

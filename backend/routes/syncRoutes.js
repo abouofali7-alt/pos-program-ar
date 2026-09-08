@@ -158,6 +158,7 @@ router.post('/push', async (req, res) => {
         }
 
         cloud.lastUpdated = Date.now();
+        cloud.reset = false;
         await saveCloudData(cloud);
         res.json({ success: true, lastUpdated: cloud.lastUpdated, deleted: cloud.deleted });
     } catch(e) {
@@ -186,7 +187,7 @@ router.get('/pull', async (req, res) => {
 router.post('/reset', async (req, res) => {
     try {
         const now = Date.now();
-        const resetObj = { lastUpdated: now, resetTimestamp: now, data: {}, deleted: {}, reset: true };
+        const resetObj = { lastUpdated: now, resetTimestamp: now, data: {}, deleted: {}, reset: false };
         await saveCloudData(resetObj);
         res.json({ success: true, message: 'Cloud database reset successfully', lastUpdated: now, resetTimestamp: now });
     } catch(e) {
