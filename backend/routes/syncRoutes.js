@@ -154,4 +154,15 @@ router.get('/pull', async (req, res) => {
     }
 });
 
+// 3. POST /api/sync/reset — تفريغ ورسترة كافة بيانات السيرفر والداتا بيز السحابية
+router.post('/reset', async (req, res) => {
+    try {
+        const resetObj = { lastUpdated: Date.now(), data: {}, deleted: {} };
+        saveCloudData(resetObj);
+        res.json({ success: true, message: 'Cloud database reset successfully', lastUpdated: resetObj.lastUpdated });
+    } catch(e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 module.exports = router;

@@ -169,9 +169,13 @@
             document.getElementById('prodModal').style.opacity = '0';
         }
         async function editProduct(id) {
-            const p = await ARDB.getById('products', id);
-            if (!p) return;
-            editingPid = id;
+            let p = await ARDB.getById('products', id);
+            if (!p) {
+                const allProds = await ARDB.getAll('products');
+                p = allProds.find(x => String(x.id) === String(id));
+            }
+            if (!p) { UI.toast('تعذر العثور على بيانات المنتج', 'warn'); return; }
+            editingPid = p.id;
             document.getElementById('prodModalTitle').textContent = 'تعديل منتج';
             document.getElementById('pName').value = p.name || '';
             document.getElementById('pBarcode').value = p.barcode || '';
@@ -279,9 +283,13 @@
         }
 
         async function viewSerials(pid) {
-            activeViewerPid = pid;
-            const p = await ARDB.getById('products', pid);
-            if (!p) return;
+            let p = await ARDB.getById('products', pid);
+            if (!p) {
+                const allProds = await ARDB.getAll('products');
+                p = allProds.find(x => String(x.id) === String(pid));
+            }
+            if (!p) { UI.toast('تعذر العثور على بيانات المنتج', 'warn'); return; }
+            activeViewerPid = p.id;
             document.getElementById('serialsModalTitle').innerHTML = '<i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> السريالات: ' + p.name;
             document.getElementById('quickSerialInput').value = '';
             await renderSerialsTable();

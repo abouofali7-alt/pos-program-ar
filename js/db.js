@@ -94,7 +94,19 @@ const ARDB = (function () {
 
     function localGetById(store, id) {
         return txn(store, 'readonly', (os) => new Promise((res, rej) => {
-            const r = os.get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+            const req1 = os.get(id);
+            req1.onsuccess = () => {
+                if (req1.result !== undefined) return res(req1.result);
+                const altId = (typeof id === 'number') ? String(id) : (!isNaN(Number(id)) ? Number(id) : null);
+                if (altId !== null) {
+                    const req2 = os.get(altId);
+                    req2.onsuccess = () => res(req2.result);
+                    req2.onerror = () => res(undefined);
+                } else {
+                    res(undefined);
+                }
+            };
+            req1.onerror = () => rej(req1.error);
         }));
     }
 
