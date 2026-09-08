@@ -140,16 +140,16 @@
                 return '<tr>' +
                     '<td>' + p.name + snBadge + '</td>' +
                     '<td class="num">' + (p.barcode || '—') + '</td>' +
-                    '<td>' + (p.categoryId && catById[p.categoryId] ? catById[p.categoryId].name : '—') + '</td>' +
+                    '<td>' + (p.categoryId && catById[String(p.categoryId)] ? catById[String(p.categoryId)].name : '—') + '</td>' +
                     '<td>' + (p.unit || 'قطعة') + '</td>' +
                     '<td class="num">' + UI.money(p.cost || 0) + '</td>' +
                     '<td class="num" style="color:var(--success);">' + UI.money(p.price || 0) + '</td>' +
                     '<td class="num" style="color:var(--accent-purple);">' + UI.money(p.wholesalePrice || p.price || 0) + '</td>' +
                     '<td class="num" style="font-weight:700;color:' + (low ? 'var(--danger)' : 'var(--text-primary)') + ';">' + q + (low ? ' <span class="badge badge-red">منخفض</span>' : '') + '</td>' +
                     '<td style="text-align:left;white-space:nowrap;">' +
-                        (p.hasSerials ? '<button class="btn btn-sm btn-secondary" title="عرض السريالات" onclick="viewSerials(' + p.id + ')"><i class="fa-solid fa-barcode"></i></button> ' : '') +
-                        '<button class="btn btn-sm" onclick="editProduct(' + p.id + ')"><i class="fa-solid fa-pen"></i></button> ' +
-                        '<button class="btn btn-sm btn-danger" onclick="delProduct(' + p.id + ')"><i class="fa-solid fa-trash"></i></button>' +
+                        (p.hasSerials ? '<button class="btn btn-sm btn-secondary" title="عرض السريالات" onclick="viewSerials(\'' + p.id + '\')"><i class="fa-solid fa-barcode"></i></button> ' : '') +
+                        '<button class="btn btn-sm" onclick="editProduct(\'' + p.id + '\')"><i class="fa-solid fa-pen"></i></button> ' +
+                        '<button class="btn btn-sm btn-danger" onclick="delProduct(\'' + p.id + '\')"><i class="fa-solid fa-trash"></i></button>' +
                     '</td></tr>';
             }).join('') || '<tr><td colspan="9" class="empty-state">لا توجد منتجات</td></tr>';
         }
@@ -207,7 +207,7 @@
             const rec = {
                 name,
                 barcode: document.getElementById('pBarcode').value.trim(),
-                categoryId: document.getElementById('pCategory').value ? Number(document.getElementById('pCategory').value) : null,
+                categoryId: document.getElementById('pCategory').value ? document.getElementById('pCategory').value : null,
                 unit: document.getElementById('pUnit').value.trim() || 'قطعة',
                 cost: Number(document.getElementById('pCost').value) || 0,
                 price: price,
@@ -239,6 +239,7 @@
 
             // حفظ السريالات المضافة مباشرة في نموذج المنتج
             if (hasSerials && parsedSerials.length > 0 && targetPid) {
+                let savedCount = 0;
                 for (const sn of parsedSerials) {
                     try {
                         await ARDB.add('serials', {
@@ -248,9 +249,20 @@
                             purchaseDate: Date.now(),
                             createdAt: Date.now()
                         });
+                        savedCount++;
                     } catch(e) {
                         console.warn('سريال مكرر:', sn);
                     }
+                }
+                if (savedCount > 0 && editingPid) {
+                    await ARDB.add('stockMovements', {
+                        date: Date.now(),
+                        productId: targetPid,
+                        direction: 'in',
+                        type: 'initial',
+                        quantity: savedCount,
+                        note: 'إضافة سريالات جديدة عند تعديل المنتج'
+                    });
                 }
             }
 
@@ -280,7 +292,7 @@
         async function renderSerialsTable() {
             if (!activeViewerPid) return;
             const allSerials = await ARDB.getAll('serials');
-            const prodSerials = (allSerials || []).filter(s => s.productId === activeViewerPid);
+            const prodSerials = (allSerials || []).filter(s => String(s.productId) === String(activeViewerPid));
             
             const tbody = document.getElementById('serialsBody');
             if (!prodSerials.length) {
@@ -297,7 +309,7 @@
                         '<td>' + (s.purchaseDate ? UI.date(s.purchaseDate) : '—') + '</td>' +
                         '<td>' + (s.invoiceDate ? UI.date(s.invoiceDate) : '—') + '</td>' +
                         '<td style="text-align:left;">' +
-                            '<button class="btn btn-sm btn-danger" onclick="deleteSerial(' + s.id + ')"><i class="fa-solid fa-trash"></i></button>' +
+                            '<button class="btn btn-sm btn-danger" onclick="deleteSerial(\'' + s.id + '\')"><i class="fa-solid fa-trash"></i></button>' +
                         '</td>' +
                         '</tr>';
                 }).join('');
@@ -358,9 +370,7 @@
         }
 
         load();
-    </script>
-
-        load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>
