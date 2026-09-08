@@ -144,6 +144,12 @@
     <script>
         let _invoices = [], _products = [], _customers = [];
 
+        if (typeof window !== 'undefined') {
+            window.addEventListener('ar_cloud_data_updated', () => {
+                try { initDashboard(); } catch(e){}
+            });
+        }
+
         async function initDashboard() {
             try {
                 const [products, categories, customers, invoices, expenses, movements, tasks] = await Promise.all([
@@ -156,11 +162,27 @@
                 renderKPIs(invoices, products);
                 renderCharts(invoices, products, categories, customers, expenses);
 
+                // حساب الأرخصية والمخزون الفعلي من حركات المخزون
+                const prodQty = {};
+                (products || []).forEach(p => prodQty[String(p.id)] = 0);
+                (movements || []).forEach(m => {
+                    if (m && m.productId != null) {
+                        const key = String(m.productId);
+                        if (prodQty[key] !== undefined) {
+                            const mQty = (Number(m.quantity) || Number(m.qty) || 0);
+                            prodQty[key] += mQty * (m.direction === 'in' ? 1 : -1);
+                        }
+                    }
+                });
+
                 // التنبيهات
                 const alerts = [];
-                const outOfStock = products.filter(p => p.minStock && (p.stock || 0) <= p.minStock);
+                const outOfStock = (products || []).filter(p => {
+                    const q = prodQty[String(p.id)] || 0;
+                    return p.minStock && q <= p.minStock;
+                });
                 if (outOfStock.length) alerts.push('<span class="badge badge-red"><i class="fa-solid fa-triangle-exclamation"></i> ' + outOfStock.length + ' منتجات نفدت أو قربت على النفاد</span>');
-                const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'in_progress');
+                const pendingTasks = (tasks || []).filter(t => t.status === 'pending' || t.status === 'in_progress');
                 if (pendingTasks.length) alerts.push('<span class="badge badge-blue"><i class="fa-solid fa-list-check"></i> ' + pendingTasks.length + ' مهام معلّقة</span>');
                 if (alerts.length) document.getElementById('alertsBox').innerHTML = '<div class="alert-row" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;">' + alerts.join('') + '</div>';
 

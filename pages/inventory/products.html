@@ -104,8 +104,19 @@
 
         function stockOf(products, movements, pid) {
             let q = 0;
-            movements.forEach(m => { if (m.productId === pid) q += (m.quantity || 0) * (m.direction === 'in' ? 1 : -1); });
+            (movements || []).forEach(m => {
+                if (m && m.productId != null && pid != null && String(m.productId) === String(pid)) {
+                    const moveQty = (Number(m.quantity) || Number(m.qty) || 0);
+                    q += moveQty * (m.direction === 'in' ? 1 : -1);
+                }
+            });
             return q;
+        }
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('ar_cloud_data_updated', () => {
+                try { load(); } catch(e){}
+            });
         }
 
         function toggleSerialsInput() {

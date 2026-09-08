@@ -70,6 +70,12 @@
     <script src="../../js/export.js"></script>
     <script src="../../js/app.js"></script>
     <script>
+        if (typeof window !== 'undefined') {
+            window.addEventListener('ar_cloud_data_updated', () => {
+                try { load(); } catch(e){}
+            });
+        }
+
         let editingSid = null;
         async function load() {
             const [sups, purchases, payments, returns] = await Promise.all([
@@ -81,22 +87,29 @@
 
             const purMap = {};
             const purPaidMap = {};
-            purchases.forEach(p => {
-                if (p.supplierId) {
-                    purMap[p.supplierId] = (purMap[p.supplierId] || 0) + (p.total || 0);
+            (purchases || []).forEach(p => {
+                if (p && p.supplierId != null) {
+                    const sKey = String(p.supplierId);
+                    purMap[sKey] = (purMap[sKey] || 0) + (p.total || 0);
                     if (p.paymentType === 'cash') {
-                        purPaidMap[p.supplierId] = (purPaidMap[p.supplierId] || 0) + (p.total || 0);
+                        purPaidMap[sKey] = (purPaidMap[sKey] || 0) + (p.total || 0);
                     }
                 }
             });
 
             const retMap = {};
-            (returns || []).forEach(r => { if (r.supplierId) retMap[r.supplierId] = (retMap[r.supplierId] || 0) + (r.total || 0); });
+            (returns || []).forEach(r => {
+                if (r && r.supplierId != null) {
+                    const sKey = String(r.supplierId);
+                    retMap[sKey] = (retMap[sKey] || 0) + (r.total || 0);
+                }
+            });
 
             const payMap = {};
-            payments.forEach(p => {
-                if ((p.type === 'payment' || p.partyType === 'supplier') && p.partyId) {
-                    payMap[p.partyId] = (payMap[p.partyId] || 0) + (p.amount || 0);
+            (payments || []).forEach(p => {
+                if (p && (p.type === 'payment' || p.partyType === 'supplier') && p.partyId != null) {
+                    const sKey = String(p.partyId);
+                    payMap[sKey] = (payMap[sKey] || 0) + (p.amount || 0);
                 }
             });
 
@@ -104,11 +117,12 @@
             document.getElementById('supTotal').textContent = sups.length;
 
             document.getElementById('supBody').innerHTML = sups.map(s => {
+                const sKey = String(s.id);
                 const openBal = Number(s.openingBalance || 0);
-                const purBal = Number(purMap[s.id] || 0);
-                const purPaid = Number(purPaidMap[s.id] || 0);
-                const retBal = Number(retMap[s.id] || 0);
-                const payBal = Number(payMap[s.id] || 0);
+                const purBal = Number(purMap[sKey] || 0);
+                const purPaid = Number(purPaidMap[sKey] || 0);
+                const retBal = Number(retMap[sKey] || 0);
+                const payBal = Number(payMap[sKey] || 0);
                 const currentBal = openBal + purBal - purPaid - retBal - payBal;
                 grandTotalPayable += currentBal;
 
