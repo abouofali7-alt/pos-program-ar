@@ -380,9 +380,25 @@ const ARDB = (function () {
         return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    async function clearAllData() {
+        const STORES = [
+            'settings','sequences','roles','users','departments','employees','attendance','payroll','leaveRequests',
+            'customers','suppliers','categories','products','serials','warehouses','stockMovements',
+            'invoices','invoiceReturns','purchases','purchaseReturns','payments','expenses','quotations','offers',
+            'accounts','journalEntries','projects','tasks'
+        ];
+        for (const s of STORES) {
+            try {
+                await txn(s, 'readwrite', (os) => new Promise((res, rej) => {
+                    const r = os.clear(); r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+                }));
+            } catch(e){}
+        }
+    }
+
     return {
         openDB, getAll, getById, getByIndex, add, put, update, remove,
-        localGetAll, localGetById, localAdd, localPut, localUpdate, localRemove,
+        localGetAll, localGetById, localAdd, localPut, localUpdate, localRemove, clearAllData,
         nextSeq, seed, syncOpeningBalances, hashPassword, currentUser, setSession, clearSession, money
     };
 })();

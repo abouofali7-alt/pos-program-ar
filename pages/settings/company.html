@@ -56,15 +56,11 @@
             <div id="cloudSyncStatus" style="margin-top:12px;display:none;padding:10px 14px;border-radius:8px;font-size:0.9rem;"></div>
         </div>
 
-        <div class="table-card" style="padding:20px;margin-top:20px;border-top:3px solid var(--success);">
-            <h3 style="margin-bottom:12px;font-size:1.1rem;color:var(--success);"><i class="fa-solid fa-database"></i> النسخ الاحتياطي واسترجاع البيانات</h3>
-            <div class="sub" style="margin-bottom:16px;">تصدير نسخة من كافّة بيانات النظام أو استرجاع بيانات سابقة بسهولة</div>
+        <div class="table-card" style="padding:20px;margin-top:20px;border-top:3px solid var(--danger);">
+            <h3 style="margin-bottom:12px;font-size:1.1rem;color:var(--danger);"><i class="fa-solid fa-trash-can"></i> تصفير وتفريغ النظام والداتا بيز بالكامل</h3>
+            <div class="sub" style="margin-bottom:16px;">حذف وتفريغ جميع البيانات والمنتجات والفواتير المسجلة محلياً وعلى السيرفر للبدء بحساب نظيف</div>
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                <button class="btn btn-secondary" onclick="ARBackup.exportAllData()"><i class="fa-solid fa-download"></i> تصدير نسخة احتياطية (JSON)</button>
-                <label class="btn btn-secondary" style="cursor:pointer;margin:0;">
-                    <i class="fa-solid fa-upload"></i> استرجاع نسخة احتياطية
-                    <input type="file" accept=".json" style="display:none;" onchange="handleRestoreFile(this)">
-                </label>
+                <button class="btn btn-danger" onclick="confirmResetAllSystemData()"><i class="fa-solid fa-trash-can"></i> تصفير وتفريغ كافّة البيانات أونلاين ومحلياً الآن</button>
             </div>
         </div>
     </main>
@@ -75,6 +71,22 @@
     <script src="../../js/backup.js"></script>
     <script src="../../js/app.js"></script>
     <script>
+        async function confirmResetAllSystemData() {
+            const ok = await UI.confirmBox('هل أنت متأكد تماماً من تفريغ وتصفير كافّة بيانات المنتجات والفواتير والمخزون والحسابات من الجهاز ومن السيرفر؟ لن يمكنك التراجع عن هذا الإجراء.', 'تصفير شامل للبيانات');
+            if (ok) {
+                try {
+                    if (typeof API !== 'undefined') {
+                        await API.resetAllData();
+                    } else if (typeof ARDB !== 'undefined') {
+                        await ARDB.clearAllData();
+                    }
+                    UI.toast('تم تفريغ وتصفير كافة البيانات بنجاح!', 'ok');
+                    setTimeout(() => window.location.reload(), 1200);
+                } catch(e) {
+                    UI.toast('حدث خطأ أثناء التصفير: ' + e.message, 'error');
+                }
+            }
+        }
         async function handleRestoreFile(input) {
             if (!input.files || !input.files[0]) return;
             const file = input.files[0];

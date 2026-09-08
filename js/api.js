@@ -237,6 +237,20 @@ const API = (function () {
         return true;
     }
 
+    async function resetAllData() {
+        try {
+            await fetch(`${getBaseUrl()}/sync/reset`, { method: 'POST', headers: getAuthHeaders() });
+        } catch(e){}
+        if (typeof ARDB !== 'undefined') {
+            await ARDB.clearAllData();
+        }
+        _lastSyncTimestamp = Date.now();
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: {} }));
+        }
+        return true;
+    }
+
     return {
         getBaseUrl,
         setBaseUrl,
@@ -247,6 +261,7 @@ const API = (function () {
         pushFullDataToCloud,
         pullCloudSync,
         startAutoSync,
+        resetAllData,
         getAll,
         getById,
         add,
