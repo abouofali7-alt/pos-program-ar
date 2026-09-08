@@ -146,6 +146,8 @@ router.get('/pull', async (req, res) => {
         res.json({
             success: true,
             lastUpdated: cloud.lastUpdated || Date.now(),
+            resetTimestamp: cloud.resetTimestamp || 0,
+            reset: !!cloud.reset,
             data: cloud.data || {},
             deleted: cloud.deleted || {}
         });
@@ -157,9 +159,10 @@ router.get('/pull', async (req, res) => {
 // 3. POST /api/sync/reset — تفريغ ورسترة كافة بيانات السيرفر والداتا بيز السحابية
 router.post('/reset', async (req, res) => {
     try {
-        const resetObj = { lastUpdated: Date.now(), data: {}, deleted: {} };
+        const now = Date.now();
+        const resetObj = { lastUpdated: now, resetTimestamp: now, data: {}, deleted: {}, reset: true };
         saveCloudData(resetObj);
-        res.json({ success: true, message: 'Cloud database reset successfully', lastUpdated: resetObj.lastUpdated });
+        res.json({ success: true, message: 'Cloud database reset successfully', lastUpdated: now, resetTimestamp: now });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
     }

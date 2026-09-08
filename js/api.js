@@ -149,6 +149,20 @@ const API = (function () {
             const res = await fetch(`${getBaseUrl()}/sync/pull`, { headers: getAuthHeaders() });
             if (res.ok) {
                 const json = await res.json();
+                const cloudResetTs = json.resetTimestamp || 0;
+                const localResetTs = Number(localStorage.getItem('ar_last_reset_ts') || 0);
+
+                if (cloudResetTs > 0 && cloudResetTs > localResetTs) {
+                    localStorage.setItem('ar_last_reset_ts', String(cloudResetTs));
+                    _lastSyncTimestamp = json.lastUpdated || cloudResetTs;
+                    await ARDB.clearAllData();
+                    await ARDB.seed();
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: {} }));
+                    }
+                    return true;
+                }
+
                 if (json && json.lastUpdated && (force || json.lastUpdated > _lastSyncTimestamp)) {
                     _lastSyncTimestamp = json.lastUpdated;
                     const cloudData = json.data || {};
@@ -256,13 +270,20 @@ const API = (function () {
     }
 
     async function resetAllData() {
+        let now = Date.now();
         try {
-            await fetch(`${getBaseUrl()}/sync/reset`, { method: 'POST', headers: getAuthHeaders() });
+            const res = await fetch(`${getBaseUrl()}/sync/reset`, { method: 'POST', headers: getAuthHeaders() });
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.resetTimestamp) now = json.resetTimestamp;
+            }
         } catch(e){}
+        localStorage.setItem('ar_last_reset_ts', String(now));
         if (typeof ARDB !== 'undefined') {
             await ARDB.clearAllData();
+            await ARDB.seed();
         }
-        _lastSyncTimestamp = Date.now();
+        _lastSyncTimestamp = now;
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: {} }));
         }
