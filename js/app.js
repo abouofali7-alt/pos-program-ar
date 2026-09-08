@@ -401,6 +401,13 @@
         await requireAuth();
         renderHeader();
         if (typeof API !== 'undefined') API.startAutoSync();
+        window.addEventListener('ar_cloud_data_updated', () => {
+            try {
+                if (typeof load === 'function') load();
+                else if (typeof loadData === 'function') loadData();
+                else if (typeof render === 'function') render();
+            } catch(e) {}
+        });
     }
 
     window.ARUI = { MAP, assetUrl, initApp, renderHeader, updateApiBadge };

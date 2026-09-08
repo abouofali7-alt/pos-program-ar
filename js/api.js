@@ -95,6 +95,14 @@ const API = (function () {
 
     /* ---------- المزامنة السحابية اللحظية الفورية بين الأجهزة ---------- */
 
+    let _debouncePushTimer = null;
+    function scheduleDebouncedFullPush() {
+        if (_debouncePushTimer) clearTimeout(_debouncePushTimer);
+        _debouncePushTimer = setTimeout(() => {
+            pushFullDataToCloud();
+        }, 400);
+    }
+
     async function pushItemToCloud(store, item, action = 'save') {
         try {
             await fetch(`${getBaseUrl()}/sync/push`, {
@@ -153,6 +161,9 @@ const API = (function () {
                             } catch(e){}
                         }
                     }
+                    if (updatedAny && typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: cloudData }));
+                    }
                     return updatedAny;
                 }
             }
@@ -165,7 +176,14 @@ const API = (function () {
         pullCloudSync();
         _syncTimer = setInterval(async () => {
             await pullCloudSync();
-        }, 5000);
+        }, 1500);
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('focus', () => pullCloudSync());
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) pullCloudSync();
+            });
+        }
     }
 
     /* ---------- العمليات المزدوجة (حفظ محلي + مزامنة سحابية) ---------- */
@@ -183,18 +201,21 @@ const API = (function () {
         const finalId = (typeof localRes === 'number' || typeof localRes === 'string') ? localRes : (item.id || Date.now());
         const finalItem = Object.assign({}, item, { id: finalId });
         pushItemToCloud(store, finalItem, 'save');
+        scheduleDebouncedFullPush();
         return localRes;
     }
 
     async function update(store, item) {
         await ARDB.localPut(store, item);
         pushItemToCloud(store, item, 'save');
+        scheduleDebouncedFullPush();
         return item;
     }
 
     async function remove(store, id) {
         await ARDB.localRemove(store, id);
         pushItemToCloud(store, { id }, 'delete');
+        scheduleDebouncedFullPush();
         return true;
     }
 
