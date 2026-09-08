@@ -229,7 +229,7 @@ const ARDB = (function () {
 
     /* ---------- البيانات الافتراضية (Seed) ---------- */
     async function seed() {
-        const count = await getAll('users');
+        const count = await localGetAll('users');
         if (count && count.length) return;
 
         const now = Date.now();
@@ -241,10 +241,10 @@ const ARDB = (function () {
             { id: 3, name: 'مشرف مخزن', description: 'المخزون والمشتريات والمنتجات' },
             { id: 4, name: 'موظف', description: 'الصلاحيات الأساسية' }
         ];
-        for (const r of roles) await put('roles', r);
+        for (const r of roles) await localPut('roles', r);
 
         // مستخدم مدير رئيسي — كلمة السر: admin123
-        await put('users', {
+        await localPut('users', {
             id: 1, username: 'admin', password: hashPassword('admin123'), name: 'مدير النظام',
             roleId: 1, roleName: 'مدير', active: true, createdAt: now
         });
@@ -255,10 +255,10 @@ const ARDB = (function () {
             { id: 2, name: 'المبيعات', description: '' },
             { id: 3, name: 'المخزون واللوجستيات', description: '' }
         ];
-        for (const d of deps) await put('departments', d);
+        for (const d of deps) await localPut('departments', d);
 
         // المخازن
-        await put('warehouses', { id: 1, name: 'المخزن الرئيسي', location: '', manager: '', description: '' });
+        await localPut('warehouses', { id: 1, name: 'المخزن الرئيسي', location: '', manager: '', description: '' });
 
         // شجرة الحسابات الأولية
         const accounts = [
@@ -277,11 +277,11 @@ const ARDB = (function () {
             { id: 13, code: '5100', name: 'المصروفات التشغيلية', type: 'expense', parentId: 12 },
             { id: 14, code: '5200', name: 'المشتريات', type: 'expense', parentId: 12 }
         ];
-        for (const a of accounts) await put('accounts', a);
+        for (const a of accounts) await localPut('accounts', a);
 
-        await put('settings', { key: 'companyName', value: 'AR-Program' });
-        await put('settings', { key: 'currency', value: 'ج.م' });
-        await put('settings', { key: 'seeded', value: String(now) });
+        await localPut('settings', { key: 'companyName', value: 'AR-Program' });
+        await localPut('settings', { key: 'currency', value: 'ج.م' });
+        await localPut('settings', { key: 'seeded', value: String(now) });
     }
 
     /* ---------- حماية كلمة السر (Hash بسيط غير قابل للعكس) ---------- */

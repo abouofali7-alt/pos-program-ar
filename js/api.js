@@ -118,9 +118,16 @@ const API = (function () {
                 'accounts','journalEntries','projects','tasks'
             ];
             const fullData = {};
+            let hasAnyLocalData = false;
             for (const s of STORES) {
-                fullData[s] = await ARDB.localGetAll(s);
+                const items = await ARDB.localGetAll(s);
+                if (items && items.length) {
+                    fullData[s] = items;
+                    hasAnyLocalData = true;
+                }
             }
+            if (!hasAnyLocalData) return false;
+
             const res = await fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
@@ -146,6 +153,17 @@ const API = (function () {
                     _lastSyncTimestamp = json.lastUpdated;
                     const cloudData = json.data || {};
                     const cloudDeleted = json.deleted || {};
+
+                    // أمر التصفير الشامل عند مسح الداتا بيز أونلاين
+                    if (json.reset) {
+                        await ARDB.clearAllData();
+                        await ARDB.seed();
+                        if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: {} }));
+                        }
+                        return true;
+                    }
+
                     let updatedAny = false;
 
                     // 1. تحديث أو إضافة العناصر الواردة من السحابة إلى IndexedDB المحلي
