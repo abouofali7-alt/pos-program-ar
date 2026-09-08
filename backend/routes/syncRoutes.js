@@ -19,37 +19,63 @@ if (!global._ar_cloud_data) {
     } catch(e) {}
 }
 
+let _isLoadedFromRemote = false;
+
 async function loadCloudData() {
-    const isEmpty = !global._ar_cloud_data || !global._ar_cloud_data.data || Object.keys(global._ar_cloud_data.data).length === 0;
-    if (isEmpty) {
-        try {
-            const res = await fetch(REMOTE_CLOUD_URL);
-            if (res.ok) {
-                const json = await res.json();
-                if (json && json.data && typeof json.data === 'object' && json.data.data) {
-                    global._ar_cloud_data = json.data;
-                    try { fs.writeFileSync(SYNC_FILE, JSON.stringify(global._ar_cloud_data), 'utf8'); } catch(e) {}
-                }
+    if (_isLoadedFromRemote && global._ar_cloud_data) {
+        return global._ar_cloud_data;
+    }
+    try {
+        if (fs.existsSync(SYNC_FILE)) {
+            const raw = fs.readFileSync(SYNC_FILE, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                global._ar_cloud_data = parsed;
+                _isLoadedFromRemote = true;
+                return global._ar_cloud_data;
             }
-        } catch(e) {}
+        }
+    } catch(e) {}
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(REMOTE_CLOUD_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+            const json = await res.json();
+            if (json && json.data && typeof json.data === 'object' && json.data.lastUpdated !== undefined) {
+                global._ar_cloud_data = json.data;
+                _isLoadedFromRemote = true;
+                try { fs.writeFileSync(SYNC_FILE, JSON.stringify(global._ar_cloud_data), 'utf8'); } catch(e) {}
+            }
+        }
+    } catch(e) {}
+
+    if (!global._ar_cloud_data) {
+        global._ar_cloud_data = { lastUpdated: Date.now(), resetTimestamp: 0, data: {}, deleted: {} };
     }
     return global._ar_cloud_data;
 }
 
-function saveCloudData(cloudObj) {
+async function saveCloudData(cloudObj) {
     global._ar_cloud_data = cloudObj;
-    setImmediate(() => {
-        try {
-            fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
-        } catch(e) {}
-        try {
-            fetch(REMOTE_CLOUD_URL, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: 'pos_sync_cloud', data: cloudObj })
-            }).catch(() => {});
-        } catch(e) {}
-    });
+    _isLoadedFromRemote = true;
+    try {
+        fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
+    } catch(e) {}
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        await fetch(REMOTE_CLOUD_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'pos_sync_cloud', data: cloudObj }),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+    } catch(e) {}
 }
 
 function getItemId(x) {
@@ -132,7 +158,7 @@ router.post('/push', async (req, res) => {
         }
 
         cloud.lastUpdated = Date.now();
-        saveCloudData(cloud);
+        await saveCloudData(cloud);
         res.json({ success: true, lastUpdated: cloud.lastUpdated, deleted: cloud.deleted });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
@@ -161,7 +187,7 @@ router.post('/reset', async (req, res) => {
     try {
         const now = Date.now();
         const resetObj = { lastUpdated: now, resetTimestamp: now, data: {}, deleted: {}, reset: true };
-        saveCloudData(resetObj);
+        await saveCloudData(resetObj);
         res.json({ success: true, message: 'Cloud database reset successfully', lastUpdated: now, resetTimestamp: now });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
