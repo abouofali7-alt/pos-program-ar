@@ -178,43 +178,40 @@ const ARDB = (function () {
     }
 
     /* ---------- الأرقام التسلسلية للفواتير ---------- */
-    function nextSeq(name, prefix, pad) {
-        return txn('sequences', 'readwrite', (os, tx) => new Promise(async (res, rej) => {
-            try {
-                const getR = os.get(name);
-                getR.onsuccess = async () => {
-                    let cur = getR.result ? Number(getR.result.value || 0) : 0;
-                    try {
-                        const targetStore = (name.includes('invoice') || name === 'sales') ? 'invoices' :
-                                            (name.includes('journal') || name.includes('JRN')) ? 'journalEntries' :
-                                            (name.includes('purchase') || name.includes('PUR')) ? 'purchases' : null;
-                        if (targetStore) {
-                            const existing = await localGetAll(targetStore);
-                            if (existing && existing.length) {
-                                existing.forEach(item => {
-                                    if (item && item.number && String(item.number).startsWith(prefix)) {
-                                        const numPart = parseInt(String(item.number).replace(prefix, ''), 10);
-                                        if (!isNaN(numPart) && numPart > cur) {
-                                            cur = numPart;
-                                        }
-                                    }
-                                });
+    async function nextSeq(name, prefix, pad) {
+        let cur = 0;
+        try {
+            const targetStore = (name.includes('invoice') || name === 'sales') ? 'invoices' :
+                                (name.includes('journal') || name.includes('JRN')) ? 'journalEntries' :
+                                (name.includes('purchase') || name.includes('PUR')) ? 'purchases' : null;
+            if (targetStore) {
+                const existing = await localGetAll(targetStore);
+                if (existing && existing.length) {
+                    existing.forEach(item => {
+                        if (item && item.number && String(item.number).startsWith(prefix)) {
+                            const numPart = parseInt(String(item.number).replace(prefix, ''), 10);
+                            if (!isNaN(numPart) && numPart > cur) {
+                                cur = numPart;
                             }
                         }
-                    } catch(e) {}
-
-                    const next = cur + 1;
-                    os.put({ name, value: next });
-                    if (typeof API !== 'undefined') {
-                        API.pushItemToCloud('sequences', { name, value: next }, 'save');
-                    }
-                    const digits = String(next).padStart(pad || 5, '0');
-                    res((prefix || '') + digits);
-                };
-                getR.onerror = () => rej(getR.error);
-            } catch(e) {
-                rej(e);
+                    });
+                }
             }
+        } catch(e) {}
+
+        return txn('sequences', 'readwrite', (os) => new Promise((res, rej) => {
+            const getR = os.get(name);
+            getR.onsuccess = () => {
+                const seqVal = getR.result ? Number(getR.result.value || 0) : 0;
+                const next = Math.max(cur, seqVal) + 1;
+                os.put({ name, value: next });
+                if (typeof API !== 'undefined') {
+                    API.pushItemToCloud('sequences', { name, value: next }, 'save');
+                }
+                const digits = String(next).padStart(pad || 5, '0');
+                res((prefix || '') + digits);
+            };
+            getR.onerror = () => rej(getR.error);
         }));
     }
 

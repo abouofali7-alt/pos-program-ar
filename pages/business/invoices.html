@@ -284,7 +284,7 @@
             }
             if (!items.length) { UI.toast('أضف على الأقل صنفًا واحدًا', 'warn'); return; }
 
-            // التحقق من توفر المخزون بنفس طريقة string comparison
+            // التحقق من توفر المخزون بمرونة وعرض تنبيه غير حاجب
             const movements = (await ARDB.getAll('stockMovements')) || [];
             for (const pid of Object.keys(qtyCheck)) {
                 let available = 0;
@@ -296,8 +296,7 @@
                 });
                 if (available < qtyCheck[pid]) {
                     const p = await ARDB.getById('products', pid);
-                    UI.toast('الكمية غير كافية لـ ' + (p ? p.name : 'المنتج') + ' (المتاح بالمخزن: ' + available + ')', 'error');
-                    return;
+                    UI.toast('تنبيه: رصيد الصنف (' + (p ? p.name : 'المنتج') + ') بالمخزن حالياً (' + available + ')', 'warn');
                 }
             }
 
