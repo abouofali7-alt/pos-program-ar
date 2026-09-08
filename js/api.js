@@ -1,9 +1,12 @@
 /* ============================================================
-   AR-Program — طبقة ربط API والباك إند (API Integration Layer)
-   يدعم وضع الهجين: الاتصال بالسيرفر أو التحويل التلقائي لقاعدة البيانات المحلية (IndexedDB)
+   AR-Program — طبقة ربط API والباك إند والمزامنة السحابية اللحظية (Cloud Auto-Sync Layer)
+   يدعم المزامنة التلقائية اللحظية بين كافّة الأجهزة والموبايل
    ============================================================ */
 
 const API = (function () {
+    let _lastSyncTimestamp = 0;
+    let _syncTimer = null;
+
     function getDefaultBaseUrl() {
         if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.protocol.startsWith('file')) {
             return window.location.origin.replace(/\/+$/, '') + '/api';
@@ -35,10 +38,7 @@ const API = (function () {
     }
 
     function isApiModeEnabled() {
-        const setting = localStorage.getItem('ar_api_mode');
-        if (setting === 'true') return true;
-        if (setting === 'false') return false;
-        return false; // الافتراضي الاستعانة بـ IndexedDB مع المزامنة التلقائية
+        return true;
     }
 
     function setApiMode(enabled) {
@@ -93,108 +93,109 @@ const API = (function () {
         return map[store] || store;
     }
 
-    /* ---------- العمليات الأساسية (CRUD مع الفولباك التلقائي لـ IndexedDB) ---------- */
+    /* ---------- المزامنة السحابية اللحظية الفورية بين الأجهزة ---------- */
+
+    async function pushItemToCloud(store, item, action = 'save') {
+        try {
+            await fetch(`${getBaseUrl()}/sync/push`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ store, item, action })
+            });
+        } catch(e) {
+            console.warn('[Sync] push item failed:', e);
+        }
+    }
+
+    async function pushFullDataToCloud() {
+        try {
+            const STORES = [
+                'settings','sequences','roles','users','departments','employees','attendance','payroll','leaveRequests',
+                'customers','suppliers','categories','products','serials','warehouses','stockMovements',
+                'invoices','invoiceReturns','purchases','purchaseReturns','payments','expenses','quotations','offers',
+                'accounts','journalEntries','projects','tasks'
+            ];
+            const fullData = {};
+            for (const s of STORES) {
+                fullData[s] = await ARDB.localGetAll(s);
+            }
+            const res = await fetch(`${getBaseUrl()}/sync/push`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ fullData })
+            });
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.lastUpdated) _lastSyncTimestamp = json.lastUpdated;
+                return true;
+            }
+        } catch(e) {
+            console.warn('[Sync] full push failed:', e);
+        }
+        return false;
+    }
+
+    async function pullCloudSync() {
+        try {
+            const res = await fetch(`${getBaseUrl()}/sync/pull`, { headers: getAuthHeaders() });
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.lastUpdated && json.lastUpdated > _lastSyncTimestamp) {
+                    _lastSyncTimestamp = json.lastUpdated;
+                    const cloudData = json.data || {};
+                    let updatedAny = false;
+                    for (const s of Object.keys(cloudData)) {
+                        const items = cloudData[s] || [];
+                        for (const item of items) {
+                            try {
+                                await ARDB.localPut(s, item);
+                                updatedAny = true;
+                            } catch(e){}
+                        }
+                    }
+                    return updatedAny;
+                }
+            }
+        } catch(e) {}
+        return false;
+    }
+
+    function startAutoSync() {
+        if (_syncTimer) return;
+        pullCloudSync();
+        _syncTimer = setInterval(async () => {
+            await pullCloudSync();
+        }, 5000);
+    }
+
+    /* ---------- العمليات المزدوجة (حفظ محلي + مزامنة سحابية) ---------- */
 
     async function getAll(store) {
-        if (isApiModeEnabled()) {
-            try {
-                const endpoint = storeToEndpoint(store);
-                const res = await fetch(`${getBaseUrl()}/${endpoint}`, { headers: getAuthHeaders() });
-                if (res.ok) {
-                    const json = await res.json();
-                    let list = null;
-                    if (Array.isArray(json)) list = json;
-                    else if (json && Array.isArray(json.data)) list = json.data;
-                    
-                    if (list && Array.isArray(list)) {
-                        // حفظ زمني في IndexedDB
-                        for (const item of list) {
-                            try { await ARDB.localPut(store, item); } catch(e){}
-                        }
-                        return list;
-                    }
-                }
-            } catch (e) {
-                console.warn(`[API] تعذر الجلب من الباك إند لـ ${store}، التحويل إلى IndexedDB المحلي.`, e);
-            }
-        }
         return await ARDB.localGetAll(store);
     }
 
     async function getById(store, id) {
-        if (isApiModeEnabled()) {
-            try {
-                const endpoint = storeToEndpoint(store);
-                const res = await fetch(`${getBaseUrl()}/${endpoint}/${id}`, { headers: getAuthHeaders() });
-                if (res.ok) {
-                    const json = await res.json();
-                    const item = (json && json.data !== undefined) ? json.data : json;
-                    if (item) return item;
-                }
-            } catch (e) {
-                console.warn(`[API] تعذر الجلب بالـ ID لـ ${store} #${id}`);
-            }
-        }
         return await ARDB.localGetById(store, id);
     }
 
     async function add(store, item) {
-        let saved = null;
-        if (isApiModeEnabled()) {
-            try {
-                const endpoint = storeToEndpoint(store);
-                const res = await fetch(`${getBaseUrl()}/${endpoint}`, {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(item)
-                });
-                if (res.ok) {
-                    const json = await res.json();
-                    saved = (json && json.data !== undefined) ? json.data : json;
-                }
-            } catch (e) {
-                console.warn(`[API] تعذر الإضافة عبر الباك إند، الحفظ في IndexedDB المحلي`, e);
-            }
-        }
-        const localRes = await ARDB.localAdd(store, saved || item);
-        return saved || localRes;
+        const localRes = await ARDB.localAdd(store, item);
+        const finalId = (typeof localRes === 'number' || typeof localRes === 'string') ? localRes : (item.id || Date.now());
+        const finalItem = Object.assign({}, item, { id: finalId });
+        pushItemToCloud(store, finalItem, 'save');
+        return localRes;
     }
 
     async function update(store, item) {
-        let updated = null;
-        if (isApiModeEnabled()) {
-            try {
-                const endpoint = storeToEndpoint(store);
-                const res = await fetch(`${getBaseUrl()}/${endpoint}/${item.id}`, {
-                    method: 'PUT',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(item)
-                });
-                if (res.ok) {
-                    const json = await res.json();
-                    updated = (json && json.data !== undefined) ? json.data : json;
-                }
-            } catch (e) {
-                console.warn(`[API] تعذر التعديل عبر الباك إند، التعديل في IndexedDB المحلي`, e);
-            }
-        }
-        await ARDB.localPut(store, updated || item);
-        return updated || item;
+        await ARDB.localPut(store, item);
+        pushItemToCloud(store, item, 'save');
+        return item;
     }
 
     async function remove(store, id) {
-        if (isApiModeEnabled()) {
-            try {
-                const endpoint = storeToEndpoint(store);
-                await fetch(`${getBaseUrl()}/${endpoint}/${id}`, {
-                    method: 'DELETE',
-                    headers: getAuthHeaders()
-                });
-            } catch (e) {
-                console.warn(`[API] تعذر الحذف عبر الباك إند، الحذف من IndexedDB المحلي`, e);
-            }
-        }
-        return await ARDB.localRemove(store, id);
+        await ARDB.localRemove(store, id);
+        pushItemToCloud(store, { id }, 'delete');
+        return true;
     }
 
     return {
@@ -203,6 +204,10 @@ const API = (function () {
         isApiModeEnabled,
         setApiMode,
         checkHealth,
+        pushItemToCloud,
+        pushFullDataToCloud,
+        pullCloudSync,
+        startAutoSync,
         getAll,
         getById,
         add,

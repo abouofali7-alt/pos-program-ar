@@ -31,6 +31,7 @@ mountCrud(app);
 app.use('/api', require('./routes/salesRoutes').router);
 app.use('/api', require('./routes/inventoryRoutes'));
 app.use('/api', require('./routes/hrRoutes'));
+app.use('/api/sync', require('./routes/syncRoutes'));
 app.use('/api/reports', require('./routes/reportsRoutes'));
 
 // الأصول الثابتة للواجهة + نقطة دخول التطبيق

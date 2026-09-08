@@ -400,6 +400,7 @@
         await loadShared();
         await requireAuth();
         renderHeader();
+        if (typeof API !== 'undefined') API.startAutoSync();
     }
 
     window.ARUI = { MAP, assetUrl, initApp, renderHeader, updateApiBadge };

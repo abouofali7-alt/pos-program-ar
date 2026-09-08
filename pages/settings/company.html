@@ -46,6 +46,16 @@
             <div id="apiTestResult" style="margin-top:12px;display:none;padding:10px 14px;border-radius:8px;font-size:0.9rem;"></div>
         </div>
 
+        <div class="table-card" style="padding:20px;margin-top:20px;border-top:3px solid #a855f7;">
+            <h3 style="margin-bottom:12px;font-size:1.1rem;color:#a855f7;"><i class="fa-solid fa-cloud-arrow-up"></i> المزامنة السحابية التلقائية عبر الأجهزة</h3>
+            <div class="sub" style="margin-bottom:16px;">مزامنة فورية لكل المنتجات والمعاملات بين الهواتف وأجهزة الكمبيوتر، مع إمكانية رفع وسحب كافة البيانات بضغطة واحدة</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="forcePushAllToCloud()"><i class="fa-solid fa-cloud-arrow-up"></i> رفع ومزامنة كافة بيانات هذا الجهاز أونلاين الآن</button>
+                <button class="btn btn-secondary" onclick="forcePullFromCloud()"><i class="fa-solid fa-cloud-arrow-down"></i> سحب أحدث البيانات من السيرفر الآن</button>
+            </div>
+            <div id="cloudSyncStatus" style="margin-top:12px;display:none;padding:10px 14px;border-radius:8px;font-size:0.9rem;"></div>
+        </div>
+
         <div class="table-card" style="padding:20px;margin-top:20px;border-top:3px solid var(--success);">
             <h3 style="margin-bottom:12px;font-size:1.1rem;color:var(--success);"><i class="fa-solid fa-database"></i> النسخ الاحتياطي واسترجاع البيانات</h3>
             <div class="sub" style="margin-bottom:16px;">تصدير نسخة من كافّة بيانات النظام أو استرجاع بيانات سابقة بسهولة</div>
@@ -142,6 +152,57 @@
                 if (url) API.setBaseUrl(url);
             }
             UI.toast('تم حفظ بيانات المنشأة والإعدادات', 'ok');
+        }
+
+        async function forcePushAllToCloud() {
+            const statusBox = document.getElementById('cloudSyncStatus');
+            statusBox.style.display = 'block';
+            statusBox.style.background = 'rgba(168,85,247,0.15)';
+            statusBox.style.color = '#a855f7';
+            statusBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري رفع كافة بيانات الجهاز إلى السيرفر أونلاين...';
+            try {
+                const ok = await API.pushFullDataToCloud();
+                if (ok) {
+                    statusBox.style.background = 'rgba(34,197,94,0.15)';
+                    statusBox.style.color = '#22c55e';
+                    statusBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> تم رفع ومزامنة كافّة البيانات أونلاين بنجاح! يمكن لأي جهاز آخر أو هاتف سحبها الآن.';
+                    UI.toast('تم رفع ومزامنة البيانات أونلاين بنجاح!', 'ok');
+                } else {
+                    statusBox.style.background = 'rgba(239,68,68,0.15)';
+                    statusBox.style.color = '#ef4444';
+                    statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> تعذر الاتصال بالسيرفر للمزامنة السحابية.';
+                }
+            } catch(e) {
+                statusBox.style.background = 'rgba(239,68,68,0.15)';
+                statusBox.style.color = '#ef4444';
+                statusBox.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> خطأ أثناء المزامنة: ' + e.message;
+            }
+        }
+
+        async function forcePullFromCloud() {
+            const statusBox = document.getElementById('cloudSyncStatus');
+            statusBox.style.display = 'block';
+            statusBox.style.background = 'rgba(168,85,247,0.15)';
+            statusBox.style.color = '#a855f7';
+            statusBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري سحب أحدث البيانات من السيرفر السحابي...';
+            try {
+                const res = await API.pullCloudSync();
+                if (res) {
+                    statusBox.style.background = 'rgba(34,197,94,0.15)';
+                    statusBox.style.color = '#22c55e';
+                    statusBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> تم سحب وتحديث البيانات من السيرفر السحابي بنجاح!';
+                    UI.toast('تم تحديث البيانات من السيرفر السحابي بنجاح!', 'ok');
+                    setTimeout(() => window.location.reload(), 1200);
+                } else {
+                    statusBox.style.background = 'rgba(59,130,246,0.15)';
+                    statusBox.style.color = '#3b82f6';
+                    statusBox.innerHTML = '<i class="fa-solid fa-circle-info"></i> بيانات هذا الجهاز محدثة بالفعل مع السيرفر السحابي.';
+                }
+            } catch(e) {
+                statusBox.style.background = 'rgba(239,68,68,0.15)';
+                statusBox.style.color = '#ef4444';
+                statusBox.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> خطأ أثناء سحب البيانات: ' + e.message;
+            }
         }
         load();
     </script>
