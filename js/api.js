@@ -209,23 +209,22 @@ const API = (function () {
     async function add(store, item) {
         const localRes = await ARDB.localAdd(store, item);
         const finalId = (typeof localRes === 'number' || typeof localRes === 'string') ? localRes : (item.id || Date.now());
-        const finalItem = Object.assign({}, item, { id: finalId });
-        pushItemToCloud(store, finalItem, 'save');
-        scheduleDebouncedFullPush();
+        if (typeof item === 'object' && item !== null) {
+            item.id = finalId;
+        }
+        pushItemToCloud(store, item, 'save');
         return localRes;
     }
 
     async function update(store, item) {
         await ARDB.localPut(store, item);
         pushItemToCloud(store, item, 'save');
-        scheduleDebouncedFullPush();
         return item;
     }
 
     async function remove(store, id) {
         await ARDB.localRemove(store, id);
         pushItemToCloud(store, { id }, 'delete');
-        scheduleDebouncedFullPush();
         return true;
     }
 

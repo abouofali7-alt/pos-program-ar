@@ -41,14 +41,24 @@ router.post('/push', (req, res) => {
         
         if (fullData && typeof fullData === 'object') {
             for (const s of Object.keys(fullData)) {
-                cloud.data[s] = fullData[s];
+                const incoming = fullData[s] || [];
+                if (!cloud.data[s]) {
+                    cloud.data[s] = incoming;
+                } else {
+                    for (const it of incoming) {
+                        if (!it) continue;
+                        const idx = cloud.data[s].findIndex(x => (x && x.id && it.id && x.id === it.id) || (x && x.key && it.key && x.key === it.key));
+                        if (idx >= 0) cloud.data[s][idx] = it;
+                        else cloud.data[s].push(it);
+                    }
+                }
             }
         } else if (store && item) {
             if (!cloud.data[store]) cloud.data[store] = [];
             if (action === 'delete') {
-                cloud.data[store] = cloud.data[store].filter(x => (x.id && x.id !== item.id) || (x.key && x.key !== item.key));
+                cloud.data[store] = cloud.data[store].filter(x => (x && x.id && x.id !== item.id) || (x && x.key && x.key !== item.key));
             } else {
-                const idx = cloud.data[store].findIndex(x => (x.id && item.id && x.id === item.id) || (x.key && item.key && x.key === item.key));
+                const idx = cloud.data[store].findIndex(x => (x && x.id && item.id && x.id === item.id) || (x && x.key && item.key && x.key === item.key));
                 if (idx >= 0) cloud.data[store][idx] = item;
                 else cloud.data[store].push(item);
             }
