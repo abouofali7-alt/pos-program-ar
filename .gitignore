@@ -5,3 +5,5 @@ backend/node_modules/
 *.log
 backend/*.log
 scratch/
+
+.vercel

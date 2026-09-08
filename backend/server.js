@@ -13,9 +13,8 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // تسجيل الأخطاء لمنع انهيار الخادم
-const CRASH_LOG = path.join(__dirname, 'server.log');
 function logCrash(tag, err) {
-    try { fs.appendFileSync(CRASH_LOG, `[${new Date().toISOString()}] [${tag}] ${(err && err.stack) || err}\n`); } catch (e) {}
+    try { console.error(`[${new Date().toISOString()}] [${tag}]`, (err && err.stack) || err); } catch (e) {}
 }
 process.on('uncaughtException', (err) => logCrash('uncaught', err));
 process.on('unhandledRejection', (reason) => logCrash('rejection', reason));

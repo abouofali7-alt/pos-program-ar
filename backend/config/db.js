@@ -17,7 +17,9 @@ if (typeof DatabaseSync === 'function') {
     try {
         db = new DatabaseSync(DB_FILE);
         db.exec('PRAGMA foreign_keys = ON;');
-        try { db.prepare('PRAGMA journal_mode = WAL').get(); } catch (e) {}
+        if (!process.env.VERCEL) {
+            try { db.prepare('PRAGMA journal_mode = WAL').get(); } catch (e) {}
+        }
     } catch (e) {
         console.error('Failed to open SQLite database:', e.message);
     }
