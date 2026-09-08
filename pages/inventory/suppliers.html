@@ -178,12 +178,14 @@
             };
             if (editingSid) { rec.id = editingSid; await ARDB.put('suppliers', rec); UI.toast('تم التعديل', 'ok'); }
             else { await ARDB.add('suppliers', rec); UI.toast('تمت الإضافة', 'ok'); }
+            if (typeof ARDB.syncOpeningBalances === 'function') await ARDB.syncOpeningBalances();
             closeSupModal(); load();
         }
         async function delSup(id) {
             const ok = await UI.confirmBox('حذف المورد؟');
             if (!ok) return;
             await ARDB.remove('suppliers', id);
+            if (typeof ARDB.syncOpeningBalances === 'function') await ARDB.syncOpeningBalances();
             UI.toast('تم الحذف', 'ok'); load();
         }
         load();

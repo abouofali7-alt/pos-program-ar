@@ -187,12 +187,14 @@
             };
             if (editingCuid) { rec.id = editingCuid; await ARDB.put('customers', rec); UI.toast('تم التعديل', 'ok'); }
             else { await ARDB.add('customers', rec); UI.toast('تمت الإضافة', 'ok'); }
+            if (typeof ARDB.syncOpeningBalances === 'function') await ARDB.syncOpeningBalances();
             closeCustModal(); load();
         }
         async function delCust(id) {
             const ok = await UI.confirmBox('حذف العميل؟');
             if (!ok) return;
             await ARDB.remove('customers', id);
+            if (typeof ARDB.syncOpeningBalances === 'function') await ARDB.syncOpeningBalances();
             UI.toast('تم الحذف', 'ok'); load();
         }
         load();

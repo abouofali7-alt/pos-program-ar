@@ -257,6 +257,80 @@ const ARDB = (function () {
         return 'h' + h.toString(16) + '_' + s.length;
     }
 
+    /* ---------- مزامنة الأرصدة الافتتاحية في الدورة المحاسبية ---------- */
+    async function syncOpeningBalances() {
+        try {
+            const [customers, suppliers, entries] = await Promise.all([
+                getAll('customers'),
+                getAll('suppliers'),
+                getAll('journalEntries')
+            ]);
+
+            const entryRefMap = {};
+            (entries || []).forEach(e => {
+                if (e && e.refId) entryRefMap[e.refId] = e;
+            });
+
+            // 1. العملاء (حسابات العملاء 4 / رأس المال 9)
+            for (const c of (customers || [])) {
+                if (!c || !c.id) continue;
+                const refId = 'cust_opening_' + c.id;
+                const openBal = Number(c.openingBalance || 0);
+                const existingEntry = entryRefMap[refId];
+
+                if (openBal > 0) {
+                    const entryData = {
+                        number: existingEntry ? existingEntry.number : await nextSeq('journalAuto', 'JRN-', 6),
+                        date: c.createdAt || Date.now(),
+                        desc: 'رصيد افتتاحي للعميل: ' + c.name,
+                        refId: refId,
+                        lines: [
+                            { accountId: 4, debit: openBal, credit: 0 },
+                            { accountId: 9, debit: 0, credit: openBal }
+                        ]
+                    };
+                    if (existingEntry) {
+                        await put('journalEntries', { ...existingEntry, ...entryData });
+                    } else {
+                        await add('journalEntries', entryData);
+                    }
+                } else if (existingEntry) {
+                    await remove('journalEntries', existingEntry.id);
+                }
+            }
+
+            // 2. الموردون (رأس المال 9 / حسابات الموردين 7)
+            for (const s of (suppliers || [])) {
+                if (!s || !s.id) continue;
+                const refId = 'sup_opening_' + s.id;
+                const openBal = Number(s.openingBalance || 0);
+                const existingEntry = entryRefMap[refId];
+
+                if (openBal > 0) {
+                    const entryData = {
+                        number: existingEntry ? existingEntry.number : await nextSeq('journalAuto', 'JRN-', 6),
+                        date: s.createdAt || Date.now(),
+                        desc: 'رصيد افتتاحي للمورد: ' + s.name,
+                        refId: refId,
+                        lines: [
+                            { accountId: 9, debit: openBal, credit: 0 },
+                            { accountId: 7, debit: 0, credit: openBal }
+                        ]
+                    };
+                    if (existingEntry) {
+                        await put('journalEntries', { ...existingEntry, ...entryData });
+                    } else {
+                        await add('journalEntries', entryData);
+                    }
+                } else if (existingEntry) {
+                    await remove('journalEntries', existingEntry.id);
+                }
+            }
+        } catch (e) {
+            console.error('Error syncing opening balances:', e);
+        }
+    }
+
     /* ---------- الجلسة ---------- */
     function currentUser() {
         try { return JSON.parse(localStorage.getItem('ar_session') || 'null'); }
@@ -274,9 +348,9 @@ const ARDB = (function () {
     return {
         openDB, getAll, getById, getByIndex, add, put, update, remove,
         localGetAll, localGetById, localAdd, localPut, localUpdate, localRemove,
-        nextSeq, seed, hashPassword, currentUser, setSession, clearSession, money
+        nextSeq, seed, syncOpeningBalances, hashPassword, currentUser, setSession, clearSession, money
     };
 })();
 
 /* جاهزية قاعدة البيانات للمتصفح كله */
-ARDB.openDB().then(() => ARDB.seed()).catch((e) => console.error('DB init error:', e));
+ARDB.openDB().then(() => ARDB.seed().then(() => ARDB.syncOpeningBalances())).catch((e) => console.error('DB init error:', e));

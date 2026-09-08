@@ -289,8 +289,8 @@
             const container = document.getElementById('cartItems');
             if (!_cart.length) {
                 container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-secondary);font-size:0.9rem;">السلة فارغة، انقر على المنتجات لإضافتها</div>';
-                document.getElementById('subTotal').textContent = '0.00 ج.م';
-                document.getElementById('grandTotal').textContent = '0.00 ج.م';
+                document.getElementById('subTotal').innerHTML = '0.00 ج.م';
+                document.getElementById('grandTotal').innerHTML = '0.00 ج.م';
                 return;
             }
 
@@ -318,8 +318,8 @@
                 `;
             }).join('');
 
-            document.getElementById('subTotal').textContent = UI.money(total) + ' ج.م';
-            document.getElementById('grandTotal').textContent = UI.money(total) + ' ج.م';
+            document.getElementById('subTotal').innerHTML = UI.money(total) + ' ج.م';
+            document.getElementById('grandTotal').innerHTML = UI.money(total) + ' ج.م';
         }
 
         async function checkout() {
