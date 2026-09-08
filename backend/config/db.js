@@ -328,7 +328,7 @@ CREATE TABLE IF NOT EXISTS seqs (
 if (db) {
     try {
         db.exec(SCHEMA);
-        seedIfEmpty();
+        if (typeof seedIfEmpty === 'function') seedIfEmpty();
     } catch (e) {
         console.error('Error executing schema/seeding:', e.message);
     }
@@ -386,9 +386,18 @@ function nextNumber(prefix) {
         return prefix + '-' + String(Math.floor(Math.random() * 900000) + 100000);
     }
 }
+
 function parseJson(s, def) {
     try { return JSON.parse(s); } catch (e) { return def; }
 }
+
+const CASH_ACCOUNT_ID = 1;
+const CUSTOMER_ACCOUNT_ID = 6;
+const SUPPLIER_ACCOUNT_ID = 7;
+const SALES_ACCOUNT_ID = 4;
+const PURCHASES_ACCOUNT_ID = 5;
+const EXPENSE_ACCOUNT_ID = 8;
+const OTHER_INCOME_ACCOUNT_ID = 10;
 
 const CASH = CASH_ACCOUNT_ID;
 const CUSTOMER = CUSTOMER_ACCOUNT_ID;
