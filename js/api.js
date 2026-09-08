@@ -125,8 +125,6 @@ const API = (function () {
         }
     }
 
-    const WEBHOOK_TOKEN = '869e97e1-323f-47d2-ba50-6082983bffcf';
-
     async function pushFullDataToCloud() {
         try {
             const STORES = [
@@ -139,22 +137,14 @@ const API = (function () {
             for (const s of STORES) {
                 fullData[s] = await ARDB.localGetAll(s);
             }
-            const cloudPayload = { lastUpdated: Date.now(), data: fullData };
-            
-            // الرفع المزدوج: لسيرفر Vercel وسيرفر التخزين السحابي التراكمي
-            fetch(`${getBaseUrl()}/sync/push`, {
+            const res = await fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ fullData })
-            }).catch(() => {});
-
-            const resDirect = await fetch(`https://webhook.site/${WEBHOOK_TOKEN}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(cloudPayload)
             });
-            if (resDirect.ok) {
-                _lastSyncTimestamp = cloudPayload.lastUpdated;
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.lastUpdated) _lastSyncTimestamp = json.lastUpdated;
                 return true;
             }
         } catch(e) {
@@ -165,39 +155,27 @@ const API = (function () {
 
     async function pullCloudSync() {
         try {
-            let json = null;
-            try {
-                const res = await fetch(`${getBaseUrl()}/sync/pull`, { headers: getAuthHeaders() });
-                if (res.ok) json = await res.json();
-            } catch(e) {}
-
-            if (!json || !json.data || !Object.keys(json.data).length) {
-                const resDirect = await fetch(`https://webhook.site/token/${WEBHOOK_TOKEN}/requests?sorting=newest`);
-                if (resDirect.ok) {
-                    const reqs = await resDirect.json();
-                    if (reqs.data && reqs.data.length > 0 && reqs.data[0].content) {
-                        json = JSON.parse(reqs.data[0].content);
+            const res = await fetch(`${getBaseUrl()}/sync/pull`, { headers: getAuthHeaders() });
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.lastUpdated && json.lastUpdated > _lastSyncTimestamp) {
+                    _lastSyncTimestamp = json.lastUpdated;
+                    const cloudData = json.data || {};
+                    let updatedAny = false;
+                    for (const s of Object.keys(cloudData)) {
+                        const items = cloudData[s] || [];
+                        for (const item of items) {
+                            try {
+                                await ARDB.localPut(s, item);
+                                updatedAny = true;
+                            } catch(e){}
+                        }
                     }
-                }
-            }
-
-            if (json && json.lastUpdated && json.lastUpdated > _lastSyncTimestamp) {
-                _lastSyncTimestamp = json.lastUpdated;
-                const cloudData = json.data || {};
-                let updatedAny = false;
-                for (const s of Object.keys(cloudData)) {
-                    const items = cloudData[s] || [];
-                    for (const item of items) {
-                        try {
-                            await ARDB.localPut(s, item);
-                            updatedAny = true;
-                        } catch(e){}
+                    if (updatedAny && typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: cloudData }));
                     }
+                    return updatedAny;
                 }
-                if (updatedAny && typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: cloudData }));
-                }
-                return updatedAny;
             }
         } catch(e) {}
         return false;
@@ -208,7 +186,7 @@ const API = (function () {
         pullCloudSync();
         _syncTimer = setInterval(async () => {
             await pullCloudSync();
-        }, 1500);
+        }, 1000);
 
         if (typeof window !== 'undefined') {
             window.addEventListener('focus', () => pullCloudSync());

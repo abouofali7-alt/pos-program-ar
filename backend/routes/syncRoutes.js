@@ -1,49 +1,42 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 
-const WEBHOOK_TOKEN = '869e97e1-323f-47d2-ba50-6082983bffcf';
-let _memoryCache = { lastUpdated: Date.now(), data: {} };
+const SYNC_FILE = process.env.VERCEL ? '/tmp/ar_cloud_sync.json' : path.join(__dirname, '..', 'ar_cloud_sync.json');
 
-async function loadCloudData() {
+if (!global._ar_cloud_data) {
+    global._ar_cloud_data = { lastUpdated: Date.now(), data: {} };
     try {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch(`https://webhook.site/token/${WEBHOOK_TOKEN}/requests?sorting=newest`, { signal: controller.signal });
-        clearTimeout(tid);
-        if (res.ok) {
-            const json = await res.json();
-            if (json.data && json.data.length > 0 && json.data[0].content) {
-                const parsed = JSON.parse(json.data[0].content);
-                if (parsed && typeof parsed === 'object' && parsed.data) {
-                    _memoryCache = parsed;
-                    return parsed;
-                }
+        if (fs.existsSync(SYNC_FILE)) {
+            const raw = fs.readFileSync(SYNC_FILE, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object' && parsed.data) {
+                global._ar_cloud_data = parsed;
             }
         }
     } catch(e) {}
-    return _memoryCache;
 }
 
-async function saveCloudData(cloudObj) {
-    _memoryCache = cloudObj;
-    try {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 4000);
-        await fetch(`https://webhook.site/${WEBHOOK_TOKEN}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(cloudObj),
-            signal: controller.signal
-        });
-        clearTimeout(tid);
-    } catch(e) {}
+function loadCloudData() {
+    return global._ar_cloud_data;
+}
+
+function saveCloudData(cloudObj) {
+    global._ar_cloud_data = cloudObj;
+    // حفظ غير حاجب في الخلفية (Non-blocking background save)
+    setImmediate(() => {
+        try {
+            fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
+        } catch(e) {}
+    });
 }
 
 // 1. POST /api/sync/push — أي جهاز يرفع معاملة أو صنف جديد
-router.post('/push', async (req, res) => {
+router.post('/push', (req, res) => {
     try {
         const { store, item, action, fullData } = req.body || {};
-        const cloud = await loadCloudData();
+        const cloud = loadCloudData();
         if (!cloud.data) cloud.data = {};
         
         if (fullData && typeof fullData === 'object') {
@@ -62,7 +55,7 @@ router.post('/push', async (req, res) => {
         }
         
         cloud.lastUpdated = Date.now();
-        await saveCloudData(cloud);
+        saveCloudData(cloud);
         res.json({ success: true, lastUpdated: cloud.lastUpdated });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
@@ -70,9 +63,9 @@ router.post('/push', async (req, res) => {
 });
 
 // 2. GET /api/sync/pull — الأجهزة الأخرى تسحب أحدث حركة فوراً
-router.get('/pull', async (req, res) => {
+router.get('/pull', (req, res) => {
     try {
-        const cloud = await loadCloudData();
+        const cloud = loadCloudData();
         res.json({ success: true, lastUpdated: cloud.lastUpdated || Date.now(), data: cloud.data || {} });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
