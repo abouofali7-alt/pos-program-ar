@@ -371,15 +371,107 @@ img, video, canvas, table, iframe {
 }
 
 /* ============================================================
-   تحسينات عامة لسهولة اللمس (Touch)
+   تحسينات عامة لسهولة اللمس (Touch) وتناسق الأجهزة
    ============================================================ */
 @media (hover: none), (pointer: coarse) {
     button, .action-btn, .btn-primary, .submenu-btn, .filter-chip,
-    .tab-btn, .action-icon-btn {
-        min-height: 44px;
+    .tab-btn, .action-icon-btn, .btn {
+        min-height: 42px;
     }
 
     .action-icon-btn {
         padding: 10px 12px;
     }
 }
+
+/* ============================================================
+   شريط الهيدر العلوي واللوحات المتجاوبة (Topbar & Layouts)
+   ============================================================ */
+@media (max-width: 992px) {
+    .pos-grid {
+        grid-template-columns: 1fr !important;
+        height: auto !important;
+    }
+    .pos-cart {
+        order: 2;
+        margin-top: 14px;
+    }
+    .pos-products {
+        order: 1;
+    }
+    #barcodeSearch {
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .topbar {
+        padding: 8px 12px !important;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .topbar-right, .topbar-left {
+        gap: 6px !important;
+    }
+    .brand {
+        font-size: 1rem !important;
+    }
+    .user-badge {
+        font-size: 0.78rem !important;
+        padding: 4px 8px !important;
+    }
+    #apiStatusBadge {
+        padding: 3px 8px !important;
+        font-size: 0.72rem !important;
+        margin-inline-start: 4px !important;
+    }
+    .icon-btn {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 0.9rem !important;
+    }
+    .pagewrap {
+        padding: 12px 14px !important;
+    }
+    .stat-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+        gap: 10px !important;
+    }
+    .stat-card {
+        padding: 14px !important;
+    }
+    .stat-card .value {
+        font-size: 1.25rem !important;
+    }
+    .page-head {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 10px !important;
+    }
+    .page-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .page-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    /* منع زوم متصفح الموبايل (iOS Safari) عند التركيز على الإدخالات */
+    input[type="text"], input[type="number"], input[type="password"],
+    input[type="search"], input[type="date"], select, textarea {
+        font-size: 16px !important;
+    }
+
+    .table-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .modal-box {
+        width: min(560px, 94vw) !important;
+        padding: 16px !important;
+        max-height: 88vh !important;
+    }
+}
+
