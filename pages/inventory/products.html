@@ -27,7 +27,7 @@
             <div class="table-head">قائمة المنتجات</div>
             <div class="table-scroll">
                 <table class="data-table" id="productsTable">
-                    <thead><tr><th>الاسم</th><th>الباركود</th><th>التصنيف</th><th>الوحدة</th><th>سعر التكلفة</th><th>سعر البيع</th><th>الرصيد</th><th></th></tr></thead>
+                    <thead><tr><th>الاسم</th><th>الباركود</th><th>التصنيف</th><th>الوحدة</th><th>سعر التكلفة</th><th>سعر قطاعي</th><th>سعر جملة</th><th>الرصيد</th><th></th></tr></thead>
                     <tbody id="prodBody"></tbody>
                 </table>
             </div>
@@ -43,7 +43,8 @@
                 <div class="form-item"><label>التصنيف</label><select id="pCategory"></select></div>
                 <div class="form-item"><label>الوحدة</label><input id="pUnit" placeholder="قطعة"></div>
                 <div class="form-item"><label>سعر التكلفة</label><input type="number" id="pCost" step="0.01" min="0"></div>
-                <div class="form-item"><label>سعر البيع</label><input type="number" id="pPrice" step="0.01" min="0"></div>
+                <div class="form-item"><label>سعر البيع (قطاعي)</label><input type="number" id="pPrice" step="0.01" min="0"></div>
+                <div class="form-item"><label>سعر البيع (جملة)</label><input type="number" id="pWholesalePrice" step="0.01" min="0" placeholder="اتركه فارغاً لنفس القطاعي"></div>
                 <div class="form-item"><label>الرصيد الابتدائي (الكمية الحالية)</label><input type="number" id="pInitialStock" step="1" min="0" placeholder="0"></div>
                 <div class="form-item"><label>حد أدنى للمخزون</label><input type="number" id="pMinStock" step="1" min="0"></div>
                 <div class="form-item" style="grid-column:1/-1;display:flex;flex-direction:column;gap:6px;margin-top:6px;">
@@ -132,19 +133,20 @@
                     '<td>' + (p.unit || 'قطعة') + '</td>' +
                     '<td class="num">' + UI.money(p.cost || 0) + '</td>' +
                     '<td class="num" style="color:var(--success);">' + UI.money(p.price || 0) + '</td>' +
+                    '<td class="num" style="color:var(--accent-purple);">' + UI.money(p.wholesalePrice || p.price || 0) + '</td>' +
                     '<td class="num" style="font-weight:700;color:' + (low ? 'var(--danger)' : 'var(--text-primary)') + ';">' + q + (low ? ' <span class="badge badge-red">منخفض</span>' : '') + '</td>' +
                     '<td style="text-align:left;white-space:nowrap;">' +
                         (p.hasSerials ? '<button class="btn btn-sm btn-secondary" title="عرض السريالات" onclick="viewSerials(' + p.id + ')"><i class="fa-solid fa-barcode"></i></button> ' : '') +
                         '<button class="btn btn-sm" onclick="editProduct(' + p.id + ')"><i class="fa-solid fa-pen"></i></button> ' +
                         '<button class="btn btn-sm btn-danger" onclick="delProduct(' + p.id + ')"><i class="fa-solid fa-trash"></i></button>' +
                     '</td></tr>';
-            }).join('') || '<tr><td colspan="8" class="empty-state">لا توجد منتجات</td></tr>';
+            }).join('') || '<tr><td colspan="9" class="empty-state">لا توجد منتجات</td></tr>';
         }
 
         function openProductModal() {
             editingPid = null;
             document.getElementById('prodModalTitle').textContent = 'إضافة منتج';
-            ['pName','pBarcode','pUnit','pCost','pPrice','pInitialStock','pMinStock','pSerialsInput'].forEach(id => document.getElementById(id).value = '');
+            ['pName','pBarcode','pUnit','pCost','pPrice','pWholesalePrice','pInitialStock','pMinStock','pSerialsInput'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('pCategory').value = '';
             document.getElementById('pHasSerials').checked = false;
             toggleSerialsInput();
@@ -166,6 +168,7 @@
             document.getElementById('pUnit').value = p.unit || '';
             document.getElementById('pCost').value = p.cost || '';
             document.getElementById('pPrice').value = p.price || '';
+            document.getElementById('pWholesalePrice').value = p.wholesalePrice || '';
             document.getElementById('pInitialStock').value = '';
             document.getElementById('pMinStock').value = p.minStock || 0;
             document.getElementById('pHasSerials').checked = !!p.hasSerials;
@@ -186,13 +189,18 @@
                 parsedSerials = rawSerials.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
             }
 
+            const price = Number(document.getElementById('pPrice').value) || 0;
+            const wholesalePriceInput = Number(document.getElementById('pWholesalePrice').value);
+            const wholesalePrice = !isNaN(wholesalePriceInput) && wholesalePriceInput > 0 ? wholesalePriceInput : price;
+
             const rec = {
                 name,
                 barcode: document.getElementById('pBarcode').value.trim(),
                 categoryId: document.getElementById('pCategory').value ? Number(document.getElementById('pCategory').value) : null,
                 unit: document.getElementById('pUnit').value.trim() || 'قطعة',
                 cost: Number(document.getElementById('pCost').value) || 0,
-                price: Number(document.getElementById('pPrice').value) || 0,
+                price: price,
+                wholesalePrice: wholesalePrice,
                 minStock: Number(document.getElementById('pMinStock').value) || 0,
                 hasSerials
             };

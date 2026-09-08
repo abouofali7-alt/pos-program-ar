@@ -31,6 +31,7 @@
 
         <div class="stat-grid">
             <div class="stat-card"><div class="label">إجمالي المبيعات (صافي)</div><div class="value green" id="repNet">0.00</div></div>
+            <div class="stat-card"><div class="label">إجمالي الأرباح</div><div class="value cyan" id="repProfit">0.00</div></div>
             <div class="stat-card"><div class="label">إجمالي الفواتير</div><div class="value cyan" id="repCount">0</div></div>
             <div class="stat-card"><div class="label">كمية الأصناف المباعة</div><div class="value purple" id="repQty">0</div></div>
             <div class="stat-card"><div class="label">قيمة المرتجعات</div><div class="value red" id="repReturns">0.00</div></div>
@@ -40,7 +41,7 @@
             <div class="table-head">المبيعات حسب المنتج</div>
             <div class="table-scroll">
                 <table class="data-table">
-                    <thead><tr><th>المنتج</th><th>الكمية المباعة</th><th>المبيعات</th></tr></thead>
+                    <thead><tr><th>المنتج</th><th>الكمية المباعة</th><th>المبيعات (صافي)</th><th>الربح</th></tr></thead>
                     <tbody id="repByProdBody"></tbody>
                 </table>
             </div>
@@ -105,10 +106,12 @@
                     const pid = it.productId || it.id;
                     const q = it.quantity || it.qty || 1;
                     const t = it.total || ((it.price || 0) * q);
+                    const unitCost = (it.cost !== undefined) ? it.cost : (pById[pid] ? pById[pid].cost || 0 : 0);
                     if (prodF && pid !== prodF) return s;
-                    if (!prodMap[pid]) prodMap[pid] = { name: (it.name || (pById[pid] ? pById[pid].name : 'صنف ' + pid)), qty: 0, amount: 0, returns: 0, retAmt: 0 };
+                    if (!prodMap[pid]) prodMap[pid] = { name: (it.name || (pById[pid] ? pById[pid].name : 'صنف ' + pid)), qty: 0, amount: 0, costTotal: 0, returns: 0, retAmt: 0, retCost: 0 };
                     prodMap[pid].qty += q;
                     prodMap[pid].amount += t;
+                    prodMap[pid].costTotal += q * unitCost;
                     qtyTotal += q;
                     return s + t;
                 }, 0);
@@ -126,16 +129,28 @@
                     const pid = it.productId || it.id;
                     const q = it.quantity || it.qty || 1;
                     const t = it.total || ((it.price || 0) * q);
+                    const unitCost = (it.cost !== undefined) ? it.cost : (pById[pid] ? pById[pid].cost || 0 : 0);
                     if (prodF && pid !== prodF) return;
                     if (prodMap[pid]) {
                         prodMap[pid].returns += q;
                         prodMap[pid].retAmt += t;
+                        prodMap[pid].retCost += q * unitCost;
                     }
                     retTotal += t;
                 });
             });
 
+            let overallProfit = 0;
+            Object.keys(prodMap).forEach(pid => {
+                const p = prodMap[pid];
+                p.netSales = p.amount - p.retAmt;
+                p.netCost = p.costTotal - p.retCost;
+                p.profit = p.netSales - p.netCost;
+                overallProfit += p.profit;
+            });
+
             document.getElementById('repNet').innerHTML = UI.money(net - retTotal);
+            if (document.getElementById('repProfit')) document.getElementById('repProfit').innerHTML = UI.money(overallProfit);
             document.getElementById('repCount').textContent = count;
             document.getElementById('repQty').textContent = qtyTotal;
             document.getElementById('repReturns').innerHTML = UI.money(retTotal);
@@ -144,8 +159,9 @@
                 const p = prodMap[pid];
                 return '<tr><td><b>' + p.name + '</b></td>' +
                     '<td class="num">' + (p.qty - p.returns) + (p.returns ? ' <span class="badge badge-red">مرتجع ' + p.returns + '</span>' : '') + '</td>' +
-                    '<td class="num" style="font-weight:700;color:var(--success);">' + UI.money(p.amount - p.retAmt) + '</td></tr>';
-            }).join('') || '<tr><td colspan="3" class="empty-state">لا توجد مبيعات في الفترة المحددة</td></tr>';
+                    '<td class="num" style="font-weight:700;color:var(--success);">' + UI.money(p.netSales) + '</td>' +
+                    '<td class="num" style="font-weight:700;color:' + (p.profit >= 0 ? 'var(--accent-cyan)' : 'var(--danger)') + ';">' + UI.money(p.profit) + '</td></tr>';
+            }).join('') || '<tr><td colspan="4" class="empty-state">لا توجد مبيعات في الفترة المحددة</td></tr>';
 
             const custMap = {};
             list.forEach(inv => {

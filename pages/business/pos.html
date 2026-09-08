@@ -38,7 +38,11 @@
                 <h2><i class="fa-solid fa-cash-register" style="color:var(--success);"></i> نقطة البيع (POS)</h2>
                 <div class="sub">نظام الكاشير والمبيعات السريعة</div>
             </div>
-            <div style="display:flex;gap:10px;">
+            <div style="display:flex;gap:10px;align-items:center;">
+                <div class="sale-type-toggle" style="display:flex;background:var(--card-dark);border:1px solid var(--border-color);border-radius:8px;padding:3px;gap:2px;">
+                    <button id="btnSaleRetail" class="btn btn-sm btn-primary-soft" onclick="setSaleType('retail')" style="border-radius:6px;font-size:0.8rem;padding:6px 12px;"><i class="fa-solid fa-user"></i> بيع قطاعي</button>
+                    <button id="btnSaleWholesale" class="btn btn-sm btn-secondary" onclick="setSaleType('wholesale')" style="border-radius:6px;font-size:0.8rem;padding:6px 12px;"><i class="fa-solid fa-boxes-stacked"></i> بيع جملة</button>
+                </div>
                 <input id="barcodeSearch" placeholder="🔍 ابحث بالاسم أو الباركوود..." style="padding:8px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-dark);color:var(--text-primary);width:260px;" autofocus>
             </div>
         </div>
@@ -98,6 +102,34 @@
         let _cart = [];
         let _selectedCat = null;
         let _posLocation = null;
+        let _saleType = 'retail';
+
+        function getProdPrice(prod) {
+            if (!prod) return 0;
+            if (_saleType === 'wholesale') {
+                return prod.wholesalePrice || prod.price || 0;
+            }
+            return prod.price || 0;
+        }
+
+        function setSaleType(type) {
+            _saleType = type;
+            const btnR = document.getElementById('btnSaleRetail');
+            const btnW = document.getElementById('btnSaleWholesale');
+            if (type === 'wholesale') {
+                if (btnR) btnR.className = 'btn btn-sm btn-secondary';
+                if (btnW) btnW.className = 'btn btn-sm btn-primary-soft';
+            } else {
+                if (btnR) btnR.className = 'btn btn-sm btn-primary-soft';
+                if (btnW) btnW.className = 'btn btn-sm btn-secondary';
+            }
+            _cart.forEach(item => {
+                const prod = _allProducts.find(p => p.id === item.productId);
+                if (prod) item.price = getProdPrice(prod);
+            });
+            renderCart();
+            renderProducts(document.getElementById('barcodeSearch') ? document.getElementById('barcodeSearch').value.trim().toLowerCase() : '');
+        }
 
         async function initPOS() {
             _allProducts = await ARDB.getAll('products');
@@ -189,7 +221,7 @@
                 <div class="prod-item" onclick="addToCart(${p.id})">
                     <div style="font-size:1.5rem;margin-bottom:6px;color:var(--accent-cyan);"><i class="fa-solid fa-box"></i></div>
                     <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</div>
-                    <div style="color:var(--success);font-weight:700;font-size:0.9rem;">${UI.money(p.price || 0)}</div>
+                    <div style="color:var(--success);font-weight:700;font-size:0.9rem;">${UI.money(getProdPrice(p))}</div>
                 </div>
             `).join('');
         }
@@ -229,11 +261,12 @@
                     existing.quantity += 1;
                     existing.serialIds.push(matched.id);
                     existing.serials.push(matched.serialNumber);
+                    existing.price = getProdPrice(prod);
                 } else {
                     _cart.push({
                         productId: prod.id,
                         productName: prod.name,
-                        price: prod.price || 0,
+                        price: getProdPrice(prod),
                         quantity: 1,
                         serialIds: [matched.id],
                         serials: [matched.serialNumber]
@@ -242,11 +275,12 @@
             } else {
                 if (existing) {
                     existing.quantity += 1;
+                    existing.price = getProdPrice(prod);
                 } else {
                     _cart.push({
                         productId: prod.id,
                         productName: prod.name,
-                        price: prod.price || 0,
+                        price: getProdPrice(prod),
                         quantity: 1,
                         serialIds: [],
                         serials: []
@@ -377,6 +411,7 @@
                 payments: payments,
                 paymentMethod: payMethodSummary,
                 paymentType: isCredit ? 'credit' : 'cash',
+                saleType: _saleType,
                 location: _posLocation,
                 type: 'pos'
             };
