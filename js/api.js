@@ -11,7 +11,6 @@ const API = (function () {
         return 'http://localhost:8080/api';
     }
     
-    // استرجاع الإعدادات المحفوظة أو استخدام الافتراضي
     function getBaseUrl() {
         return localStorage.getItem('ar_api_base_url') || getDefaultBaseUrl();
     }
@@ -24,22 +23,28 @@ const API = (function () {
         localStorage.setItem('ar_api_base_url', cleanUrl);
     }
 
+    function getAuthHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        try {
+            const sess = JSON.parse(localStorage.getItem('ar_session') || 'null');
+            if (sess && sess.token) {
+                headers['Authorization'] = 'Bearer ' + sess.token;
+            }
+        } catch(e) {}
+        return headers;
+    }
+
     function isApiModeEnabled() {
         const setting = localStorage.getItem('ar_api_mode');
         if (setting === 'true') return true;
         if (setting === 'false') return false;
-        // عندما يعمل الموقع عبر خادم ويب HTTP/HTTPS، يتم تفعيل وضع الباك إند المركزية تلقائياً لجميع الأجهزة
-        if (typeof window !== 'undefined' && window.location && window.location.protocol && window.location.protocol.startsWith('http')) {
-            return true;
-        }
-        return false;
+        return false; // الافتراضي الاستعانة بـ IndexedDB مع المزامنة التلقائية
     }
 
     function setApiMode(enabled) {
         localStorage.setItem('ar_api_mode', enabled ? 'true' : 'false');
     }
 
-    // فحص صحة وتوفر الباك إند
     async function checkHealth() {
         const baseUrl = getBaseUrl();
         try {
@@ -48,16 +53,12 @@ const API = (function () {
             const res = await fetch(`${baseUrl}/health`, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (res.ok) {
-                setApiMode(true);
                 return { status: 'online', mode: 'api', url: baseUrl };
             }
-        } catch (e) {
-            // السيرفر غير متصل
-        }
+        } catch (e) {}
         return { status: 'offline', mode: 'local', url: baseUrl };
     }
 
-    // تحويل اسم المخزن في ARDB إلى اسم الـ Endpoint
     function storeToEndpoint(store) {
         const map = {
             settings: 'settings',
@@ -73,6 +74,7 @@ const API = (function () {
             suppliers: 'suppliers',
             categories: 'categories',
             products: 'products',
+            serials: 'serials',
             warehouses: 'warehouses',
             stockMovements: 'stock-movements',
             invoices: 'invoices',
@@ -91,16 +93,29 @@ const API = (function () {
         return map[store] || store;
     }
 
-    /* ---------- العمليات الأساسية (CRUD) ---------- */
+    /* ---------- العمليات الأساسية (CRUD مع الفولباك التلقائي لـ IndexedDB) ---------- */
 
     async function getAll(store) {
         if (isApiModeEnabled()) {
             try {
                 const endpoint = storeToEndpoint(store);
-                const res = await fetch(`${getBaseUrl()}/${endpoint}`);
-                if (res.ok) return await res.json();
+                const res = await fetch(`${getBaseUrl()}/${endpoint}`, { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    let list = null;
+                    if (Array.isArray(json)) list = json;
+                    else if (json && Array.isArray(json.data)) list = json.data;
+                    
+                    if (list && Array.isArray(list)) {
+                        // حفظ زمني في IndexedDB
+                        for (const item of list) {
+                            try { await ARDB.localPut(store, item); } catch(e){}
+                        }
+                        return list;
+                    }
+                }
             } catch (e) {
-                console.warn(`[API] فشل الاتصال بالباك إند لجلب ${store}، استخدام IndexedDB بدلاً عنه.`, e);
+                console.warn(`[API] تعذر الجلب من الباك إند لـ ${store}، التحويل إلى IndexedDB المحلي.`, e);
             }
         }
         return await ARDB.localGetAll(store);
@@ -110,68 +125,71 @@ const API = (function () {
         if (isApiModeEnabled()) {
             try {
                 const endpoint = storeToEndpoint(store);
-                const res = await fetch(`${getBaseUrl()}/${endpoint}/${id}`);
-                if (res.ok) return await res.json();
+                const res = await fetch(`${getBaseUrl()}/${endpoint}/${id}`, { headers: getAuthHeaders() });
+                if (res.ok) {
+                    const json = await res.json();
+                    const item = (json && json.data !== undefined) ? json.data : json;
+                    if (item) return item;
+                }
             } catch (e) {
-                console.warn(`[API] فشل الاتصال بالباك إند لجلب ${store} #${id}`);
+                console.warn(`[API] تعذر الجلب بالـ ID لـ ${store} #${id}`);
             }
         }
         return await ARDB.localGetById(store, id);
     }
 
     async function add(store, item) {
+        let saved = null;
         if (isApiModeEnabled()) {
             try {
                 const endpoint = storeToEndpoint(store);
                 const res = await fetch(`${getBaseUrl()}/${endpoint}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(item)
                 });
                 if (res.ok) {
-                    const saved = await res.json();
-                    try { await ARDB.localPut(store, saved); } catch(e){}
-                    return saved;
+                    const json = await res.json();
+                    saved = (json && json.data !== undefined) ? json.data : json;
                 }
             } catch (e) {
                 console.warn(`[API] تعذر الإضافة عبر الباك إند، الحفظ في IndexedDB المحلي`, e);
             }
         }
-        return await ARDB.localAdd(store, item);
+        const localRes = await ARDB.localAdd(store, saved || item);
+        return saved || localRes;
     }
 
     async function update(store, item) {
+        let updated = null;
         if (isApiModeEnabled()) {
             try {
                 const endpoint = storeToEndpoint(store);
                 const res = await fetch(`${getBaseUrl()}/${endpoint}/${item.id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(item)
                 });
                 if (res.ok) {
-                    const updated = await res.json();
-                    try { await ARDB.localPut(store, updated); } catch(e){}
-                    return updated;
+                    const json = await res.json();
+                    updated = (json && json.data !== undefined) ? json.data : json;
                 }
             } catch (e) {
                 console.warn(`[API] تعذر التعديل عبر الباك إند، التعديل في IndexedDB المحلي`, e);
             }
         }
-        return await ARDB.localPut(store, item);
+        await ARDB.localPut(store, updated || item);
+        return updated || item;
     }
 
     async function remove(store, id) {
         if (isApiModeEnabled()) {
             try {
                 const endpoint = storeToEndpoint(store);
-                const res = await fetch(`${getBaseUrl()}/${endpoint}/${id}`, {
-                    method: 'DELETE'
+                await fetch(`${getBaseUrl()}/${endpoint}/${id}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
                 });
-                if (res.ok) {
-                    try { await ARDB.localRemove(store, id); } catch(e){}
-                    return true;
-                }
             } catch (e) {
                 console.warn(`[API] تعذر الحذف عبر الباك إند، الحذف من IndexedDB المحلي`, e);
             }
