@@ -403,6 +403,7 @@
             else if (typeof render === 'function') render();
             else if (typeof initDashboard === 'function') initDashboard();
             else if (typeof loadPos === 'function') loadPos();
+            else if (typeof initPOS === 'function') initPOS();
             else if (typeof initPage === 'function') initPage();
         } catch(e) {}
     }
@@ -412,9 +413,9 @@
         await requireAuth();
         renderHeader();
         if (typeof API !== 'undefined') {
-            API.pullCloudSync(true).then(() => {
-                refreshCurrentPage();
-            });
+            await API.pullCloudSync(true);
+            refreshCurrentPage();
+            API.pushFullDataToCloud();
             API.startAutoSync();
         }
         window.addEventListener('ar_cloud_data_updated', () => {
