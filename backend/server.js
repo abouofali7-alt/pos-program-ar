@@ -19,9 +19,10 @@ function logCrash(tag, err) {
 process.on('uncaughtException', (err) => logCrash('uncaught', err));
 process.on('unhandledRejection', (reason) => logCrash('rejection', reason));
 
-// عام: تسجيل الدخول وحالة الخادم
+// عام: تسجيل الدخول وحالة الخادم والمزامنة
 app.use('/api/auth', require('./routes/authRoutes'));
 app.get('/api/health', (req, res) => res.json({ success: true, data: { ok: true, time: new Date().toISOString() } }));
+app.use('/api/sync', require('./routes/syncRoutes'));
 
 // كل باقي واجهات الـ API محمية بالتوكن
 app.use('/api', auth);
@@ -31,7 +32,6 @@ mountCrud(app);
 app.use('/api', require('./routes/salesRoutes').router);
 app.use('/api', require('./routes/inventoryRoutes'));
 app.use('/api', require('./routes/hrRoutes'));
-app.use('/api/sync', require('./routes/syncRoutes'));
 app.use('/api/reports', require('./routes/reportsRoutes'));
 
 // الأصول الثابتة للواجهة + نقطة دخول التطبيق
