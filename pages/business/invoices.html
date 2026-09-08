@@ -229,8 +229,9 @@
         }
 
         async function saveInvoice() {
-            const date = new Date(document.getElementById('invDate').value + 'T12:00:00').getTime();
-            const customerId = document.getElementById('invCustomer').value ? Number(document.getElementById('invCustomer').value) : null;
+            const dateVal = document.getElementById('invDate').value;
+            const date = dateVal ? new Date(dateVal + 'T12:00:00').getTime() : Date.now();
+            const customerId = document.getElementById('invCustomer').value || null;
             const paymentType = document.getElementById('invPayType').value || 'cash';
             const note = document.getElementById('invNote').value.trim();
 
@@ -244,52 +245,74 @@
                 const priceInput = tr.querySelector('input[id^="ilPrice_"]');
                 const serialsSel = tr.querySelector('select[id^="ilSerials_"]');
 
-                if (sel) {
-                    const pid = Number(sel.value);
-                    if (pid) {
-                        const opt = sel.options[sel.selectedIndex];
-                        const requiresSerials = opt && opt.dataset.serials === '1';
-                        const q = Number(qtyInput.value) || 0;
-                        const p = Number(priceInput.value) || 0;
+                if (sel && sel.value) {
+                    const pid = sel.value;
+                    const opt = sel.options[sel.selectedIndex];
+                    const requiresSerials = opt && opt.dataset.serials === '1';
+                    const q = Number(qtyInput.value) || 0;
+                    const p = Number(priceInput.value) || 0;
 
-                        let selectedSerialIds = [];
-                        let selectedSerialSNs = [];
-                        if (requiresSerials && serialsSel) {
-                            const selOpts = Array.from(serialsSel.selectedOptions).filter(o => !o.disabled);
-                            selectedSerialIds = selOpts.map(o => Number(o.value));
-                            selectedSerialSNs = selOpts.map(o => o.dataset.sn);
+                    let selectedSerialIds = [];
+                    let selectedSerialSNs = [];
+                    if (requiresSerials && serialsSel) {
+                        const selOpts = Array.from(serialsSel.selectedOptions).filter(o => !o.disabled);
+                        selectedSerialIds = selOpts.map(o => o.value);
+                        selectedSerialSNs = selOpts.map(o => o.dataset.sn);
 
-                            if (selectedSerialIds.length !== q) {
-                                UI.toast('عدد السريالات المحددة (' + selectedSerialIds.length + ') لا يطابق الكمية المباعة (' + q + ')', 'warn');
-                                return;
-                            }
+                        if (selectedSerialIds.length !== q) {
+                            UI.toast('عدد السريالات المحددة (' + selectedSerialIds.length + ') لا يطابق الكمية المباعة (' + q + ')', 'warn');
+                            return;
                         }
+                    }
 
-                        if (q > 0) {
-                            const pr = await ARDB.getById('products', pid);
-                            items.push({ productId: pid, name: pr ? pr.name : '', quantity: q, price: p, cost: pr ? (pr.cost || 0) : 0, total: q * p, serialIds: selectedSerialIds, serials: selectedSerialSNs });
-                            total += q * p;
-                            qtyCheck[pid] = (qtyCheck[pid] || 0) + q;
-                        }
+                    if (q > 0) {
+                        const pr = await ARDB.getById('products', pid);
+                        items.push({
+                            productId: pid,
+                            name: pr ? pr.name : (opt ? opt.text.split(' (')[0] : 'صنف'),
+                            quantity: q,
+                            price: p,
+                            cost: pr ? (pr.cost || 0) : 0,
+                            total: q * p,
+                            serialIds: selectedSerialIds,
+                            serials: selectedSerialSNs
+                        });
+                        total += q * p;
+                        qtyCheck[pid] = (qtyCheck[pid] || 0) + q;
                     }
                 }
             }
             if (!items.length) { UI.toast('أضف على الأقل صنفًا واحدًا', 'warn'); return; }
 
-            // التحقق من توفر المخزون
-            const movements = await ARDB.getAll('stockMovements');
+            // التحقق من توفر المخزون بنفس طريقة string comparison
+            const movements = (await ARDB.getAll('stockMovements')) || [];
             for (const pid of Object.keys(qtyCheck)) {
                 let available = 0;
-                movements.forEach(m => { if (m.productId === Number(pid)) available += (m.quantity || 0) * (m.direction === 'in' ? 1 : -1); });
+                movements.forEach(m => {
+                    if (m && m.productId != null && String(m.productId) === String(pid)) {
+                        const mQty = (Number(m.quantity) || Number(m.qty) || 0);
+                        available += mQty * (m.direction === 'in' ? 1 : -1);
+                    }
+                });
                 if (available < qtyCheck[pid]) {
-                    const p = await ARDB.getById('products', Number(pid));
-                    UI.toast('الكمية غير كافية لـ ' + (p ? p.name : 'المنتج') + ' (المتاح: ' + available + ')', 'error');
+                    const p = await ARDB.getById('products', pid);
+                    UI.toast('الكمية غير كافية لـ ' + (p ? p.name : 'المنتج') + ' (المتاح بالمخزن: ' + available + ')', 'error');
                     return;
                 }
             }
 
             const number = await ARDB.nextSeq('invoice', 'INV-', 6);
-            const invId = await ARDB.add('invoices', { number, date, customerId, paymentType, location: _invLocation, items, total, note, createdAt: Date.now() });
+            const invId = await ARDB.add('invoices', {
+                number,
+                date,
+                customerId,
+                paymentType,
+                location: _invLocation,
+                items,
+                total,
+                note,
+                createdAt: Date.now()
+            });
 
             // تحديث حالة السريالات المباعة
             for (const it of items) {
@@ -301,7 +324,27 @@
             }
 
             for (const it of items) {
-                await ARDB.add('stockMovements', { date, productId: it.productId, direction: 'out', type: 'sale', quantity: it.quantity, note: 'فاتورة ' + number });
+                await ARDB.add('stockMovements', {
+                    date,
+                    productId: it.productId,
+                    direction: 'out',
+                    type: 'sale',
+                    quantity: it.quantity,
+                    note: 'فاتورة بيع ' + number
+                });
+            }
+
+            // تسجيل الدفعة النقدية إن وجدت
+            if (paymentType === 'cash' && customerId && total > 0) {
+                await ARDB.add('payments', {
+                    date,
+                    type: 'receipt',
+                    partyType: 'customer',
+                    partyId: customerId,
+                    amount: total,
+                    method: 'cash',
+                    note: 'سداد فاتورة بيع ' + number
+                });
             }
 
             // تسجيل الإيراد في دفتر اليومية
@@ -310,7 +353,8 @@
             if (total > 0) {
                 await ARDB.add('journalEntries', {
                     number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
-                    date, desc: 'فواتير بيع ' + number + (paymentType === 'credit' ? ' (آجل)' : ' (نقداً)'),
+                    date,
+                    desc: 'فواتير بيع ' + number + (paymentType === 'credit' ? ' (آجل)' : ' (نقداً)'),
                     lines: [
                         { accountId: debitAccount, debit: total, credit: 0 },
                         { accountId: incomeAccount, debit: 0, credit: total }
@@ -318,7 +362,7 @@
                 });
             }
 
-            UI.toast('تم حفظ الفاتورة ' + number, 'ok');
+            UI.toast('تم حفظ الفاتورة ' + number + ' بنجاح', 'ok');
             closeInvModal();
             load();
         }

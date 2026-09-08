@@ -220,30 +220,28 @@
                 const costInput = tr.querySelector('input[id^="plCost_"]');
                 const serialsTa = tr.querySelector('textarea[id^="plSerials_"]');
 
-                if (sel) {
-                    const pid = Number(sel.value);
-                    if (pid) {
-                        const opt = sel.options[sel.selectedIndex];
-                        const requiresSerials = opt && opt.dataset.serials === '1';
-                        const q = Number(qtyInput.value) || 0;
-                        const c = Number(costInput.value) || 0;
+                if (sel && sel.value) {
+                    const pid = sel.value;
+                    const opt = sel.options[sel.selectedIndex];
+                    const requiresSerials = opt && opt.dataset.serials === '1';
+                    const q = Number(qtyInput.value) || 0;
+                    const c = Number(costInput.value) || 0;
 
-                        let parsedSerials = [];
-                        if (requiresSerials && serialsTa) {
-                            const raw = serialsTa.value.trim();
-                            if (raw) {
-                                parsedSerials = raw.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
-                            }
-                            if (parsedSerials.length !== q) {
-                                UI.toast('عدد السريالات المدخلة (' + parsedSerials.length + ') يجب أن يساوي الكمية المشتراة (' + q + ')', 'warn');
-                                return;
-                            }
+                    let parsedSerials = [];
+                    if (requiresSerials && serialsTa) {
+                        const raw = serialsTa.value.trim();
+                        if (raw) {
+                            parsedSerials = raw.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
                         }
+                        if (parsedSerials.length !== q) {
+                            UI.toast('عدد السريالات المدخلة (' + parsedSerials.length + ') يجب أن يساوي الكمية المشتراة (' + q + ')', 'warn');
+                            return;
+                        }
+                    }
 
-                        if (q > 0) {
-                            items.push({ productId: pid, quantity: q, cost: c, total: q * c, serials: parsedSerials });
-                            total += q * c;
-                        }
+                    if (q > 0) {
+                        items.push({ productId: pid, quantity: q, cost: c, total: q * c, serials: parsedSerials });
+                        total += q * c;
                     }
                 }
             }
@@ -273,13 +271,13 @@
                 }
             }
 
-            // تحديث سعر تكلفة المنتج و زيادة الرصيد
+            // تحديث سعر تكلفة المنتج وزيادة الرصيد
             for (const it of items) {
                 const p = await ARDB.getById('products', it.productId);
                 if (p) {
                     await ARDB.put('products', Object.assign({}, p, { id: p.id, cost: it.cost }));
-                    await ARDB.add('stockMovements', { date, productId: it.productId, direction: 'in', type: 'purchase', quantity: it.quantity, note: 'فاتورة ' + number });
                 }
+                await ARDB.add('stockMovements', { date, productId: it.productId, direction: 'in', type: 'purchase', quantity: it.quantity, note: 'فاتورة شراء ' + number });
             }
 
             // قيد محاسبي للمشتريات
