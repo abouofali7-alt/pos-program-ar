@@ -141,6 +141,7 @@
                 UI.toast('تمت الإضافة', 'ok');
             }
             closeUserModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function toggleUser(id, active) {
             const u = await ARDB.getById('users', id);

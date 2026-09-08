@@ -84,8 +84,8 @@
                     '<td><span class="badge ' + typeColor + '">' + (TYPE_NAMES[a.type] || a.type) + '</span></td>' +
                     '<td>' + (parent ? parent.name : '—') + '</td>' +
                     '<td style="text-align:left;white-space:nowrap;">' +
-                        '<button class="btn btn-sm" onclick="editAccount(' + a.id + ')"><i class="fa-solid fa-pen"></i></button> ' +
-                        '<button class="btn btn-sm btn-danger" onclick="delAccount(' + a.id + ')"><i class="fa-solid fa-trash"></i></button>' +
+                        '<button class="btn btn-sm" onclick="editAccount(\'' + a.id + '\')"><i class="fa-solid fa-pen"></i></button> ' +
+                        '<button class="btn btn-sm btn-danger" onclick="delAccount(\'' + a.id + '\')"><i class="fa-solid fa-trash"></i></button>' +
                     '</td></tr>';
             }).join('') || '<tr><td colspan="5" class="empty-state">لا توجد حسابات</td></tr>';
         }
@@ -120,10 +120,10 @@
             const code = document.getElementById('accCode').value.trim();
             const name = document.getElementById('accName').value.trim();
             const type = document.getElementById('accType').value;
-            const parentId = document.getElementById('accParent').value ? Number(document.getElementById('accParent').value) : null;
+            const parentId = document.getElementById('accParent').value ? document.getElementById('accParent').value : null;
             if (!code || !name) { UI.toast('الكود والاسم مطلوبان', 'warn'); return; }
             const existing = await ARDB.getAll('accounts');
-            const dup = existing.find(a => a.code === code && a.id !== editingId);
+            const dup = existing.find(a => a.code === code && String(a.id) !== String(editingId));
             if (dup) { UI.toast('الكود موجود مسبقًا', 'error'); return; }
             const rec = { code, name, type, parentId };
             if (editingId) { rec.id = editingId; await ARDB.put('accounts', rec); UI.toast('تم التعديل', 'ok'); }
@@ -138,8 +138,8 @@
             UI.toast('تم الحذف', 'ok');
             load();
         }
-
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>

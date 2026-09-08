@@ -125,6 +125,7 @@
             if (dup) { rec.id = dup.id; await ARDB.put('payroll', rec); UI.toast('تم التحديث', 'ok'); }
             else { await ARDB.add('payroll', rec); UI.toast('تم الحفظ', 'ok'); }
             closePayModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function togglePay(id) {
             const p = await ARDB.getById('payroll', id);

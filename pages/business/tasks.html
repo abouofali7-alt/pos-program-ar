@@ -143,6 +143,7 @@
             if (editingTid) { rec.id = editingTid; await ARDB.put('tasks', rec); UI.toast('تم التعديل', 'ok'); }
             else { await ARDB.add('tasks', rec); UI.toast('تمت الإضافة', 'ok'); }
             closeTaskModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function delTask(id) {
             const ok = await UI.confirmBox('حذف المهمة؟');

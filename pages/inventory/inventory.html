@@ -71,6 +71,7 @@
             document.getElementById('stockBody').innerHTML = rows.join('') || '<tr><td colspan="6" class="empty-state">لا توجد منتجات</td></tr>';
         }
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>

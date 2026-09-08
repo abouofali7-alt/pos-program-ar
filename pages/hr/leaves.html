@@ -110,6 +110,7 @@
             });
             UI.toast('تم إرسال الطلب', 'ok');
             closeLeaveModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function setLeave(id, status) {
             await ARDB.update('leaveRequests', id, { status });

@@ -112,6 +112,7 @@
             await ARDB.add('stockMovements', { date, productId, direction, type, quantity, note });
             UI.toast('تمت الحركة', 'ok');
             closeMoveModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function delMove(id) {
             const ok = await UI.confirmBox('حذف الحركة؟');

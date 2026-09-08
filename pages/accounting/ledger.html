@@ -28,7 +28,8 @@
         <div id="ledgerResult"></div>
     </main>
 
-    <script src="../../js/ui.js"></script>
+    <script src="../../js/ui.js">    window.addEventListener('ar_cloud_data_updated', () => { if (typeof load === 'function') load(); });
+    </script>
     <script src="../../js/db.js"></script>
     <script src="../../js/app.js"></script>
     <script>

@@ -135,6 +135,7 @@
                 UI.toast('تمت الإضافة', 'ok');
             }
             closeOfferModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function toggleOffer(id) {
             const o = await ARDB.getById('offers', id);

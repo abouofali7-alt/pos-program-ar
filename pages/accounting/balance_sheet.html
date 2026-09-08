@@ -94,6 +94,7 @@
                 '<td>الخصوم + حقوق الملكية</td><td></td><td class="num">' + UI.money(liabilitySum + equitySum) + '</td></tr>';
         }
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>

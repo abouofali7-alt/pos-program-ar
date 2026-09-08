@@ -396,17 +396,29 @@
         if (lb) lb.addEventListener('click', () => { localStorage.removeItem('ar_session'); if (typeof ARDB !== 'undefined') ARDB.clearSession(); window.location.href = prefix + 'pages/login.html'; });
     }
 
+    function refreshCurrentPage() {
+        try {
+            if (typeof load === 'function') load();
+            else if (typeof loadData === 'function') loadData();
+            else if (typeof render === 'function') render();
+            else if (typeof initDashboard === 'function') initDashboard();
+            else if (typeof loadPos === 'function') loadPos();
+            else if (typeof initPage === 'function') initPage();
+        } catch(e) {}
+    }
+
     async function initApp() {
         await loadShared();
         await requireAuth();
         renderHeader();
-        if (typeof API !== 'undefined') API.startAutoSync();
+        if (typeof API !== 'undefined') {
+            API.pullCloudSync(true).then(() => {
+                refreshCurrentPage();
+            });
+            API.startAutoSync();
+        }
         window.addEventListener('ar_cloud_data_updated', () => {
-            try {
-                if (typeof load === 'function') load();
-                else if (typeof loadData === 'function') loadData();
-                else if (typeof render === 'function') render();
-            } catch(e) {}
+            refreshCurrentPage();
         });
     }
 

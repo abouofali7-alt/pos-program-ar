@@ -93,6 +93,7 @@
             if (editingDid) { rec.id = editingDid; await ARDB.put('departments', rec); UI.toast('تم التعديل', 'ok'); }
             else { await ARDB.add('departments', rec); UI.toast('تمت الإضافة', 'ok'); }
             closeDeptModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function delDept(id) {
             const ok = await UI.confirmBox('حذف القسم؟');

@@ -89,6 +89,7 @@
             if (editingCid) { rec.id = editingCid; await ARDB.put('categories', rec); UI.toast('تم التعديل', 'ok'); }
             else { await ARDB.add('categories', rec); UI.toast('تمت الإضافة', 'ok'); }
             closeCatModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function delCat(id) {
             const ok = await UI.confirmBox('حذف التصنيف؟');

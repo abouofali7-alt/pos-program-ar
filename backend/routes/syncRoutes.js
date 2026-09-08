@@ -69,10 +69,17 @@ function isMatch(x, y) {
 // 1. POST /api/sync/push — أي جهاز يرفع معاملة أو صنف جديد
 router.post('/push', async (req, res) => {
     try {
-        const { store, item, action, fullData } = req.body || {};
+        const { store, item, action, fullData, batch } = req.body || {};
         const cloud = await loadCloudData();
         if (!cloud.data) cloud.data = {};
         if (!cloud.deleted) cloud.deleted = {};
+
+        const itemsToProcess = [];
+        if (batch && Array.isArray(batch)) {
+            itemsToProcess.push(...batch);
+        } else if (store && item) {
+            itemsToProcess.push({ store, item, action });
+        }
 
         if (fullData && typeof fullData === 'object') {
             for (const s of Object.keys(fullData)) {
@@ -94,25 +101,32 @@ router.post('/push', async (req, res) => {
                     }
                 }
             }
-        } else if (store && item) {
-            if (!cloud.data[store]) cloud.data[store] = [];
-            if (!cloud.deleted[store]) cloud.deleted[store] = [];
-            const itemId = getItemId(item);
+        }
 
-            if (action === 'delete') {
-                cloud.data[store] = cloud.data[store].filter(x => !isMatch(x, item));
-                if (itemId && !cloud.deleted[store].includes(itemId)) {
-                    cloud.deleted[store].push(itemId);
+        for (const entry of itemsToProcess) {
+            const s = entry.store;
+            const it = entry.item;
+            const act = entry.action || 'save';
+            if (!s || !it) continue;
+
+            if (!cloud.data[s]) cloud.data[s] = [];
+            if (!cloud.deleted[s]) cloud.deleted[s] = [];
+            const itemId = getItemId(it);
+
+            if (act === 'delete') {
+                cloud.data[s] = cloud.data[s].filter(x => !isMatch(x, it));
+                if (itemId && !cloud.deleted[s].includes(itemId)) {
+                    cloud.deleted[s].push(itemId);
                 }
             } else {
-                const idx = cloud.data[store].findIndex(x => isMatch(x, item));
+                const idx = cloud.data[s].findIndex(x => isMatch(x, it));
                 if (idx >= 0) {
-                    cloud.data[store][idx] = item;
+                    cloud.data[s][idx] = it;
                 } else {
-                    cloud.data[store].push(item);
+                    cloud.data[s].push(it);
                 }
                 if (itemId) {
-                    cloud.deleted[store] = cloud.deleted[store].filter(id => String(id) !== itemId);
+                    cloud.deleted[s] = cloud.deleted[s].filter(id => String(id) !== itemId);
                 }
             }
         }

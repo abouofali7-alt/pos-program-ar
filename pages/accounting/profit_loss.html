@@ -120,6 +120,7 @@
                 '<td class="num" style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + ';">' + UI.money(Math.abs(net)) + '</td></tr>';
         }
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>

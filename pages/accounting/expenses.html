@@ -59,7 +59,7 @@
         async function load() {
             const expenses = (await ARDB.getAll('expenses')).sort((a, b) => (b.date || 0) - (a.date || 0));
             const accounts = await ARDB.getAll('accounts');
-            const accById = {}; accounts.forEach(a => accById[a.id] = a);
+            const accById = {}; accounts.forEach(a => accById[String(a.id)] = a);
 
             const total = expenses.reduce((s, e) => s + (e.amount || 0), 0);
             document.getElementById('expTotal').innerHTML = UI.money(total);
@@ -67,10 +67,10 @@
 
             document.getElementById('expBody').innerHTML = expenses.map(e =>
                 '<tr><td>' + UI.date(e.date) + '</td>' +
-                '<td>' + (accById[e.accountId] ? accById[e.accountId].name : '—') + '</td>' +
+                '<td>' + (accById[String(e.accountId)] ? accById[String(e.accountId)].name : '—') + '</td>' +
                 '<td>' + (e.note || '—') + '</td>' +
                 '<td class="num" style="font-weight:700;color:var(--danger);">' + UI.money(e.amount) + '</td>' +
-                '<td style="text-align:left;"><button class="btn btn-sm btn-danger" onclick="delExpense(' + e.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>'
+                '<td style="text-align:left;"><button class="btn btn-sm btn-danger" onclick="delExpense(\'' + e.id + '\')"><i class="fa-solid fa-trash"></i></button></td></tr>'
             ).join('') || '<tr><td colspan="5" class="empty-state">لا توجد مصروفات</td></tr>';
 
             const sel = document.getElementById('expAccount');
@@ -89,7 +89,7 @@
         }
         async function saveExpense() {
             const date = new Date(document.getElementById('expDate').value + 'T12:00:00').getTime();
-            const accountId = Number(document.getElementById('expAccount').value);
+            const accountId = document.getElementById('expAccount').value;
             const amount = Number(document.getElementById('expAmount').value) || 0;
             const note = document.getElementById('expNote').value.trim();
             if (amount <= 0) { UI.toast('أدخل مبلغًا صحيحًا', 'warn'); return; }
@@ -114,6 +114,7 @@
             UI.toast('تم الحذف', 'ok'); load();
         }
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>

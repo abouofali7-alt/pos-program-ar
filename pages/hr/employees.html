@@ -120,6 +120,7 @@
             if (editingEid) { const old = await ARDB.getById('employees', editingEid); rec.active = old ? old.active : true; rec.id = editingEid; await ARDB.put('employees', rec); UI.toast('تم التعديل', 'ok'); }
             else { await ARDB.add('employees', rec); UI.toast('تمت الإضافة', 'ok'); }
             closeEmpModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function delEmp(id) {
             const ok = await UI.confirmBox('حذف الموظف؟ (لن تُحذف بيانات الحضور والرواتب المرتبطة)');

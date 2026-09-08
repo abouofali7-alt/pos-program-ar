@@ -80,7 +80,7 @@
         async function load() {
             const [suppliers, purchases, products] = await Promise.all([ARDB.getAll('suppliers'), ARDB.getAll('purchases'), ARDB.getAll('products')]);
             _allSuppliers = suppliers;
-            const supById = {}; suppliers.forEach(s => supById[s.id] = s);
+            const supById = {}; suppliers.forEach(s => supById[String(s.id)] = s);
             const sel = document.getElementById('purSupplier');
             sel.innerHTML = '<option value="">— اختر المورد —</option>' + suppliers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
             sel.onchange = onPurSupplierChange;
@@ -92,18 +92,18 @@
 
                 return '<tr><td class="num">' + p.number + locBadge + '</td>' +
                 '<td>' + UI.date(p.date) + '</td>' +
-                '<td>' + (p.supplierId && supById[p.supplierId] ? supById[p.supplierId].name : '—') + '</td>' +
+                '<td>' + (p.supplierId && supById[String(p.supplierId)] ? supById[String(p.supplierId)].name : '—') + '</td>' +
                 '<td class="num">' + p.items.length + '</td>' +
                 '<td><span class="badge ' + (isCredit ? 'badge-amber' : 'badge-green') + '">' + (isCredit ? 'آجل' : 'نقداً') + '</span></td>' +
                 '<td class="num" style="font-weight:700;">' + UI.money(p.total) + '</td>' +
-                '<td style="text-align:left;"><button class="btn btn-sm btn-danger" onclick="delPurchase(' + p.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
+                '<td style="text-align:left;"><button class="btn btn-sm btn-danger" onclick="delPurchase(\'' + p.id + '\')"><i class="fa-solid fa-trash"></i></button></td></tr>';
             }).join('') || '<tr><td colspan="7" class="empty-state">لا توجد فواتير شراء</td></tr>';
         }
 
         function onPurSupplierChange() {
-            const sid = Number(document.getElementById('purSupplier').value);
+            const sid = String(document.getElementById('purSupplier').value);
             if (sid) {
-                const s = _allSuppliers.find(x => x.id === sid);
+                const s = _allSuppliers.find(x => String(x.id) === sid);
                 if (s && (s.address || s.lat)) {
                     document.getElementById('purLocation').value = s.address || `${s.lat}, ${s.lng}`;
                 }
@@ -308,6 +308,7 @@
         }
 
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>

@@ -129,6 +129,7 @@
             if (editingPrid) { rec.id = editingPrid; await ARDB.put('projects', rec); UI.toast('تم التعديل', 'ok'); }
             else { await ARDB.add('projects', rec); UI.toast('تمت الإضافة', 'ok'); }
             closeProjModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function delProj(id) {
             const ok = await UI.confirmBox('حذف المشروع؟');

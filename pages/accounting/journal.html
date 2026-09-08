@@ -78,7 +78,7 @@
                     '<td>' + en.desc + '</td>' +
                     '<td class="num" style="color:var(--success);">' + UI.money(dr) + '</td>' +
                     '<td class="num" style="color:var(--danger);">' + UI.money(cr) + '</td>' +
-                    '<td style="text-align:left;"><button class="btn btn-sm btn-danger" onclick="delEntry(' + en.id + ')"><i class="fa-solid fa-trash"></i></button></td>' +
+                    '<td style="text-align:left;"><button class="btn btn-sm btn-danger" onclick="delEntry(\'' + en.id + '\')"><i class="fa-solid fa-trash"></i></button></td>' +
                     '</tr>';
             }).join('') || '<tr><td colspan="6" class="empty-state">لا توجد قيود</td></tr>';
         }
@@ -143,7 +143,7 @@
                 const acc = tr.querySelector('select[id^="lineAcc_"]');
                 const dr = tr.querySelector('input[id^="lineDr_"]');
                 const cr = tr.querySelector('input[id^="lineCr_"]');
-                const a = acc ? Number(acc.value) : 0;
+                const a = acc ? acc.value : 0;
                 const d = dr ? (Number(dr.value) || 0) : 0;
                 const c = cr ? (Number(cr.value) || 0) : 0;
                 if (a && (d || c)) lines.push({ accountId: a, debit: d, credit: c });
@@ -169,6 +169,7 @@
         }
 
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>

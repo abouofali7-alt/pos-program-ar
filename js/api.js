@@ -71,22 +71,42 @@ const API = (function () {
 
     /* ---------- المزامنة السحابية اللحظية الفورية بين الأجهزة ---------- */
 
-    async function pushItemToCloud(store, item, action = 'save') {
+    let _pushQueue = [];
+    let _pushTimer = null;
+    let _isPushing = false;
+
+    async function processPushQueue() {
+        if (_isPushing || _pushQueue.length === 0) return;
+        _isPushing = true;
+        const batch = _pushQueue.splice(0, _pushQueue.length);
         try {
             const res = await fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ store, item, action })
+                body: JSON.stringify({ batch })
             });
             if (res.ok) {
                 const json = await res.json();
                 if (json && json.lastUpdated) {
                     _lastSyncTimestamp = json.lastUpdated;
                 }
+            } else {
+                _pushQueue.unshift(...batch);
             }
         } catch(e) {
-            console.warn('[Sync] push item failed:', e);
+            _pushQueue.unshift(...batch);
+        } finally {
+            _isPushing = false;
+            if (_pushQueue.length > 0) {
+                setTimeout(processPushQueue, 80);
+            }
         }
+    }
+
+    function pushItemToCloud(store, item, action = 'save') {
+        _pushQueue.push({ store, item, action });
+        if (_pushTimer) clearTimeout(_pushTimer);
+        _pushTimer = setTimeout(processPushQueue, 40);
     }
 
     async function pushFullDataToCloud() {
@@ -117,12 +137,12 @@ const API = (function () {
         return false;
     }
 
-    async function pullCloudSync() {
+    async function pullCloudSync(force = false) {
         try {
             const res = await fetch(`${getBaseUrl()}/sync/pull`, { headers: getAuthHeaders() });
             if (res.ok) {
                 const json = await res.json();
-                if (json && json.lastUpdated && json.lastUpdated > _lastSyncTimestamp) {
+                if (json && json.lastUpdated && (force || json.lastUpdated > _lastSyncTimestamp)) {
                     _lastSyncTimestamp = json.lastUpdated;
                     const cloudData = json.data || {};
                     const cloudDeleted = json.deleted || {};
@@ -155,7 +175,7 @@ const API = (function () {
                         }
                     }
 
-                    if (updatedAny && typeof window !== 'undefined') {
+                    if ((updatedAny || force) && typeof window !== 'undefined') {
                         window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: cloudData }));
                     }
                     return updatedAny;
@@ -173,9 +193,9 @@ const API = (function () {
         }, 1000);
 
         if (typeof window !== 'undefined') {
-            window.addEventListener('focus', () => pullCloudSync());
+            window.addEventListener('focus', () => pullCloudSync(true));
             document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) pullCloudSync();
+                if (!document.hidden) pullCloudSync(true);
             });
         }
     }

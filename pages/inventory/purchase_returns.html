@@ -90,6 +90,7 @@
             document.getElementById('ptrTotal').textContent = '0.00';
             pickedPurchase = null;
             await load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         function closePtrModal() {
             document.getElementById('ptrModal').style.visibility = 'hidden';

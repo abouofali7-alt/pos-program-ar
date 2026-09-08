@@ -134,6 +134,7 @@
             quoLineCount = 0;
             recalcQuo();
             await load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         function closeQuoModal() {
             document.getElementById('quoModal').style.visibility = 'hidden';

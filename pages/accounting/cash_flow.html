@@ -120,6 +120,7 @@
             UI.toast('تم الحفظ', 'ok');
             closeFlowModal();
             load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function delFlow(id) {
             const ok = await UI.confirmBox('حذف الحركة؟');

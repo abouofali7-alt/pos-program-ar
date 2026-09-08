@@ -131,6 +131,7 @@
                 UI.toast('تمت الإضافة', 'ok');
             }
             closeRoleModal(); load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         async function delRole(id) {
             const r = await ARDB.getById('roles', id);

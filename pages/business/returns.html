@@ -90,6 +90,7 @@
             document.getElementById('retTotal').textContent = '0.00';
             pickedInvoice = null;
             await load();
+        window.addEventListener('ar_cloud_data_updated', load);
         }
         function closeRetModal() {
             document.getElementById('retModal').style.visibility = 'hidden';
