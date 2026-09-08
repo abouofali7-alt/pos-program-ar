@@ -6,6 +6,9 @@
             var l = localStorage.getItem('ar_lang') || 'ar';
             document.documentElement.lang = l;
             document.documentElement.dir = (l === 'en') ? 'ltr' : 'rtl';
+            if (!localStorage.getItem('ar_session')) {
+                window.location.href = 'pages/login.html';
+            }
         } catch(e) {}
     </script>
     <meta charset="utf-8">
