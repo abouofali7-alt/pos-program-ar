@@ -37,6 +37,7 @@
         business: { label: 'إدارة الأعمال', icon: 'fa-briefcase', pages: [
             { href: 'business/pos.html', label: 'نقطة البيع (POS)' },
             { href: 'business/customers.html', label: 'العملاء' },
+            { href: 'business/partner_ledger.html', label: 'حركات العملاء والموردين' },
             { href: 'business/invoices.html', label: 'فواتير البيع' },
             { href: 'business/returns.html', label: 'مرتجعات المبيعات' },
             { href: 'business/quotations.html', label: 'عروض الأسعار' },

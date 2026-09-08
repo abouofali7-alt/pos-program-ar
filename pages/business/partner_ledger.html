@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كشف حركات العملاء والموردين — AR-Program</title>
+    <link rel="stylesheet" href="../../css/global.css">
+    <link rel="stylesheet" href="../../css/app.css">
+    <link rel="stylesheet" href="../../css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body class="dark-mode">
+    <div id="appHeaderHost"></div>
+    <main class="pagewrap" style="padding:22px;max-width:1200px;margin:0 auto;">
+        <div class="page-head">
+            <div>
+                <h2><i class="fa-solid fa-file-invoice-dollar" style="color:var(--accent-cyan);"></i> كشف حركات العملاء والموردين</h2>
+                <div class="sub">سجل تفصيلي دقيق للمبيعات، المشتريات، السدادات والحرصيد التراكمي</div>
+            </div>
+            <div class="page-actions" style="display:flex;gap:8px;">
+                <button class="btn btn-secondary" onclick="ARExport.tableToCSV('ledgerTable', 'كشف_الحساب')"><i class="fa-solid fa-file-excel"></i> تصدير Excel</button>
+                <button class="btn btn-secondary" onclick="ARExport.printTable('ledgerTable', 'كشف الحساب')"><i class="fa-solid fa-print"></i> طباعة</button>
+            </div>
+        </div>
+
+        <div class="table-card" style="margin-bottom:16px;padding:16px;">
+            <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+                <div class="form-item">
+                    <label>نوع الطرف</label>
+                    <select id="partyType" onchange="onPartyTypeChange()">
+                        <option value="customer">عميل (مبيعات)</option>
+                        <option value="supplier">مورد (مشتريات)</option>
+                    </select>
+                </div>
+                <div class="form-item">
+                    <label id="partySelectLabel">العميل</label>
+                    <select id="partySelect" onchange="loadLedger()"></select>
+                </div>
+                <div class="form-item"><label>من تاريخ</label><input type="date" id="repFrom"></div>
+                <div class="form-item"><label>إلى تاريخ</label><input type="date" id="repTo"></div>
+                <div class="form-item" style="display:flex;align-items:flex-end;">
+                    <button class="btn btn-primary-soft" onclick="loadLedger()" style="width:100%;"><i class="fa-solid fa-filter"></i> عرض كشف الحساب</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stat-grid" style="margin-bottom:18px;">
+            <div class="stat-card"><div class="label">الرصيد الافتتاحي</div><div class="value cyan" id="statOpen">0.00</div></div>
+            <div class="stat-card"><div class="label" id="statDebitLabel">إجمالي الفواتير (مدين)</div><div class="value purple" id="statDebit">0.00</div></div>
+            <div class="stat-card"><div class="label" id="statCreditLabel">إجمالي السدادات (دائن)</div><div class="value green" id="statCredit">0.00</div></div>
+            <div class="stat-card"><div class="label" id="statBalLabel">الرصيد المتبقي الحكيم</div><div class="value red" id="statBal">0.00</div></div>
+        </div>
+
+        <div class="table-card">
+            <div class="table-head" id="ledgerTableHead">سجل الحركات التفصيلي</div>
+            <div class="table-scroll">
+                <table class="data-table" id="ledgerTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>التاريخ</th>
+                            <th>نوع الحركة</th>
+                            <th>رقم الفاتورة / المستند</th>
+                            <th>بيان / طريقة الدفع</th>
+                            <th>مدين (ج.م)</th>
+                            <th>دائن (ج.م)</th>
+                            <th>الرصيد المتراكم</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ledgerBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="../../js/ui.js"></script>
+    <script src="../../js/db.js"></script>
+    <script src="../../js/export.js"></script>
+    <script src="../../js/app.js"></script>
+    <script>
+        let _customers = [];
+        let _suppliers = [];
+
+        function dayFrom(str) { return new Date(str + 'T00:00:00').getTime(); }
+        function dayTo(str) { return new Date(str + 'T23:59:59').getTime(); }
+
+        function getInvoicePaidAmount(inv) {
+            if (!inv) return 0;
+            if (inv.payments && inv.payments.length) {
+                return inv.payments.filter(p => p.method !== 'credit' && p.method !== 'bnpl').reduce((s, p) => s + (p.amount || 0), 0);
+            }
+            if (inv.paymentType === 'cash') return inv.total || 0;
+            return 0;
+        }
+
+        function getPurchasePaidAmount(pur) {
+            if (!pur) return 0;
+            if (pur.paymentType === 'cash') return pur.total || 0;
+            return 0;
+        }
+
+        async function initPage() {
+            const [custs, sups] = await Promise.all([ARDB.getAll('customers'), ARDB.getAll('suppliers')]);
+            _customers = custs || [];
+            _suppliers = sups || [];
+
+            const params = new URLSearchParams(window.location.search);
+            const pType = params.get('type') || params.get('partyType') || 'customer';
+            const pId = Number(params.get('id') || params.get('partyId'));
+
+            document.getElementById('partyType').value = pType;
+
+            const d = new Date();
+            function localDateStr(dt) { return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); }
+            document.getElementById('repTo').value = UI.todayInput();
+            const first = new Date(d.getFullYear() - 1, d.getMonth(), 1);
+            document.getElementById('repFrom').value = localDateStr(first);
+
+            onPartyTypeChange(pId);
+        }
+
+        function onPartyTypeChange(preSelectId = null) {
+            const pType = document.getElementById('partyType').value;
+            const sel = document.getElementById('partySelect');
+            const label = document.getElementById('partySelectLabel');
+
+            if (pType === 'customer') {
+                label.textContent = 'العميل';
+                sel.innerHTML = '<option value="">— اختر العميل —</option>' + _customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            } else {
+                label.textContent = 'المورد';
+                sel.innerHTML = '<option value="">— اختر المورد —</option>' + _suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            }
+
+            if (preSelectId) sel.value = preSelectId;
+            loadLedger();
+        }
+
+        async function loadLedger() {
+            const pType = document.getElementById('partyType').value;
+            const partyId = Number(document.getElementById('partySelect').value);
+            const fStr = document.getElementById('repFrom').value;
+            const tStr = document.getElementById('repTo').value;
+
+            if (!partyId) {
+                document.getElementById('ledgerBody').innerHTML = '<tr><td colspan="8" class="empty-state">يرجى اختيار العميل أو المورد لمعرض كشف الحركات</td></tr>';
+                document.getElementById('statOpen').textContent = '0.00';
+                document.getElementById('statDebit').textContent = '0.00';
+                document.getElementById('statCredit').textContent = '0.00';
+                document.getElementById('statBal').textContent = '0.00';
+                return;
+            }
+
+            const fromTime = fStr ? dayFrom(fStr) : 0;
+            const toTime = tStr ? dayTo(tStr) : Date.now() + 86400000;
+
+            const events = [];
+
+            if (pType === 'customer') {
+                const party = _customers.find(c => c.id === partyId);
+                const partyName = party ? party.name : 'عميل';
+                const openBal = Number(party ? party.openingBalance || 0 : 0);
+
+                document.getElementById('ledgerTableHead').textContent = `سجل حركات العميل: ${partyName}`;
+
+                // 1. الرصيد الافتتاحي
+                if (openBal !== 0) {
+                    events.push({
+                        date: 0,
+                        typeLabel: 'رصيد افتتاحي',
+                        typeClass: 'badge-purple',
+                        docNo: '—',
+                        desc: 'الرصيد الافتتاحي للعميل',
+                        debit: openBal > 0 ? openBal : 0,
+                        credit: openBal < 0 ? Math.abs(openBal) : 0
+                    });
+                }
+
+                // 2. الفواتير
+                const invoices = (await ARDB.getAll('invoices')).filter(i => i.customerId === partyId);
+                invoices.forEach(inv => {
+                    events.push({
+                        date: inv.date || 0,
+                        typeLabel: 'فاتورة بيع',
+                        typeClass: 'badge-blue',
+                        docNo: inv.number || ('#INV-' + inv.id),
+                        desc: inv.note || (inv.paymentMethod ? `طريقة الدفع: ${inv.paymentMethod}` : 'مبيعات فاتورة بيع'),
+                        debit: inv.total || 0,
+                        credit: 0
+                    });
+
+                    const paidAmt = getInvoicePaidAmount(inv);
+                    if (paidAmt > 0) {
+                        events.push({
+                            date: (inv.date || 0) + 1,
+                            typeLabel: 'سداد فاتورة',
+                            typeClass: 'badge-green',
+                            docNo: inv.number || ('#INV-' + inv.id),
+                            desc: `سداد فوري (${inv.paymentMethod || 'نقداً/فيزا'})`,
+                            debit: 0,
+                            credit: paidAmt
+                        });
+                    }
+                });
+
+                // 3. سندات القبض
+                const payments = (await ARDB.getAll('payments')).filter(p => (p.partyType === 'customer' || p.type === 'receipt') && p.partyId === partyId);
+                payments.forEach(p => {
+                    events.push({
+                        date: p.date || 0,
+                        typeLabel: 'سند قبض',
+                        typeClass: 'badge-green',
+                        docNo: p.number || ('#REC-' + p.id),
+                        desc: p.notes || p.desc || 'تحصيل / سداد من العميل',
+                        debit: 0,
+                        credit: p.amount || 0
+                    });
+                });
+
+                // 4. مرتجعات المبيعات
+                const returns = (await ARDB.getAll('invoiceReturns')).filter(r => r.customerId === partyId);
+                returns.forEach(r => {
+                    events.push({
+                        date: r.date || 0,
+                        typeLabel: 'مرتجع مبيعات',
+                        typeClass: 'badge-red',
+                        docNo: r.number || ('#RET-' + r.id),
+                        desc: r.reason || 'مرتجع فاتورة بيع',
+                        debit: 0,
+                        credit: r.total || 0
+                    });
+                });
+
+            } else {
+                // الموردين
+                const party = _suppliers.find(s => s.id === partyId);
+                const partyName = party ? party.name : 'مورد';
+                const openBal = Number(party ? party.openingBalance || 0 : 0);
+
+                document.getElementById('ledgerTableHead').textContent = `سجل حركات المورد: ${partyName}`;
+
+                if (openBal !== 0) {
+                    events.push({
+                        date: 0,
+                        typeLabel: 'رصيد افتتاحي',
+                        typeClass: 'badge-purple',
+                        docNo: '—',
+                        desc: 'الرصيد الافتتاحي للمورد',
+                        debit: 0,
+                        credit: openBal
+                    });
+                }
+
+                // فواتير الشراء
+                const purchases = (await ARDB.getAll('purchases')).filter(p => p.supplierId === partyId);
+                purchases.forEach(pur => {
+                    events.push({
+                        date: pur.date || 0,
+                        typeLabel: 'فاتورة شراء',
+                        typeClass: 'badge-amber',
+                        docNo: pur.number || ('#PUR-' + pur.id),
+                        desc: pur.note || (pur.paymentType === 'cash' ? 'شراء نقدي' : 'شراء آجل'),
+                        debit: 0,
+                        credit: pur.total || 0
+                    });
+
+                    const paidAmt = getPurchasePaidAmount(pur);
+                    if (paidAmt > 0) {
+                        events.push({
+                            date: (pur.date || 0) + 1,
+                            typeLabel: 'سداد شراء',
+                            typeClass: 'badge-green',
+                            docNo: pur.number || ('#PUR-' + pur.id),
+                            desc: 'سداد فوري للمورد (نقداً)',
+                            debit: paidAmt,
+                            credit: 0
+                        });
+                    }
+                });
+
+                // سندات الصرف
+                const payments = (await ARDB.getAll('payments')).filter(p => (p.partyType === 'supplier' || p.type === 'payment') && p.partyId === partyId);
+                payments.forEach(p => {
+                    events.push({
+                        date: p.date || 0,
+                        typeLabel: 'سند صرف',
+                        typeClass: 'badge-green',
+                        docNo: p.number || ('#PAY-' + p.id),
+                        desc: p.notes || p.desc || 'سداد دفعات للمورد',
+                        debit: p.amount || 0,
+                        credit: 0
+                    });
+                });
+
+                // مرتجعات المشتريات
+                const returns = (await ARDB.getAll('purchaseReturns')).filter(r => r.supplierId === partyId);
+                returns.forEach(r => {
+                    events.push({
+                        date: r.date || 0,
+                        typeLabel: 'مرتجع مشتريات',
+                        typeClass: 'badge-red',
+                        docNo: r.number || ('#PRET-' + r.id),
+                        desc: r.reason || 'مرتجع مشتريات',
+                        debit: r.total || 0,
+                        credit: 0
+                    });
+                });
+            }
+
+            // ترتيب زمني للحركات
+            events.sort((a, b) => a.date - b.date);
+
+            // تصفية حسب الفترة الزمنية المحددة وحساب الرصيد التراكمي
+            let runningBal = 0;
+            let sumDebit = 0;
+            let sumCredit = 0;
+            let openBalInPeriod = 0;
+
+            const filteredRows = [];
+
+            events.forEach(ev => {
+                if (pType === 'customer') {
+                    runningBal += (ev.debit - ev.credit);
+                } else {
+                    runningBal += (ev.credit - ev.debit);
+                }
+
+                if (ev.date < fromTime) {
+                    openBalInPeriod = runningBal;
+                } else if (ev.date <= toTime) {
+                    sumDebit += ev.debit;
+                    sumCredit += ev.credit;
+                    filteredRows.push({
+                        ...ev,
+                        balAfter: runningBal
+                    });
+                }
+            });
+
+            document.getElementById('statOpen').innerHTML = UI.money(openBalInPeriod);
+            document.getElementById('statDebit').innerHTML = UI.money(sumDebit);
+            document.getElementById('statCredit').innerHTML = UI.money(sumCredit);
+            document.getElementById('statBal').innerHTML = UI.money(runningBal);
+
+            if (!filteredRows.length) {
+                document.getElementById('ledgerBody').innerHTML = '<tr><td colspan="8" class="empty-state">لا توجد حركات تسديد أو فواتير في الفترة المحددة</td></tr>';
+                return;
+            }
+
+            let idx = 1;
+            document.getElementById('ledgerBody').innerHTML = filteredRows.map(r => `
+                <tr>
+                    <td class="num">${idx++}</td>
+                    <td>${r.date ? UI.date(r.date) : '—'}</td>
+                    <td><span class="badge ${r.typeClass}">${r.typeLabel}</span></td>
+                    <td class="num" style="font-weight:700;">${r.docNo}</td>
+                    <td style="font-size:0.85rem;color:var(--text-secondary);">${r.desc}</td>
+                    <td class="num" style="font-weight:600;color:${r.debit > 0 ? 'var(--accent-purple)' : 'inherit'};">${r.debit ? UI.money(r.debit) : '—'}</td>
+                    <td class="num" style="font-weight:600;color:${r.credit > 0 ? 'var(--success)' : 'inherit'};">${r.credit ? UI.money(r.credit) : '—'}</td>
+                    <td class="num" style="font-weight:800;color:${r.balAfter > 0 ? 'var(--danger)' : 'var(--text-primary)'};">${UI.money(r.balAfter)}</td>
+                </tr>
+            `).join('');
+        }
+
+        initPage();
+    </script>
+</body>
+</html>
