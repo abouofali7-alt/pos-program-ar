@@ -7,8 +7,6 @@ const API = (function () {
     let _lastSyncTimestamp = 0;
     let _syncTimer = null;
 
-    const REMOTE_SYNC_BIN = 'https://extendsclass.com/api/json-storage/bin/acacfac';
-
     function getDefaultBaseUrl() {
         if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.protocol.startsWith('file')) {
             return window.location.origin.replace(/\/+$/, '') + '/api';
@@ -127,6 +125,8 @@ const API = (function () {
         }
     }
 
+    const WEBHOOK_TOKEN = '869e97e1-323f-47d2-ba50-6082983bffcf';
+
     async function pushFullDataToCloud() {
         try {
             const STORES = [
@@ -141,15 +141,15 @@ const API = (function () {
             }
             const cloudPayload = { lastUpdated: Date.now(), data: fullData };
             
-            // الرفع المزدوج: لسيرفر Vercel وسيرفر التخزين السحابي الدائم
+            // الرفع المزدوج: لسيرفر Vercel وسيرفر التخزين السحابي التراكمي
             fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ fullData })
             }).catch(() => {});
 
-            const resDirect = await fetch(REMOTE_SYNC_BIN, {
-                method: 'PUT',
+            const resDirect = await fetch(`https://webhook.site/${WEBHOOK_TOKEN}`, {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(cloudPayload)
             });
@@ -172,8 +172,13 @@ const API = (function () {
             } catch(e) {}
 
             if (!json || !json.data || !Object.keys(json.data).length) {
-                const resDirect = await fetch(REMOTE_SYNC_BIN);
-                if (resDirect.ok) json = await resDirect.json();
+                const resDirect = await fetch(`https://webhook.site/token/${WEBHOOK_TOKEN}/requests?sorting=newest`);
+                if (resDirect.ok) {
+                    const reqs = await resDirect.json();
+                    if (reqs.data && reqs.data.length > 0 && reqs.data[0].content) {
+                        json = JSON.parse(reqs.data[0].content);
+                    }
+                }
             }
 
             if (json && json.lastUpdated && json.lastUpdated > _lastSyncTimestamp) {

@@ -1,20 +1,23 @@
 const express = require('express');
 const router = express.Router();
 
-const REMOTE_BIN = 'https://extendsclass.com/api/json-storage/bin/acacfac';
+const WEBHOOK_TOKEN = '869e97e1-323f-47d2-ba50-6082983bffcf';
 let _memoryCache = { lastUpdated: Date.now(), data: {} };
 
 async function loadCloudData() {
     try {
         const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 3500);
-        const res = await fetch(REMOTE_BIN, { signal: controller.signal });
+        const tid = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://webhook.site/token/${WEBHOOK_TOKEN}/requests?sorting=newest`, { signal: controller.signal });
         clearTimeout(tid);
         if (res.ok) {
             const json = await res.json();
-            if (json && typeof json === 'object' && json.data) {
-                _memoryCache = json;
-                return json;
+            if (json.data && json.data.length > 0 && json.data[0].content) {
+                const parsed = JSON.parse(json.data[0].content);
+                if (parsed && typeof parsed === 'object' && parsed.data) {
+                    _memoryCache = parsed;
+                    return parsed;
+                }
             }
         }
     } catch(e) {}
@@ -25,9 +28,9 @@ async function saveCloudData(cloudObj) {
     _memoryCache = cloudObj;
     try {
         const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 3500);
-        await fetch(REMOTE_BIN, {
-            method: 'PUT',
+        const tid = setTimeout(() => controller.abort(), 4000);
+        await fetch(`https://webhook.site/${WEBHOOK_TOKEN}`, {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(cloudObj),
             signal: controller.signal
