@@ -191,16 +191,21 @@ const API = (function () {
     }
 
     async function add(store, item) {
-        const localRes = await ARDB.localAdd(store, item);
-        const finalId = (typeof localRes === 'number' || typeof localRes === 'string') ? localRes : (item.id || Date.now());
         if (typeof item === 'object' && item !== null) {
-            item.id = finalId;
+            if (!item.id) {
+                item.id = Date.now() + Math.floor(Math.random() * 10000);
+            }
         }
+        await ARDB.localPut(store, item);
+        const finalId = (item && item.id) ? item.id : Date.now();
         pushItemToCloud(store, item, 'save');
-        return localRes;
+        return finalId;
     }
 
     async function update(store, item) {
+        if (typeof item === 'object' && item !== null && !item.id) {
+            item.id = Date.now() + Math.floor(Math.random() * 10000);
+        }
         await ARDB.localPut(store, item);
         pushItemToCloud(store, item, 'save');
         return item;
