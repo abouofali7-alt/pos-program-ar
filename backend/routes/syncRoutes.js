@@ -1,31 +1,46 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
-const path = require('path');
 
-const SYNC_FILE = process.env.VERCEL ? '/tmp/ar_cloud_sync.json' : path.join(__dirname, '..', 'ar_cloud_sync.json');
+const REMOTE_BIN = 'https://extendsclass.com/api/json-storage/bin/acacfac';
+let _memoryCache = { lastUpdated: Date.now(), data: {} };
 
-function loadCloudData() {
+async function loadCloudData() {
     try {
-        if (fs.existsSync(SYNC_FILE)) {
-            const raw = fs.readFileSync(SYNC_FILE, 'utf8');
-            return JSON.parse(raw);
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(REMOTE_BIN, { signal: controller.signal });
+        clearTimeout(tid);
+        if (res.ok) {
+            const json = await res.json();
+            if (json && typeof json === 'object' && json.data) {
+                _memoryCache = json;
+                return json;
+            }
         }
     } catch(e) {}
-    return { lastUpdated: Date.now(), data: {} };
+    return _memoryCache;
 }
 
-function saveCloudData(cloudObj) {
+async function saveCloudData(cloudObj) {
+    _memoryCache = cloudObj;
     try {
-        fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj, null, 2), 'utf8');
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 3500);
+        await fetch(REMOTE_BIN, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cloudObj),
+            signal: controller.signal
+        });
+        clearTimeout(tid);
     } catch(e) {}
 }
 
 // 1. POST /api/sync/push — أي جهاز يرفع معاملة أو صنف جديد
-router.post('/push', (req, res) => {
+router.post('/push', async (req, res) => {
     try {
         const { store, item, action, fullData } = req.body || {};
-        const cloud = loadCloudData();
+        const cloud = await loadCloudData();
         if (!cloud.data) cloud.data = {};
         
         if (fullData && typeof fullData === 'object') {
@@ -44,7 +59,7 @@ router.post('/push', (req, res) => {
         }
         
         cloud.lastUpdated = Date.now();
-        saveCloudData(cloud);
+        await saveCloudData(cloud);
         res.json({ success: true, lastUpdated: cloud.lastUpdated });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
@@ -52,9 +67,9 @@ router.post('/push', (req, res) => {
 });
 
 // 2. GET /api/sync/pull — الأجهزة الأخرى تسحب أحدث حركة فوراً
-router.get('/pull', (req, res) => {
+router.get('/pull', async (req, res) => {
     try {
-        const cloud = loadCloudData();
+        const cloud = await loadCloudData();
         res.json({ success: true, lastUpdated: cloud.lastUpdated || Date.now(), data: cloud.data || {} });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });

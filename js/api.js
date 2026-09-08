@@ -7,6 +7,8 @@ const API = (function () {
     let _lastSyncTimestamp = 0;
     let _syncTimer = null;
 
+    const REMOTE_SYNC_BIN = 'https://extendsclass.com/api/json-storage/bin/acacfac';
+
     function getDefaultBaseUrl() {
         if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.protocol.startsWith('file')) {
             return window.location.origin.replace(/\/+$/, '') + '/api';
@@ -15,7 +17,17 @@ const API = (function () {
     }
     
     function getBaseUrl() {
-        return localStorage.getItem('ar_api_base_url') || getDefaultBaseUrl();
+        const saved = localStorage.getItem('ar_api_base_url');
+        const isLive = typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.protocol.startsWith('file');
+
+        if (isLive) {
+            if (!saved || saved.includes('localhost') || saved.includes('127.0.0.1')) {
+                const originApi = window.location.origin.replace(/\/+$/, '') + '/api';
+                localStorage.setItem('ar_api_base_url', originApi);
+                return originApi;
+            }
+        }
+        return saved || getDefaultBaseUrl();
     }
 
     function setBaseUrl(url) {
@@ -127,14 +139,22 @@ const API = (function () {
             for (const s of STORES) {
                 fullData[s] = await ARDB.localGetAll(s);
             }
-            const res = await fetch(`${getBaseUrl()}/sync/push`, {
+            const cloudPayload = { lastUpdated: Date.now(), data: fullData };
+            
+            // الرفع المزدوج: لسيرفر Vercel وسيرفر التخزين السحابي الدائم
+            fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ fullData })
+            }).catch(() => {});
+
+            const resDirect = await fetch(REMOTE_SYNC_BIN, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cloudPayload)
             });
-            if (res.ok) {
-                const json = await res.json();
-                if (json && json.lastUpdated) _lastSyncTimestamp = json.lastUpdated;
+            if (resDirect.ok) {
+                _lastSyncTimestamp = cloudPayload.lastUpdated;
                 return true;
             }
         } catch(e) {
@@ -145,27 +165,34 @@ const API = (function () {
 
     async function pullCloudSync() {
         try {
-            const res = await fetch(`${getBaseUrl()}/sync/pull`, { headers: getAuthHeaders() });
-            if (res.ok) {
-                const json = await res.json();
-                if (json && json.lastUpdated && json.lastUpdated > _lastSyncTimestamp) {
-                    _lastSyncTimestamp = json.lastUpdated;
-                    const cloudData = json.data || {};
-                    let updatedAny = false;
-                    for (const s of Object.keys(cloudData)) {
-                        const items = cloudData[s] || [];
-                        for (const item of items) {
-                            try {
-                                await ARDB.localPut(s, item);
-                                updatedAny = true;
-                            } catch(e){}
-                        }
+            let json = null;
+            try {
+                const res = await fetch(`${getBaseUrl()}/sync/pull`, { headers: getAuthHeaders() });
+                if (res.ok) json = await res.json();
+            } catch(e) {}
+
+            if (!json || !json.data || !Object.keys(json.data).length) {
+                const resDirect = await fetch(REMOTE_SYNC_BIN);
+                if (resDirect.ok) json = await resDirect.json();
+            }
+
+            if (json && json.lastUpdated && json.lastUpdated > _lastSyncTimestamp) {
+                _lastSyncTimestamp = json.lastUpdated;
+                const cloudData = json.data || {};
+                let updatedAny = false;
+                for (const s of Object.keys(cloudData)) {
+                    const items = cloudData[s] || [];
+                    for (const item of items) {
+                        try {
+                            await ARDB.localPut(s, item);
+                            updatedAny = true;
+                        } catch(e){}
                     }
-                    if (updatedAny && typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: cloudData }));
-                    }
-                    return updatedAny;
                 }
+                if (updatedAny && typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: cloudData }));
+                }
+                return updatedAny;
             }
         } catch(e) {}
         return false;

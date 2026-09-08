@@ -99,10 +99,15 @@
         // السكربتات الأساسية — الانتظار حتى اكتمال تحميل المحركات الرئيسية
         await Promise.all([
             loadScript(assetUrl('js/ui.js')),
+            loadScript(assetUrl('js/api.js')),
             loadScript(assetUrl('js/db.js')),
             loadScript(assetUrl('js/currency.js')),
             loadScript(assetUrl('js/i18n.js'))
         ]);
+
+        if (typeof API !== 'undefined') {
+            API.checkHealth().then(updateApiBadge);
+        }
 
         // بقية الخدمات والسكربتات
         loadScript(assetUrl('js/location.js'));
@@ -112,11 +117,6 @@
         loadScript(assetUrl('js/export.js'));
         loadScript(assetUrl('js/notifications.js')).then(() => {
             if (typeof ARNotifications !== 'undefined') ARNotifications.loadNotifications();
-        });
-        loadScript(assetUrl('js/api.js')).then(() => {
-            if (typeof API !== 'undefined') {
-                API.checkHealth().then(updateApiBadge);
-            }
         });
         initQuickSearch();
     }
