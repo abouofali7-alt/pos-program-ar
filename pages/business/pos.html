@@ -328,19 +328,35 @@
 
             if (typeof ARPayments !== 'undefined') {
                 ARPayments.openCheckoutModal(total, async (payRes) => {
-                    if (payRes.status === 'success') {
-                        await finalizeInvoice(total, payRes.method);
+                    if (payRes && payRes.status === 'success') {
+                        await finalizeInvoice(total, payRes);
                     }
                 });
             } else {
-                await finalizeInvoice(total, 'cash');
+                await finalizeInvoice(total, {
+                    method: 'cash',
+                    payments: [{ method: 'cash', amount: total, label: 'نقداً (كاش)' }]
+                });
             }
         }
 
-        async function finalizeInvoice(total, payMethod) {
+        async function finalizeInvoice(total, payRes) {
             const invNumber = await ARDB.nextSeq('invoice_seq', 'POS-', 5);
             const customerId = document.getElementById('posCustomer') && document.getElementById('posCustomer').value ? Number(document.getElementById('posCustomer').value) : null;
             
+            // استخراج وتنسيق الدفعات المتعددة
+            const payments = (payRes && payRes.payments && payRes.payments.length)
+                ? payRes.payments
+                : [{ method: (typeof payRes === 'string' ? payRes : (payRes && payRes.method ? payRes.method : 'cash')), amount: total, label: 'كاش' }];
+
+            const payMethodSummary = payments.map(p => {
+                const mObj = typeof ARPayments !== 'undefined' ? ARPayments.METHODS.find(m => m.id === p.method) : null;
+                const lbl = mObj ? mObj.label : (p.label || p.method);
+                return `${lbl}: ${p.amount} ج.م`;
+            }).join(' + ');
+
+            const isCredit = payments.some(p => p.method === 'bnpl' || p.method === 'credit');
+
             // تجهيز عناصر الفاتورة بالشكل المعياري القياسي للنظام
             const invItems = _cart.map(c => ({
                 productId: c.productId,
@@ -358,8 +374,9 @@
                 customerId: customerId,
                 total: total,
                 items: invItems,
-                paymentMethod: payMethod || 'cash',
-                paymentType: payMethod === 'credit' ? 'credit' : 'cash',
+                payments: payments,
+                paymentMethod: payMethodSummary,
+                paymentType: isCredit ? 'credit' : 'cash',
                 location: _posLocation,
                 type: 'pos'
             };
@@ -386,43 +403,60 @@
                 });
             }
 
-            // قيد يومية محاسبي تلقائي لمبيعات الكاشير
-            const debitAcc = payMethod === 'credit' ? 4 : 3; // 4: العملاء/مدينون, 3: الصندوق
+            // قيود اليومية المحاسبية المفصلة حسب طرق الدفع المتعددة
             if (total > 0) {
+                const journalLines = [];
+                payments.forEach(p => {
+                    if (p.amount > 0) {
+                        // حساب الدفع: 4 للآجل/العملاء، 3 للنقدية/البنك
+                        const accId = (p.method === 'bnpl' || p.method === 'credit') ? 4 : 3;
+                        journalLines.push({ accountId: accId, debit: p.amount, credit: 0 });
+                    }
+                });
+                // الطرف الدائن: المبيعات (حساب 11)
+                journalLines.push({ accountId: 11, debit: 0, credit: total });
+
                 await ARDB.add('journalEntries', {
                     number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
                     date: Date.now(),
-                    desc: 'مبيعات كاشير POS ' + invNumber,
-                    lines: [
-                        { accountId: debitAcc, debit: total, credit: 0 },
-                        { accountId: 11, debit: 0, credit: total }  // المبيعات
-                    ]
+                    desc: 'مبيعات كاشير POS ' + invNumber + ' (' + payMethodSummary + ')',
+                    lines: journalLines
                 });
             }
 
             if (typeof ARAudit !== 'undefined') {
-                ARAudit.logAction('إصدار فاتورة POS', 'المبيعات', `فاتورة رقم ${invNumber} بقيمة ${total} عبر ${payMethod}`);
+                ARAudit.logAction('إصدار فاتورة POS', 'المبيعات', `فاتورة رقم ${invNumber} بقيمة ${total} عبر ${payMethodSummary}`);
             }
 
             UI.toast('تم حفظ وإتمام الفاتورة رقم: ' + invNumber, 'ok');
 
-            // طباعة إيصال السريع
+            // طباعة إيصال السريع مع تفاصيل طرق الدفع المتعددة
             const win = window.open('', '', 'width=400,height=600');
             if (win) {
+                const payDetailsRows = payments.map(p => {
+                    const mObj = typeof ARPayments !== 'undefined' ? ARPayments.METHODS.find(m => m.id === p.method) : null;
+                    const lbl = mObj ? mObj.label : (p.label || p.method);
+                    return `<tr><td><b>${lbl}:</b></td><td style="text-align:left;">${UI.money(p.amount)} ج.م</td></tr>`;
+                }).join('');
+
                 win.document.write(`
                     <html lang="ar" dir="rtl">
                     <head><title>إيصال ${invNumber}</title></head>
                     <body style="font-family:sans-serif;padding:15px;text-align:center;font-size:12px;">
                         <h3>إيصال مبيعات — AR-Program</h3>
                         <p>رقم الفاتورة: ${invNumber}</p>
-                        <p>طريقة الدفع: ${payMethod}</p>
                         <p>التاريخ: ${new Date().toLocaleString('ar-EG')}</p>
                         <hr>
                         <table style="width:100%;text-align:right;font-size:11px;">
-                            ${invItems.map(c => `<tr><td>${c.name} ${(c.serials && c.serials.length) ? '(S/N: ' + c.serials.join(',') + ')' : ''} (x${c.quantity})</td><td style="text-align:left;">${c.total}</td></tr>`).join('')}
+                            ${invItems.map(c => `<tr><td>${c.name} ${(c.serials && c.serials.length) ? '(S/N: ' + c.serials.join(',') + ')' : ''} (x${c.quantity})</td><td style="text-align:left;">${UI.money(c.total)}</td></tr>`).join('')}
                         </table>
                         <hr>
-                        <h3 style="margin-top:10px;">الإجمالي: ${total} ج.م</h3>
+                        <div style="font-weight:700;margin-bottom:6px;">تفاصيل السداد:</div>
+                        <table style="width:100%;text-align:right;font-size:11px;margin-bottom:8px;">
+                            ${payDetailsRows}
+                        </table>
+                        <hr>
+                        <h3 style="margin-top:10px;">الإجمالي: ${UI.money(total)} ج.م</h3>
                         <p>شكراً لزيارتكم!</p>
                         <script>window.onload = function() { window.print(); window.close(); }<\/script>
                     </body>
