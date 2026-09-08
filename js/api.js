@@ -69,57 +69,21 @@ const API = (function () {
         return { status: 'offline', mode: 'local', url: baseUrl };
     }
 
-    function storeToEndpoint(store) {
-        const map = {
-            settings: 'settings',
-            sequences: 'sequences',
-            roles: 'roles',
-            users: 'users',
-            departments: 'departments',
-            employees: 'employees',
-            attendance: 'attendance',
-            payroll: 'payroll',
-            leaveRequests: 'leave-requests',
-            customers: 'customers',
-            suppliers: 'suppliers',
-            categories: 'categories',
-            products: 'products',
-            serials: 'serials',
-            warehouses: 'warehouses',
-            stockMovements: 'stock-movements',
-            invoices: 'invoices',
-            invoiceReturns: 'invoice-returns',
-            purchases: 'purchases',
-            purchaseReturns: 'purchase-returns',
-            payments: 'payments',
-            expenses: 'expenses',
-            quotations: 'quotations',
-            offers: 'offers',
-            accounts: 'accounts',
-            journalEntries: 'journal-entries',
-            projects: 'projects',
-            tasks: 'tasks'
-        };
-        return map[store] || store;
-    }
-
     /* ---------- المزامنة السحابية اللحظية الفورية بين الأجهزة ---------- */
-
-    let _debouncePushTimer = null;
-    function scheduleDebouncedFullPush() {
-        if (_debouncePushTimer) clearTimeout(_debouncePushTimer);
-        _debouncePushTimer = setTimeout(() => {
-            pushFullDataToCloud();
-        }, 400);
-    }
 
     async function pushItemToCloud(store, item, action = 'save') {
         try {
-            await fetch(`${getBaseUrl()}/sync/push`, {
+            const res = await fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ store, item, action })
             });
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.lastUpdated) {
+                    _lastSyncTimestamp = json.lastUpdated;
+                }
+            }
         } catch(e) {
             console.warn('[Sync] push item failed:', e);
         }
@@ -161,16 +125,36 @@ const API = (function () {
                 if (json && json.lastUpdated && json.lastUpdated > _lastSyncTimestamp) {
                     _lastSyncTimestamp = json.lastUpdated;
                     const cloudData = json.data || {};
+                    const cloudDeleted = json.deleted || {};
                     let updatedAny = false;
+
+                    // 1. تحديث أو إضافة العناصر الواردة من السحابة إلى IndexedDB المحلي
                     for (const s of Object.keys(cloudData)) {
                         const items = cloudData[s] || [];
+                        if (!items || !items.length) continue;
                         for (const item of items) {
+                            if (!item) continue;
                             try {
                                 await ARDB.localPut(s, item);
                                 updatedAny = true;
                             } catch(e){}
                         }
                     }
+
+                    // 2. حذف العناصر التي تم حذفها صراحةً من السحابة في الأجهزة الأخرى
+                    for (const s of Object.keys(cloudDeleted)) {
+                        const deletedIds = cloudDeleted[s] || [];
+                        for (const delId of deletedIds) {
+                            if (delId == null) continue;
+                            try {
+                                const numId = Number(delId);
+                                if (!isNaN(numId)) await ARDB.localRemove(s, numId);
+                                await ARDB.localRemove(s, String(delId));
+                                updatedAny = true;
+                            } catch(e){}
+                        }
+                    }
+
                     if (updatedAny && typeof window !== 'undefined') {
                         window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: cloudData }));
                     }

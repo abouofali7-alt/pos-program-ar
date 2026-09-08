@@ -4,9 +4,10 @@ const fs = require('fs');
 const path = require('path');
 
 const SYNC_FILE = process.env.VERCEL ? '/tmp/ar_cloud_sync.json' : path.join(__dirname, '..', 'ar_cloud_sync.json');
+const REMOTE_CLOUD_URL = 'https://api.restful-api.dev/objects/ff808181a067127101a0818dc3d24b44';
 
 if (!global._ar_cloud_data) {
-    global._ar_cloud_data = { lastUpdated: Date.now(), data: {} };
+    global._ar_cloud_data = { lastUpdated: Date.now(), data: {}, deleted: {} };
     try {
         if (fs.existsSync(SYNC_FILE)) {
             const raw = fs.readFileSync(SYNC_FILE, 'utf8');
@@ -18,65 +19,122 @@ if (!global._ar_cloud_data) {
     } catch(e) {}
 }
 
-function loadCloudData() {
+async function loadCloudData() {
+    const isEmpty = !global._ar_cloud_data || !global._ar_cloud_data.data || Object.keys(global._ar_cloud_data.data).length === 0;
+    if (isEmpty) {
+        try {
+            const res = await fetch(REMOTE_CLOUD_URL);
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.data && typeof json.data === 'object' && json.data.data) {
+                    global._ar_cloud_data = json.data;
+                    try { fs.writeFileSync(SYNC_FILE, JSON.stringify(global._ar_cloud_data), 'utf8'); } catch(e) {}
+                }
+            }
+        } catch(e) {}
+    }
     return global._ar_cloud_data;
 }
 
 function saveCloudData(cloudObj) {
     global._ar_cloud_data = cloudObj;
-    // حفظ غير حاجب في الخلفية (Non-blocking background save)
     setImmediate(() => {
         try {
             fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
         } catch(e) {}
+        try {
+            fetch(REMOTE_CLOUD_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: 'pos_sync_cloud', data: cloudObj })
+            }).catch(() => {});
+        } catch(e) {}
     });
 }
 
+function getItemId(x) {
+    if (!x) return null;
+    if (x.id !== undefined && x.id !== null) return String(x.id);
+    if (x.key !== undefined && x.key !== null) return String(x.key);
+    return null;
+}
+
+function isMatch(x, y) {
+    if (!x || !y) return false;
+    const idX = getItemId(x);
+    const idY = getItemId(y);
+    return idX !== null && idY !== null && idX === idY;
+}
+
 // 1. POST /api/sync/push — أي جهاز يرفع معاملة أو صنف جديد
-router.post('/push', (req, res) => {
+router.post('/push', async (req, res) => {
     try {
         const { store, item, action, fullData } = req.body || {};
-        const cloud = loadCloudData();
+        const cloud = await loadCloudData();
         if (!cloud.data) cloud.data = {};
-        
+        if (!cloud.deleted) cloud.deleted = {};
+
         if (fullData && typeof fullData === 'object') {
             for (const s of Object.keys(fullData)) {
                 const incoming = fullData[s] || [];
-                if (!cloud.data[s]) {
-                    cloud.data[s] = incoming;
-                } else {
-                    for (const it of incoming) {
-                        if (!it) continue;
-                        const idx = cloud.data[s].findIndex(x => (x && x.id && it.id && x.id === it.id) || (x && x.key && it.key && x.key === it.key));
-                        if (idx >= 0) cloud.data[s][idx] = it;
-                        else cloud.data[s].push(it);
+                if (!cloud.data[s]) cloud.data[s] = [];
+                if (!cloud.deleted[s]) cloud.deleted[s] = [];
+
+                for (const it of incoming) {
+                    if (!it) continue;
+                    const itId = getItemId(it);
+                    const idx = cloud.data[s].findIndex(x => isMatch(x, it));
+                    if (idx >= 0) {
+                        cloud.data[s][idx] = it;
+                    } else {
+                        cloud.data[s].push(it);
+                    }
+                    if (itId) {
+                        cloud.deleted[s] = cloud.deleted[s].filter(id => String(id) !== itId);
                     }
                 }
             }
         } else if (store && item) {
             if (!cloud.data[store]) cloud.data[store] = [];
+            if (!cloud.deleted[store]) cloud.deleted[store] = [];
+            const itemId = getItemId(item);
+
             if (action === 'delete') {
-                cloud.data[store] = cloud.data[store].filter(x => (x && x.id && x.id !== item.id) || (x && x.key && x.key !== item.key));
+                cloud.data[store] = cloud.data[store].filter(x => !isMatch(x, item));
+                if (itemId && !cloud.deleted[store].includes(itemId)) {
+                    cloud.deleted[store].push(itemId);
+                }
             } else {
-                const idx = cloud.data[store].findIndex(x => (x && x.id && item.id && x.id === item.id) || (x && x.key && item.key && x.key === item.key));
-                if (idx >= 0) cloud.data[store][idx] = item;
-                else cloud.data[store].push(item);
+                const idx = cloud.data[store].findIndex(x => isMatch(x, item));
+                if (idx >= 0) {
+                    cloud.data[store][idx] = item;
+                } else {
+                    cloud.data[store].push(item);
+                }
+                if (itemId) {
+                    cloud.deleted[store] = cloud.deleted[store].filter(id => String(id) !== itemId);
+                }
             }
         }
-        
+
         cloud.lastUpdated = Date.now();
         saveCloudData(cloud);
-        res.json({ success: true, lastUpdated: cloud.lastUpdated });
+        res.json({ success: true, lastUpdated: cloud.lastUpdated, deleted: cloud.deleted });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
 
 // 2. GET /api/sync/pull — الأجهزة الأخرى تسحب أحدث حركة فوراً
-router.get('/pull', (req, res) => {
+router.get('/pull', async (req, res) => {
     try {
-        const cloud = loadCloudData();
-        res.json({ success: true, lastUpdated: cloud.lastUpdated || Date.now(), data: cloud.data || {} });
+        const cloud = await loadCloudData();
+        res.json({
+            success: true,
+            lastUpdated: cloud.lastUpdated || Date.now(),
+            data: cloud.data || {},
+            deleted: cloud.deleted || {}
+        });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
     }
