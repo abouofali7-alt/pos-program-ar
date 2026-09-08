@@ -392,15 +392,19 @@
             const isCredit = payments.some(p => p.method === 'bnpl' || p.method === 'credit');
 
             // تجهيز عناصر الفاتورة بالشكل المعياري القياسي للنظام
-            const invItems = _cart.map(c => ({
-                productId: c.productId,
-                name: c.productName,
-                quantity: c.quantity,
-                price: c.price,
-                total: c.price * c.quantity,
-                serialIds: c.serialIds || [],
-                serials: c.serials || []
-            }));
+            const invItems = _cart.map(c => {
+                const prod = _allProducts.find(p => p.id === c.productId);
+                return {
+                    productId: c.productId,
+                    name: c.productName,
+                    quantity: c.quantity,
+                    price: c.price,
+                    cost: prod ? (prod.cost || 0) : 0,
+                    total: c.price * c.quantity,
+                    serialIds: c.serialIds || [],
+                    serials: c.serials || []
+                };
+            });
 
             const invoice = {
                 number: invNumber,

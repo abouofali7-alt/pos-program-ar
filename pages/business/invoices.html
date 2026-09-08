@@ -259,7 +259,8 @@
                         }
 
                         if (q > 0) {
-                            items.push({ productId: pid, quantity: q, price: p, total: q * p, serialIds: selectedSerialIds, serials: selectedSerialSNs });
+                            const pr = await ARDB.getById('products', pid);
+                            items.push({ productId: pid, name: pr ? pr.name : '', quantity: q, price: p, cost: pr ? (pr.cost || 0) : 0, total: q * p, serialIds: selectedSerialIds, serials: selectedSerialSNs });
                             total += q * p;
                             qtyCheck[pid] = (qtyCheck[pid] || 0) + q;
                         }

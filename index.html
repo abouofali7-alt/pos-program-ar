@@ -178,12 +178,21 @@
 
         function renderKPIs(invoices, products) {
             const totalSales = (invoices || []).reduce((s, x) => s + (x.total || 0), 0);
-            const totalProfit = totalSales * 0.25;
+            const pById = {};
+            (products || []).forEach(p => pById[p.id] = p);
+
+            let totalProfit = 0;
             let totalQty = 0;
+
             (invoices || []).forEach(inv => {
                 if (inv.items) {
                     inv.items.forEach(it => {
-                        totalQty += (Number(it.quantity) || Number(it.qty) || 1);
+                        const pid = it.productId || it.id;
+                        const q = (Number(it.quantity) || Number(it.qty) || 1);
+                        const price = Number(it.price || 0);
+                        const unitCost = (it.cost !== undefined) ? Number(it.cost) : (pById[pid] ? Number(pById[pid].cost || 0) : 0);
+                        totalProfit += (price - unitCost) * q;
+                        totalQty += q;
                     });
                 }
             });
