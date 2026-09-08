@@ -408,10 +408,46 @@
         } catch(e) {}
     }
 
+    /* ---------- تسجيل خروج تلقائي عند الخمول لمدة دقيقة (1-Minute Idle Auto-Logout) ---------- */
+    let _idleTimer = null;
+    const IDLE_TIMEOUT_MS = 60 * 1000; // 60 ثانية (دقيقة واحدة)
+
+    function resetIdleTimer() {
+        if (_idleTimer) clearTimeout(_idleTimer);
+        const user = getStoredUser();
+        const isLoginPage = typeof window !== 'undefined' && window.location.pathname.endsWith('login.html');
+        if (!user || isLoginPage) return;
+
+        _idleTimer = setTimeout(() => {
+            performAutoLogout();
+        }, IDLE_TIMEOUT_MS);
+    }
+
+    function performAutoLogout() {
+        localStorage.removeItem('ar_session');
+        if (typeof ARDB !== 'undefined') ARDB.clearSession();
+        if (typeof window !== 'undefined') {
+            const isLoginPage = window.location.pathname.endsWith('login.html');
+            if (!isLoginPage) {
+                window.location.href = relPrefix() + 'pages/login.html';
+            }
+        }
+    }
+
+    function initIdleMonitor() {
+        if (typeof window === 'undefined') return;
+        const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'touchend', 'scroll', 'click'];
+        events.forEach(evt => {
+            window.addEventListener(evt, resetIdleTimer, { passive: true });
+        });
+        resetIdleTimer();
+    }
+
     async function initApp() {
         await loadShared();
         await requireAuth();
         renderHeader();
+        initIdleMonitor();
         if (typeof API !== 'undefined') {
             await API.pullCloudSync(true);
             refreshCurrentPage();
@@ -423,10 +459,11 @@
         });
     }
 
-    window.ARUI = { MAP, assetUrl, initApp, renderHeader, updateApiBadge };
+    window.ARUI = { MAP, assetUrl, initApp, renderHeader, updateApiBadge, resetIdleTimer, initIdleMonitor };
 })();
 
-/* تشغيل تلقائي إن وُجدت عناصر الهيدر */
+/* تشغيل تلقائي إن وُجدت عناصر الهيدر أو المصادقة */
 window.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('appHeaderHost')) window.ARUI.initApp();
+    else if (typeof window.ARUI !== 'undefined' && window.ARUI.initIdleMonitor) window.ARUI.initIdleMonitor();
 });
