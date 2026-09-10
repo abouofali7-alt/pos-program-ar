@@ -491,10 +491,6 @@
                 input.value = '';
                 UI.toast('تم استيراد ' + count + ' منتج بنجاح!', 'ok');
                 load();
-
-                if (typeof API !== 'undefined') {
-                    API.pushFullDataToCloud();
-                }
             } catch(err) {
                 input.value = '';
                 UI.toast('حدث خطأ أثناء قراءة الملف: ' + err.message, 'error');

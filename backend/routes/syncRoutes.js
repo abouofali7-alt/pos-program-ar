@@ -116,14 +116,15 @@ router.post('/push', async (req, res) => {
                 for (const it of incoming) {
                     if (!it) continue;
                     const itId = getItemId(it);
+                    if (itId && cloud.deleted[s].map(String).includes(String(itId))) {
+                        // هذا العنصر محذوف صراحة على السحابة، يتوجب استبعاده وعدم إعادته من الجهاز المحلّي
+                        continue;
+                    }
                     const idx = cloud.data[s].findIndex(x => isMatch(x, it));
                     if (idx >= 0) {
                         cloud.data[s][idx] = it;
                     } else {
                         cloud.data[s].push(it);
-                    }
-                    if (itId) {
-                        cloud.deleted[s] = cloud.deleted[s].filter(id => String(id) !== itId);
                     }
                 }
             }

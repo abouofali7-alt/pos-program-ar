@@ -519,7 +519,6 @@
         if (typeof API !== 'undefined') {
             await API.pullCloudSync(true);
             refreshCurrentPage();
-            API.pushFullDataToCloud();
             API.startAutoSync();
         }
         window.addEventListener('ar_cloud_data_updated', () => {
