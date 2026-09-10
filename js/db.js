@@ -132,7 +132,13 @@ const ARDB = (function () {
 
     function localRemove(store, id) {
         return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
-            const r = os.delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+            os.delete(id);
+            if (typeof id === 'number') {
+                os.delete(String(id));
+            } else if (typeof id === 'string' && !isNaN(Number(id))) {
+                os.delete(Number(id));
+            }
+            res();
         }));
     }
 

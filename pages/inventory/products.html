@@ -414,21 +414,57 @@
                 } else {
                     const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
                     if (lines.length > 0) {
-                        const firstLine = lines[0].toLowerCase();
-                        const startIndex = (firstLine.includes('اسم') || firstLine.includes('name') || firstLine.includes('barcode') || firstLine.includes('باركود')) ? 1 : 0;
+                        const header = lines[0].split(/[,;\t]+/).map(c => c.trim().replace(/^["']|["']$/g, '').toLowerCase());
                         
+                        let colName = header.findIndex(h => h.includes('اسم') || h.includes('name'));
+                        let colBarcode = header.findIndex(h => h.includes('باركود') || h.includes('barcode'));
+                        let colCat = header.findIndex(h => h.includes('تصنيف') || h.includes('category'));
+                        let colUnit = header.findIndex(h => h.includes('وحدة') || h.includes('unit'));
+                        let colCost = header.findIndex(h => h.includes('تكلفة') || h.includes('cost'));
+                        let colPrice = header.findIndex(h => h.includes('قطاعي') || (h.includes('سعر') && !h.includes('تكلفة') && !h.includes('جملة')) || h.includes('price'));
+                        let colWholesale = header.findIndex(h => h.includes('جملة') || h.includes('wholesale'));
+                        let colStock = header.findIndex(h => h.includes('رصيد') || h.includes('كمية') || h.includes('stock') || h.includes('qty'));
+                        let colMinStock = header.findIndex(h => h.includes('أدنى') || h.includes('min'));
+
+                        // مطابقة أعمدة الجدول المصدر من النظام تلقائياً
+                        const isExportedTable = header.includes('الاسم') && header.includes('الباركود');
+                        if (isExportedTable) {
+                            colName = 0;
+                            colBarcode = 1;
+                            colCat = 2;
+                            colUnit = 3;
+                            colCost = 4;
+                            colPrice = 5;
+                            colWholesale = 6;
+                            colStock = 7;
+                            colMinStock = -1;
+                        } else {
+                            if (colName === -1) colName = 0;
+                            if (colBarcode === -1) colBarcode = 1;
+                            if (colCat === -1) colCat = 2;
+                            if (colUnit === -1) colUnit = 3;
+                            if (colCost === -1) colCost = 4;
+                            if (colPrice === -1) colPrice = 5;
+                            if (colWholesale === -1) colWholesale = 6;
+                            if (colStock === -1) colStock = 7;
+                        }
+
+                        const hasHeader = (colName >= 0 && header[colName] && (header[colName].includes('اسم') || header[colName].includes('name')));
+                        const startIndex = hasHeader ? 1 : 0;
+
                         for (let i = startIndex; i < lines.length; i++) {
                             const row = lines[i].split(/[,;\t]+/).map(c => c.trim().replace(/^["']|["']$/g, ''));
-                            if (row.length > 0 && row[0]) {
+                            if (row.length > 0 && row[colName]) {
                                 importedProducts.push({
-                                    name: row[0],
-                                    barcode: row[1] || '',
-                                    unit: row[2] || 'قطعة',
-                                    cost: Number(row[3]) || 0,
-                                    price: Number(row[4]) || Number(row[3]) || 0,
-                                    wholesalePrice: Number(row[5]) || Number(row[4]) || Number(row[3]) || 0,
-                                    initialStock: Number(row[6]) || 0,
-                                    minStock: Number(row[7]) || 0
+                                    name: row[colName],
+                                    barcode: (colBarcode >= 0 && row[colBarcode]) ? row[colBarcode] : '',
+                                    category: (colCat >= 0 && row[colCat]) ? row[colCat] : '',
+                                    unit: (colUnit >= 0 && row[colUnit]) ? row[colUnit] : 'قطعة',
+                                    cost: (colCost >= 0 && row[colCost]) ? (Number(row[colCost]) || 0) : 0,
+                                    price: (colPrice >= 0 && row[colPrice]) ? (Number(row[colPrice]) || 0) : 0,
+                                    wholesalePrice: (colWholesale >= 0 && row[colWholesale]) ? (Number(row[colWholesale]) || 0) : 0,
+                                    initialStock: (colStock >= 0 && row[colStock]) ? (Number(row[colStock]) || 0) : 0,
+                                    minStock: (colMinStock >= 0 && row[colMinStock]) ? (Number(row[colMinStock]) || 0) : 0
                                 });
                             }
                         }
