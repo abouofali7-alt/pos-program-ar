@@ -147,8 +147,9 @@ router.post('/push', async (req, res) => {
                 for (const it of incoming) {
                     if (!it) continue;
                     const itId = getItemId(it);
-                    if (itId) {
-                        cloud.deleted[s] = cloud.deleted[s].filter(id => String(id) !== String(itId));
+                    if (itId && cloud.deleted[s] && cloud.deleted[s].some(id => String(id) === String(itId))) {
+                        // عنصر محذوف صراحة من قبل، لا تقم بإعادة إحيائه من النسخ المحلية الأقدم
+                        continue;
                     }
                     const idx = cloud.data[s].findIndex(x => isMatch(x, it));
                     if (idx >= 0) {

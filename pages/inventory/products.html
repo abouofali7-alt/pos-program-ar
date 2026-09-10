@@ -372,10 +372,31 @@
         }
 
         async function deleteSerial(sid) {
-            const ok = await UI.confirmBox('حذف هذا الرقم التسلسلي؟');
+            const ok = await UI.confirmBox('هل أنت تأكد من حذف هذا الرقم التسلسلي؟ سيتم خصم 1 من رصيد المنتج المخزني ولن يعود للظهور.');
             if (!ok) return;
+
+            let targetSerial = null;
+            try {
+                const allS = await ARDB.getAll('serials');
+                targetSerial = (allS || []).find(s => String(s.id) === String(sid));
+            } catch(e){}
+
             await ARDB.remove('serials', sid);
-            UI.toast('تم الحذف', 'ok');
+
+            if (activeViewerPid) {
+                if (!targetSerial || (targetSerial.status !== 'sold' && targetSerial.status !== 'purchase_returned')) {
+                    await ARDB.add('stockMovements', {
+                        date: Date.now(),
+                        productId: activeViewerPid,
+                        direction: 'out',
+                        type: 'adjustment',
+                        quantity: 1,
+                        note: 'خصم كمية بسبب حذف السريال: ' + (targetSerial ? targetSerial.serialNumber : sid)
+                    });
+                }
+            }
+
+            UI.toast('تم حذف السريال وخصم الكمية من المخزون', 'ok');
             await renderSerialsTable();
             load();
         }
