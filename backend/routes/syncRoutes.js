@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SYNC_FILE = process.env.VERCEL ? '/tmp/ar_cloud_sync.json' : path.join(__dirname, '..', 'ar_cloud_sync.json');
-const REMOTE_CLOUD_URL = 'https://api.restful-api.dev/objects/ff808181a067127101a0818dc3d24b44';
+let _remoteObjectId = 'ff808181a067127101a0818dc3d24b44';
 
 if (!global._ar_cloud_data) {
     global._ar_cloud_data = { lastUpdated: Date.now(), data: {}, deleted: {} };
@@ -21,6 +21,28 @@ if (!global._ar_cloud_data) {
 
 let _isLoadedFromRemote = false;
 
+async function createRemoteObject(cloudObj) {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch('https://api.restful-api.dev/objects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'pos_sync_cloud', data: cloudObj || global._ar_cloud_data }),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+            const json = await res.json();
+            if (json && json.id) {
+                _remoteObjectId = json.id;
+                return true;
+            }
+        }
+    } catch(e) {}
+    return false;
+}
+
 async function loadCloudData() {
     if (_isLoadedFromRemote && global._ar_cloud_data) {
         return global._ar_cloud_data;
@@ -29,7 +51,7 @@ async function loadCloudData() {
         if (fs.existsSync(SYNC_FILE)) {
             const raw = fs.readFileSync(SYNC_FILE, 'utf8');
             const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === 'object') {
+            if (parsed && typeof parsed === 'object' && parsed.data) {
                 global._ar_cloud_data = parsed;
                 _isLoadedFromRemote = true;
                 return global._ar_cloud_data;
@@ -39,8 +61,8 @@ async function loadCloudData() {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        const res = await fetch(REMOTE_CLOUD_URL, { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) {
             const json = await res.json();
@@ -48,7 +70,11 @@ async function loadCloudData() {
                 global._ar_cloud_data = json.data;
                 _isLoadedFromRemote = true;
                 try { fs.writeFileSync(SYNC_FILE, JSON.stringify(global._ar_cloud_data), 'utf8'); } catch(e) {}
+                return global._ar_cloud_data;
             }
+        } else if (res.status === 404) {
+            // Object expired or missing, auto-create a new one!
+            await createRemoteObject(global._ar_cloud_data);
         }
     } catch(e) {}
 
@@ -67,15 +93,20 @@ async function saveCloudData(cloudObj) {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        await fetch(REMOTE_CLOUD_URL, {
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'pos_sync_cloud', data: cloudObj }),
             signal: controller.signal
         });
         clearTimeout(timeoutId);
-    } catch(e) {}
+        if (!res.ok) {
+            await createRemoteObject(cloudObj);
+        }
+    } catch(e) {
+        await createRemoteObject(cloudObj);
+    }
 }
 
 function getItemId(x) {

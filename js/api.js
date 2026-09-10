@@ -15,16 +15,14 @@ const API = (function () {
     }
     
     function getBaseUrl() {
-        const saved = localStorage.getItem('ar_api_base_url');
         const isLive = typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.protocol.startsWith('file');
 
         if (isLive) {
-            if (!saved || saved.includes('localhost') || saved.includes('127.0.0.1')) {
-                const originApi = window.location.origin.replace(/\/+$/, '') + '/api';
-                localStorage.setItem('ar_api_base_url', originApi);
-                return originApi;
-            }
+            const originApi = window.location.origin.replace(/\/+$/, '') + '/api';
+            localStorage.setItem('ar_api_base_url', originApi);
+            return originApi;
         }
+        const saved = localStorage.getItem('ar_api_base_url');
         return saved || getDefaultBaseUrl();
     }
 
@@ -224,7 +222,10 @@ const API = (function () {
 
     function startAutoSync() {
         if (_syncTimer) return;
-        pullCloudSync();
+        pullCloudSync(true).then(() => {
+            pushFullDataToCloud();
+        });
+
         _syncTimer = setInterval(async () => {
             await pullCloudSync();
         }, 1000);
