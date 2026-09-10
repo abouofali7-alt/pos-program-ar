@@ -389,8 +389,8 @@
                 '<div class="topbar-right">' +
                     '<button id="appNavBtn" class="icon-btn"><i class="fa-solid fa-bars"></i></button>' +
                     '<a class="brand" href="' + prefix + 'index.html"><i class="fa-solid fa-cubes"></i> AR-Program</a>' +
-                    '<a href="' + prefix + 'index.html" class="btn btn-secondary" style="margin-inline-start:10px;padding:4px 12px;font-size:0.82rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;"><i class="fa-solid fa-house"></i> ' + homeTxt + '</a>' +
-                    '<span id="apiStatusBadge" style="font-size:0.75rem;padding:4px 10px;border-radius:20px;margin-inline-start:12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><i class="fa-solid fa-spinner fa-spin"></i> ...</span>' +
+                    '<a href="' + prefix + 'index.html" class="btn btn-secondary topbar-home-btn" style="margin-inline-start:6px;padding:4px 10px;font-size:0.82rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;" title="' + homeTxt + '"><i class="fa-solid fa-house"></i> <span>' + homeTxt + '</span></a>' +
+                    '<span id="apiStatusBadge" style="font-size:0.75rem;padding:4px 10px;border-radius:20px;margin-inline-start:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><i class="fa-solid fa-spinner fa-spin"></i> ...</span>' +
                 '</div>' +
                 '<div class="topbar-left">' +
                     '<select id="currSelect" onchange="if(typeof ARCurrency!=\'undefined\')ARCurrency.setActiveCurrency(this.value)" style="background:var(--card-dark);border:1px solid var(--border-color);color:var(--text-primary);padding:4px 8px;border-radius:6px;font-size:0.78rem;outline:none;cursor:pointer;">' +
@@ -407,7 +407,7 @@
                     '<button id="notifBellBtn" class="icon-btn" title="' + notifTitle + '" style="position:relative;"><i class="fa-solid fa-bell"></i><span id="notifBadge" style="position:absolute;top:-2px;right:-2px;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:bold;border-radius:10px;padding:1px 5px;display:none;"></span></button>' +
                     '<button id="quickSearchBtn" class="icon-btn" title="' + searchTitle + '"><i class="fa-solid fa-magnifying-glass"></i></button>' +
                     '<button id="themeToggle" class="icon-btn"><i class="fa-solid fa-moon"></i></button>' +
-                    (user ? '<span class="user-badge"><i class="fa-solid fa-user-shield"></i> ' + (user.name || user.username || '') + '</span>' : '') +
+                    (user ? '<span class="user-badge" title="' + (user.name || user.username || '') + '"><i class="fa-solid fa-user-shield"></i> <span class="user-name-text">' + (user.name || user.username || '') + '</span></span>' : '') +
                     (user ? '<button id="logoutBtn" class="icon-btn danger"><i class="fa-solid fa-right-from-bracket"></i></button>' : '') +
                 '</div>' +
             '</header>' +
