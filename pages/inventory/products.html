@@ -22,7 +22,7 @@
                 <button class="btn btn-secondary" onclick="importProductsFile()"><i class="fa-solid fa-file-import"></i> استيراد منتجات</button>
                 <button class="btn btn-secondary" onclick="ARExport.printTable('productsTable', 'جدول المنتجات')"><i class="fa-solid fa-print"></i> طباعة</button>
                 <button class="btn btn-primary-soft" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> إضافة منتج</button>
-                <input type="file" id="importProductsInput" accept=".json,.csv,.txt" style="display:none;" onchange="handleProductsImportFile(this)">
+                <input type="file" id="importProductsInput" accept=".json,.csv,.txt,.xlsx,.xls" style="display:none;" onchange="handleProductsImportFile(this)">
             </div>
         </div>
         <div class="table-card">
@@ -96,6 +96,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="../../js/ui.js"></script>
     <script src="../../js/db.js"></script>
     <script src="../../js/export.js"></script>
@@ -394,15 +395,133 @@
             document.getElementById('importProductsInput').click();
         }
 
+        function parseNum(val) {
+            if (val === null || val === undefined) return 0;
+            const str = String(val).replace(/,/g, '').replace(/[^0-9.-]/g, '').trim();
+            const n = parseFloat(str);
+            return isNaN(n) ? 0 : n;
+        }
+
+        function parseCSVText(text) {
+            text = text.replace(/^\uFEFF/, '');
+            const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+            if (lines.length === 0) return [];
+
+            const firstLine = lines[0];
+            let delimiter = ',';
+            if (firstLine.includes('\t')) delimiter = '\t';
+            else if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';';
+
+            const rows = [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const row = [];
+                let current = '';
+                let inQuotes = false;
+
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    const nextChar = line[j + 1];
+
+                    if (char === '"') {
+                        if (inQuotes && nextChar === '"') {
+                            current += '"';
+                            j++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === delimiter && !inQuotes) {
+                        row.push(current.trim().replace(/^["']|["']$/g, ''));
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                row.push(current.trim().replace(/^["']|["']$/g, ''));
+                rows.push(row);
+            }
+            return rows;
+        }
+
+        function process2DRows(rawRows) {
+            if (!rawRows || !rawRows.length) return [];
+            
+            let headerRow = rawRows[0];
+            let colName = -1, colBarcode = -1, colCat = -1, colUnit = -1, colCost = -1, colPrice = -1, colWholesale = -1, colStock = -1, colMinStock = -1;
+
+            headerRow.forEach((h, idx) => {
+                const cleanH = String(h || '').trim().replace(/^\uFEFF/, '').replace(/^["']|["']$/g, '').toLowerCase();
+                if (!cleanH) return;
+
+                if (colName === -1 && (cleanH.includes('اسم') || cleanH.includes('name') || cleanH.includes('صنف') || cleanH.includes('منتج') || cleanH.includes('title'))) {
+                    colName = idx;
+                } else if (colBarcode === -1 && (cleanH.includes('باركود') || cleanH.includes('barcode') || cleanH.includes('كود') || cleanH.includes('code'))) {
+                    colBarcode = idx;
+                } else if (colCat === -1 && (cleanH.includes('تصنيف') || cleanH.includes('قسم') || cleanH.includes('category') || cleanH.includes('cat') || cleanH.includes('group'))) {
+                    colCat = idx;
+                } else if (colUnit === -1 && (cleanH.includes('وحدة') || cleanH.includes('unit'))) {
+                    colUnit = idx;
+                } else if (colCost === -1 && (cleanH.includes('تكلفة') || cleanH.includes('شراء') || cleanH.includes('cost') || cleanH.includes('buy') || cleanH.includes('purchase'))) {
+                    colCost = idx;
+                } else if (colWholesale === -1 && (cleanH.includes('جملة') || cleanH.includes('wholesale'))) {
+                    colWholesale = idx;
+                } else if (colPrice === -1 && (cleanH.includes('قطاعي') || cleanH.includes('بيع') || cleanH.includes('retail') || cleanH.includes('price') || (cleanH.includes('سعر') && !cleanH.includes('تكلفة') && !cleanH.includes('شراء') && !cleanH.includes('جملة')))) {
+                    colPrice = idx;
+                } else if (colStock === -1 && (cleanH.includes('رصيد') || cleanH.includes('كمية') || cleanH.includes('مخزون') || cleanH.includes('stock') || cleanH.includes('qty') || cleanH.includes('quantity'))) {
+                    colStock = idx;
+                } else if (colMinStock === -1 && (cleanH.includes('أدنى') || cleanH.includes('ادنى') || cleanH.includes('min') || cleanH.includes('limit'))) {
+                    colMinStock = idx;
+                }
+            });
+
+            const hasHeader = colName >= 0;
+            if (!hasHeader) {
+                colName = 0;
+                colBarcode = 1;
+                colCat = 2;
+                colUnit = 3;
+                colCost = 4;
+                colPrice = 5;
+                colWholesale = 6;
+                colStock = 7;
+                colMinStock = -1;
+            }
+
+            const startIndex = hasHeader ? 1 : 0;
+            const items = [];
+
+            for (let i = startIndex; i < rawRows.length; i++) {
+                const row = rawRows[i];
+                if (!row || !row.length) continue;
+                const nameVal = row[colName];
+                if (nameVal && String(nameVal).trim()) {
+                    items.push({
+                        name: String(nameVal).trim(),
+                        barcode: (colBarcode >= 0 && row[colBarcode] !== undefined) ? String(row[colBarcode]).trim() : '',
+                        category: (colCat >= 0 && row[colCat] !== undefined) ? String(row[colCat]).trim() : '',
+                        unit: (colUnit >= 0 && row[colUnit] !== undefined) ? String(row[colUnit]).trim() : 'قطعة',
+                        cost: (colCost >= 0 && row[colCost] !== undefined) ? row[colCost] : 0,
+                        price: (colPrice >= 0 && row[colPrice] !== undefined) ? row[colPrice] : 0,
+                        wholesalePrice: (colWholesale >= 0 && row[colWholesale] !== undefined) ? row[colWholesale] : 0,
+                        initialStock: (colStock >= 0 && row[colStock] !== undefined) ? row[colStock] : 0,
+                        minStock: (colMinStock >= 0 && row[colMinStock] !== undefined) ? row[colMinStock] : 0
+                    });
+                }
+            }
+            return items;
+        }
+
         async function handleProductsImportFile(input) {
             if (!input.files || !input.files[0]) return;
             const file = input.files[0];
             
             try {
-                const text = await file.text();
                 let importedProducts = [];
+                const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+                const isJson = file.name.endsWith('.json');
 
-                if (file.name.endsWith('.json')) {
+                if (isJson) {
+                    const text = await file.text();
                     const parsed = JSON.parse(text);
                     if (Array.isArray(parsed)) {
                         importedProducts = parsed;
@@ -411,64 +530,16 @@
                     } else if (parsed && parsed.data && Array.isArray(parsed.data.products)) {
                         importedProducts = parsed.data.products;
                     }
+                } else if (isExcel && window.XLSX) {
+                    const buffer = await file.arrayBuffer();
+                    const workbook = XLSX.read(buffer, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+                    importedProducts = process2DRows(rawRows);
                 } else {
-                    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-                    if (lines.length > 0) {
-                        const header = lines[0].split(/[,;\t]+/).map(c => c.trim().replace(/^["']|["']$/g, '').toLowerCase());
-                        
-                        let colName = header.findIndex(h => h.includes('اسم') || h.includes('name'));
-                        let colBarcode = header.findIndex(h => h.includes('باركود') || h.includes('barcode'));
-                        let colCat = header.findIndex(h => h.includes('تصنيف') || h.includes('category'));
-                        let colUnit = header.findIndex(h => h.includes('وحدة') || h.includes('unit'));
-                        let colCost = header.findIndex(h => h.includes('تكلفة') || h.includes('cost'));
-                        let colPrice = header.findIndex(h => h.includes('قطاعي') || (h.includes('سعر') && !h.includes('تكلفة') && !h.includes('جملة')) || h.includes('price'));
-                        let colWholesale = header.findIndex(h => h.includes('جملة') || h.includes('wholesale'));
-                        let colStock = header.findIndex(h => h.includes('رصيد') || h.includes('كمية') || h.includes('stock') || h.includes('qty'));
-                        let colMinStock = header.findIndex(h => h.includes('أدنى') || h.includes('min'));
-
-                        // مطابقة أعمدة الجدول المصدر من النظام تلقائياً
-                        const isExportedTable = header.includes('الاسم') && header.includes('الباركود');
-                        if (isExportedTable) {
-                            colName = 0;
-                            colBarcode = 1;
-                            colCat = 2;
-                            colUnit = 3;
-                            colCost = 4;
-                            colPrice = 5;
-                            colWholesale = 6;
-                            colStock = 7;
-                            colMinStock = -1;
-                        } else {
-                            if (colName === -1) colName = 0;
-                            if (colBarcode === -1) colBarcode = 1;
-                            if (colCat === -1) colCat = 2;
-                            if (colUnit === -1) colUnit = 3;
-                            if (colCost === -1) colCost = 4;
-                            if (colPrice === -1) colPrice = 5;
-                            if (colWholesale === -1) colWholesale = 6;
-                            if (colStock === -1) colStock = 7;
-                        }
-
-                        const hasHeader = (colName >= 0 && header[colName] && (header[colName].includes('اسم') || header[colName].includes('name')));
-                        const startIndex = hasHeader ? 1 : 0;
-
-                        for (let i = startIndex; i < lines.length; i++) {
-                            const row = lines[i].split(/[,;\t]+/).map(c => c.trim().replace(/^["']|["']$/g, ''));
-                            if (row.length > 0 && row[colName]) {
-                                importedProducts.push({
-                                    name: row[colName],
-                                    barcode: (colBarcode >= 0 && row[colBarcode]) ? row[colBarcode] : '',
-                                    category: (colCat >= 0 && row[colCat]) ? row[colCat] : '',
-                                    unit: (colUnit >= 0 && row[colUnit]) ? row[colUnit] : 'قطعة',
-                                    cost: (colCost >= 0 && row[colCost]) ? (Number(row[colCost]) || 0) : 0,
-                                    price: (colPrice >= 0 && row[colPrice]) ? (Number(row[colPrice]) || 0) : 0,
-                                    wholesalePrice: (colWholesale >= 0 && row[colWholesale]) ? (Number(row[colWholesale]) || 0) : 0,
-                                    initialStock: (colStock >= 0 && row[colStock]) ? (Number(row[colStock]) || 0) : 0,
-                                    minStock: (colMinStock >= 0 && row[colMinStock]) ? (Number(row[colMinStock]) || 0) : 0
-                                });
-                            }
-                        }
-                    }
+                    const text = await file.text();
+                    const rawRows = parseCSVText(text);
+                    importedProducts = process2DRows(rawRows);
                 }
 
                 if (!importedProducts || !importedProducts.length) {
@@ -478,39 +549,86 @@
                 }
 
                 let count = 0;
-                const categories = await ARDB.getAll('categories');
+                let updatedCount = 0;
+                const [categories, existingProducts] = await Promise.all([
+                    ARDB.getAll('categories'),
+                    ARDB.getAll('products')
+                ]);
+
                 const catMap = {};
                 (categories || []).forEach(c => {
-                    if (c && c.name) catMap[c.name.trim()] = c.id;
+                    if (c && c.name) catMap[c.name.trim().toLowerCase()] = c.id;
+                });
+
+                const prodByBarcode = {};
+                const prodByName = {};
+                (existingProducts || []).forEach(p => {
+                    if (p.barcode && String(p.barcode).trim()) prodByBarcode[String(p.barcode).trim()] = p;
+                    if (p.name && String(p.name).trim()) prodByName[String(p.name).trim().toLowerCase()] = p;
                 });
 
                 for (const item of importedProducts) {
                     if (!item || !item.name) continue;
                     
+                    const cleanName = String(item.name).trim();
+                    if (!cleanName) continue;
+
+                    const cleanBarcode = item.barcode ? String(item.barcode).trim() : '';
+
                     let catId = item.categoryId || null;
-                    if (!catId && item.category && catMap[item.category.trim()]) {
-                        catId = catMap[item.category.trim()];
+                    if (!catId && item.category && String(item.category).trim()) {
+                        const catNameTrim = String(item.category).trim();
+                        const catKey = catNameTrim.toLowerCase();
+                        if (catMap[catKey]) {
+                            catId = catMap[catKey];
+                        } else {
+                            try {
+                                const newCatId = await ARDB.add('categories', { name: catNameTrim, note: 'مستوردة' });
+                                if (newCatId) {
+                                    catMap[catKey] = newCatId;
+                                    catId = newCatId;
+                                }
+                            } catch(e){}
+                        }
                     }
 
-                    const cost = Number(item.cost || 0);
-                    const price = Number(item.price || item.cost || 0);
-                    const wholesalePrice = Number(item.wholesalePrice || price);
-                    const initialStock = Number(item.initialStock || item.qty || item.quantity || 0);
+                    const cost = parseNum(item.cost);
+                    const price = parseNum(item.price) || cost;
+                    const wholesalePrice = parseNum(item.wholesalePrice) || price;
+                    const initialStock = parseNum(item.initialStock || item.qty || item.quantity || item.stock);
+                    const minStock = parseNum(item.minStock);
 
-                    const rec = {
-                        name: String(item.name).trim(),
-                        barcode: item.barcode ? String(item.barcode).trim() : '',
-                        categoryId: catId,
-                        unit: item.unit ? String(item.unit).trim() : 'قطعة',
-                        cost: cost,
-                        price: price,
-                        wholesalePrice: wholesalePrice,
-                        minStock: Number(item.minStock || 0),
-                        hasSerials: !!item.hasSerials
-                    };
+                    let existing = (cleanBarcode && prodByBarcode[cleanBarcode]) || prodByName[cleanName.toLowerCase()];
+                    let targetPid = null;
 
-                    const targetPid = await ARDB.add('products', rec);
-                    count++;
+                    if (existing) {
+                        existing.name = cleanName;
+                        if (cleanBarcode) existing.barcode = cleanBarcode;
+                        if (catId) existing.categoryId = catId;
+                        if (item.unit) existing.unit = String(item.unit).trim();
+                        if (cost > 0) existing.cost = cost;
+                        if (price > 0) existing.price = price;
+                        if (wholesalePrice > 0) existing.wholesalePrice = wholesalePrice;
+                        if (item.minStock !== undefined) existing.minStock = minStock;
+
+                        await ARDB.put('products', existing);
+                        targetPid = existing.id;
+                        updatedCount++;
+                    } else {
+                        const rec = {
+                            name: cleanName,
+                            barcode: cleanBarcode,
+                            categoryId: catId,
+                            unit: item.unit ? String(item.unit).trim() : 'قطعة',
+                            cost: cost,
+                            price: price,
+                            wholesalePrice: wholesalePrice,
+                            minStock: minStock,
+                            hasSerials: !!item.hasSerials
+                        };
+                        targetPid = await ARDB.add('products', rec);
+                        count++;
+                    }
 
                     if (initialStock > 0 && targetPid) {
                         await ARDB.add('stockMovements', {
@@ -525,7 +643,11 @@
                 }
 
                 input.value = '';
-                UI.toast('تم استيراد ' + count + ' منتج بنجاح!', 'ok');
+                const msgParts = [];
+                if (count > 0) msgParts.push('إضافة ' + count + ' منتج جديد');
+                if (updatedCount > 0) msgParts.push('تحديث ' + updatedCount + ' منتج');
+                const finalMsg = msgParts.length > 0 ? ('تم ' + msgParts.join(' و ') + ' بنجاح!') : 'لم يتم تغيير أي بيانات';
+                UI.toast(finalMsg, 'ok');
                 load();
             } catch(err) {
                 input.value = '';
