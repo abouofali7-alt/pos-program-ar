@@ -36,7 +36,7 @@
         </div>
     </main>
 
-    <div id="prodModal" class="modal-mask" style="visibility:hidden;opacity:0;">
+    <div id="prodModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closeProductModal()">
         <div class="modal-box">
             <h3 id="prodModalTitle">إضافة منتج</h3>
             <div class="form-grid">
@@ -68,7 +68,7 @@
     </div>
 
     <!-- modal عرض واستعراض السريالات الخاص بالمنتج -->
-    <div id="serialsModal" class="modal-mask" style="visibility:hidden;opacity:0;">
+    <div id="serialsModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closeSerialsModal()">
         <div class="modal-box" style="width:min(720px,94vw);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                 <h3 id="serialsModalTitle" style="margin:0;"><i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> الأرقام التسلسلية للمنتج</h3>
@@ -170,6 +170,11 @@
         function closeProductModal() {
             document.getElementById('prodModal').style.visibility = 'hidden';
             document.getElementById('prodModal').style.opacity = '0';
+        }
+        function closeSerialsModal() {
+            document.getElementById('serialsModal').style.visibility = 'hidden';
+            document.getElementById('serialsModal').style.opacity = '0';
+            activeViewerPid = null;
         }
         async function editProduct(id) {
             let p = await ARDB.getById('products', id);
