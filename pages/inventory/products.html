@@ -19,8 +19,10 @@
             </div>
             <div class="page-actions" style="display:flex;gap:8px;">
                 <button class="btn btn-secondary" onclick="ARExport.tableToCSV('productsTable', 'المنتجات')"><i class="fa-solid fa-file-excel"></i> تصدير Excel</button>
+                <button class="btn btn-secondary" onclick="importProductsFile()"><i class="fa-solid fa-file-import"></i> استيراد منتجات</button>
                 <button class="btn btn-secondary" onclick="ARExport.printTable('productsTable', 'جدول المنتجات')"><i class="fa-solid fa-print"></i> طباعة</button>
                 <button class="btn btn-primary-soft" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> إضافة منتج</button>
+                <input type="file" id="importProductsInput" accept=".json,.csv,.txt" style="display:none;" onchange="handleProductsImportFile(this)">
             </div>
         </div>
         <div class="table-card">
@@ -372,9 +374,131 @@
             load();
         }
 
-        function closeSerialsModal() {
-            document.getElementById('serialsModal').style.visibility = 'hidden';
-            document.getElementById('serialsModal').style.opacity = '0';
+        function importProductsFile() {
+            let sess = null;
+            try {
+                sess = JSON.parse(localStorage.getItem('ar_session') || 'null');
+            } catch(e){}
+
+            const isManager = sess && (
+                sess.roleId === 1 || 
+                sess.roleName === 'مدير' || 
+                (sess.username && sess.username.toLowerCase() === 'admin')
+            );
+
+            if (!isManager) {
+                UI.toast('عذراً، خاصية استيراد المنتجات مخصصة للمدير فقط!', 'error');
+                return;
+            }
+
+            document.getElementById('importProductsInput').click();
+        }
+
+        async function handleProductsImportFile(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            
+            try {
+                const text = await file.text();
+                let importedProducts = [];
+
+                if (file.name.endsWith('.json')) {
+                    const parsed = JSON.parse(text);
+                    if (Array.isArray(parsed)) {
+                        importedProducts = parsed;
+                    } else if (parsed && Array.isArray(parsed.products)) {
+                        importedProducts = parsed.products;
+                    } else if (parsed && parsed.data && Array.isArray(parsed.data.products)) {
+                        importedProducts = parsed.data.products;
+                    }
+                } else {
+                    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+                    if (lines.length > 0) {
+                        const firstLine = lines[0].toLowerCase();
+                        const startIndex = (firstLine.includes('اسم') || firstLine.includes('name') || firstLine.includes('barcode') || firstLine.includes('باركود')) ? 1 : 0;
+                        
+                        for (let i = startIndex; i < lines.length; i++) {
+                            const row = lines[i].split(/[,;\t]+/).map(c => c.trim().replace(/^["']|["']$/g, ''));
+                            if (row.length > 0 && row[0]) {
+                                importedProducts.push({
+                                    name: row[0],
+                                    barcode: row[1] || '',
+                                    unit: row[2] || 'قطعة',
+                                    cost: Number(row[3]) || 0,
+                                    price: Number(row[4]) || Number(row[3]) || 0,
+                                    wholesalePrice: Number(row[5]) || Number(row[4]) || Number(row[3]) || 0,
+                                    initialStock: Number(row[6]) || 0,
+                                    minStock: Number(row[7]) || 0
+                                });
+                            }
+                        }
+                    }
+                }
+
+                if (!importedProducts || !importedProducts.length) {
+                    UI.toast('لم يتم العثور على منتجات صالحة في الملف المحدد', 'warn');
+                    input.value = '';
+                    return;
+                }
+
+                let count = 0;
+                const categories = await ARDB.getAll('categories');
+                const catMap = {};
+                (categories || []).forEach(c => {
+                    if (c && c.name) catMap[c.name.trim()] = c.id;
+                });
+
+                for (const item of importedProducts) {
+                    if (!item || !item.name) continue;
+                    
+                    let catId = item.categoryId || null;
+                    if (!catId && item.category && catMap[item.category.trim()]) {
+                        catId = catMap[item.category.trim()];
+                    }
+
+                    const cost = Number(item.cost || 0);
+                    const price = Number(item.price || item.cost || 0);
+                    const wholesalePrice = Number(item.wholesalePrice || price);
+                    const initialStock = Number(item.initialStock || item.qty || item.quantity || 0);
+
+                    const rec = {
+                        name: String(item.name).trim(),
+                        barcode: item.barcode ? String(item.barcode).trim() : '',
+                        categoryId: catId,
+                        unit: item.unit ? String(item.unit).trim() : 'قطعة',
+                        cost: cost,
+                        price: price,
+                        wholesalePrice: wholesalePrice,
+                        minStock: Number(item.minStock || 0),
+                        hasSerials: !!item.hasSerials
+                    };
+
+                    const targetPid = await ARDB.add('products', rec);
+                    count++;
+
+                    if (initialStock > 0 && targetPid) {
+                        await ARDB.add('stockMovements', {
+                            date: Date.now(),
+                            productId: targetPid,
+                            direction: 'in',
+                            type: 'initial',
+                            quantity: initialStock,
+                            note: 'رصيد أول المدة (استيراد ملف)'
+                        });
+                    }
+                }
+
+                input.value = '';
+                UI.toast('تم استيراد ' + count + ' منتج بنجاح!', 'ok');
+                load();
+
+                if (typeof API !== 'undefined') {
+                    API.pushFullDataToCloud();
+                }
+            } catch(err) {
+                input.value = '';
+                UI.toast('حدث خطأ أثناء قراءة الملف: ' + err.message, 'error');
+            }
         }
 
         load();
