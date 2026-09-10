@@ -85,7 +85,32 @@
                 if (!found) { UI.toast('اسم المستخدم أو كلمة المرور غير صحيحة', 'error'); return; }
                 if (found.active === false) { UI.toast('الحساب موقوف', 'error'); return; }
 
-                const sess = { id: found.id, username: found.username, name: found.name || 'المستخدم', roleId: found.roleId || 1, roleName: found.roleName || 'مدير' };
+                let permissions = [];
+                const isManager = found.roleId === 1 || found.roleName === 'مدير' || (found.username && found.username.toLowerCase() === 'admin');
+                if (isManager) {
+                    permissions = ['accounting', 'inventory', 'hr', 'business', 'settings'];
+                } else {
+                    try {
+                        const roles = await ARDB.getAll('roles');
+                        const r = (roles || []).find(x => x.id === found.roleId || x.name === found.roleName);
+                        if (r && Array.isArray(r.permissions)) {
+                            permissions = r.permissions;
+                        } else {
+                            permissions = ['business'];
+                        }
+                    } catch(e) {
+                        permissions = ['business'];
+                    }
+                }
+
+                const sess = {
+                    id: found.id,
+                    username: found.username,
+                    name: found.name || 'المستخدم',
+                    roleId: found.roleId || 1,
+                    roleName: found.roleName || 'مدير',
+                    permissions: permissions
+                };
                 localStorage.setItem('ar_session', JSON.stringify(sess));
                 if (typeof ARDB !== 'undefined') ARDB.setSession(sess);
 

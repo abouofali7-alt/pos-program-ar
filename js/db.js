@@ -236,10 +236,10 @@ const ARDB = (function () {
 
         // الصلاحيات
         const roles = [
-            { id: 1, name: 'مدير', description: 'صلاحيات كاملة على كل الوحدات' },
-            { id: 2, name: 'محاسب', description: 'المحاسبة والتقارير والمخزون' },
-            { id: 3, name: 'مشرف مخزن', description: 'المخزون والمشتريات والمنتجات' },
-            { id: 4, name: 'موظف', description: 'الصلاحيات الأساسية' }
+            { id: 1, name: 'مدير', description: 'صلاحيات كاملة على كل الوحدات', permissions: ['accounting', 'inventory', 'hr', 'business', 'settings'] },
+            { id: 2, name: 'محاسب', description: 'المحاسبة والتقارير والمخزون', permissions: ['accounting', 'inventory', 'business'] },
+            { id: 3, name: 'مشرف مخزن', description: 'المخزون والمشتريات والمنتجات', permissions: ['inventory'] },
+            { id: 4, name: 'موظف', description: 'الصلاحيات الأساسية', permissions: ['business'] }
         ];
         for (const r of roles) await localPut('roles', r);
 

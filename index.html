@@ -352,13 +352,36 @@
             ARCharts.renderHorizontalBarChart('chartSubCategory', subCatData);
         }
 
-        function filterQuarter(qtr, btn) {
-            document.querySelectorAll('.qtr-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            initDashboard();
+        function applyDashboardPermissions() {
+            let sess = null;
+            try { sess = JSON.parse(localStorage.getItem('ar_session') || 'null'); } catch(e){}
+            if (!sess) return;
+
+            const cards = document.querySelectorAll('.module-card');
+            cards.forEach(card => {
+                const href = card.getAttribute('href') || '';
+                let modKey = null;
+                if (href.includes('accounting/')) modKey = 'accounting';
+                else if (href.includes('inventory/')) modKey = 'inventory';
+                else if (href.includes('hr/')) modKey = 'hr';
+                else if (href.includes('business/')) modKey = 'business';
+                else if (href.includes('settings/')) modKey = 'settings';
+
+                if (modKey && typeof window.ARUI !== 'undefined' && window.ARUI.userHasModulePermission) {
+                    if (!window.ARUI.userHasModulePermission(sess, modKey)) {
+                        card.style.opacity = '0.35';
+                        card.style.pointerEvents = 'none';
+                        card.style.filter = 'grayscale(1)';
+                        card.title = 'غير مسموح لك بالدخول إلى هذه الوحدة';
+                    }
+                }
+            });
         }
 
-        window.addEventListener('DOMContentLoaded', initDashboard);
+        window.addEventListener('DOMContentLoaded', () => {
+            initDashboard();
+            setTimeout(applyDashboardPermissions, 200);
+        });
     </script>
 </body>
 </html>

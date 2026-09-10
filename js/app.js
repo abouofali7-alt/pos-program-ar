@@ -226,17 +226,79 @@
         }
     }
 
+    function isManagerUser(user) {
+        if (!user) return false;
+        return user.roleId === 1 || user.roleName === 'مدير' || (user.username && user.username.toLowerCase() === 'admin');
+    }
+
+    function getUserPermissions(user) {
+        if (!user) return [];
+        if (isManagerUser(user)) {
+            return ['accounting', 'inventory', 'hr', 'business', 'settings'];
+        }
+        if (Array.isArray(user.permissions)) return user.permissions;
+        return [];
+    }
+
+    function userHasModulePermission(user, moduleKey) {
+        if (!user || !moduleKey) return true;
+        if (isManagerUser(user)) return true;
+        const perms = getUserPermissions(user);
+        return perms.includes(moduleKey);
+    }
+
     async function requireAuth() {
         await loadScript(assetUrl('js/db.js'));
-        const user = getStoredUser();
+        let user = getStoredUser();
         const p = window.location.pathname;
         const isLoginPage = p.endsWith('login.html');
 
         if (!user && !isLoginPage) {
             window.location.href = relPrefix() + 'pages/login.html';
+            return { dbReady: true, user: null };
         } else if (user && isLoginPage) {
             window.location.href = relPrefix() + 'index.html';
+            return { dbReady: true, user };
         }
+
+        if (user && !isLoginPage) {
+            // مزامنة مصفوفة الصلاحيات للجلسات القديمة التي لم تتضمن permissions
+            if ((!user.permissions || !Array.isArray(user.permissions)) && !isManagerUser(user)) {
+                try {
+                    const roles = await ARDB.getAll('roles');
+                    const r = (roles || []).find(x => x.id === user.roleId || x.name === user.roleName);
+                    if (r && Array.isArray(r.permissions)) {
+                        user.permissions = r.permissions;
+                    } else {
+                        user.permissions = ['business'];
+                    }
+                    localStorage.setItem('ar_session', JSON.stringify(user));
+                } catch(e){}
+            }
+
+            // فحص صلاحية الوصول للصفحة الحالية
+            let currentModule = null;
+            if (p.includes('/pages/accounting/')) currentModule = 'accounting';
+            else if (p.includes('/pages/inventory/')) currentModule = 'inventory';
+            else if (p.includes('/pages/hr/')) currentModule = 'hr';
+            else if (p.includes('/pages/business/')) currentModule = 'business';
+            else if (p.includes('/pages/settings/')) currentModule = 'settings';
+
+            if (currentModule && !userHasModulePermission(user, currentModule)) {
+                const moduleNames = {
+                    accounting: 'المحاسبة',
+                    inventory: 'المخزون',
+                    hr: 'الموارد البشرية',
+                    business: 'إدارة الأعمال',
+                    settings: 'الإعدادات'
+                };
+                const nameAr = moduleNames[currentModule] || currentModule;
+                alert('عذراً، ليس لديك صلاحية الوصول لوحدة ' + nameAr);
+                window.location.href = relPrefix() + 'index.html';
+                return { dbReady: true, user, forbidden: true };
+            }
+        }
+
         return { dbReady: true, user };
     }
 
@@ -245,6 +307,7 @@
         const container = document.getElementById('appNavHost');
         if (!container) return;
         const prefix = relPrefix();
+        const user = getStoredUser();
         let html = '';
 
         const pageKeyMap = {
@@ -286,6 +349,11 @@
         };
 
         for (const key of Object.keys(MAP)) {
+            // حجب القوائم التي لا يملك المستخدم صلاحيتها
+            if (user && !userHasModulePermission(user, key)) {
+                continue;
+            }
+
             const group = MAP[key];
             const groupLabel = (typeof ARI18n !== 'undefined') ? ARI18n.t(key) : group.label;
             html += '<div class="nav-group"><div class="nav-group-title"><i class="fa-solid ' + group.icon + '"></i>' + groupLabel + '</div>';
@@ -459,7 +527,7 @@
         });
     }
 
-    window.ARUI = { MAP, assetUrl, initApp, renderHeader, updateApiBadge, resetIdleTimer, initIdleMonitor };
+    window.ARUI = { MAP, assetUrl, initApp, renderHeader, updateApiBadge, resetIdleTimer, initIdleMonitor, userHasModulePermission, isManagerUser, getUserPermissions };
 })();
 
 /* تشغيل تلقائي إن وُجدت عناصر الهيدر أو المصادقة */
