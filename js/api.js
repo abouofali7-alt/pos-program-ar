@@ -80,29 +80,41 @@ const API = (function () {
             _broadcastChannel.onmessage = (event) => {
                 if (event.data === 'sync_now') {
                     pullCloudSync(true);
+                } else if (event.data === 'reset_now') {
+                    _pushQueue = [];
+                    pullCloudSync(true);
                 }
             };
         }
     } catch(e) {}
 
-    function notifyLocalTabs() {
+    function notifyLocalTabs(msg = 'sync_now') {
         if (_broadcastChannel) {
-            try { _broadcastChannel.postMessage('sync_now'); } catch(e) {}
+            try { _broadcastChannel.postMessage(msg); } catch(e) {}
         }
     }
 
     async function processPushQueue() {
         if (_isPushing || _pushQueue.length === 0) return;
         _isPushing = true;
+        const clientResetTs = Number(localStorage.getItem('ar_last_reset_ts') || 0);
         const batch = _pushQueue.splice(0, _pushQueue.length);
         try {
             const res = await fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ batch })
+                body: JSON.stringify({ batch, clientResetTs })
             });
             if (res.ok) {
                 const json = await res.json();
+                if (json && json.reset) {
+                    _pushQueue = [];
+                    if (json.resetTimestamp) {
+                        localStorage.setItem('ar_last_reset_ts', String(json.resetTimestamp));
+                    }
+                    pullCloudSync(true);
+                    return;
+                }
                 if (json && json.lastUpdated) {
                     _lastSyncTimestamp = json.lastUpdated;
                 }
@@ -128,6 +140,7 @@ const API = (function () {
 
     async function pushFullDataToCloud() {
         try {
+            const clientResetTs = Number(localStorage.getItem('ar_last_reset_ts') || 0);
             const STORES = [
                 'settings','sequences','roles','users','departments','employees','attendance','payroll','leaveRequests',
                 'customers','suppliers','categories','products','serials','warehouses','stockMovements',
@@ -148,10 +161,18 @@ const API = (function () {
             const res = await fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ fullData })
+                body: JSON.stringify({ fullData, clientResetTs })
             });
             if (res.ok) {
                 const json = await res.json();
+                if (json && json.reset) {
+                    _pushQueue = [];
+                    if (json.resetTimestamp) {
+                        localStorage.setItem('ar_last_reset_ts', String(json.resetTimestamp));
+                    }
+                    pullCloudSync(true);
+                    return false;
+                }
                 if (json && json.lastUpdated) _lastSyncTimestamp = json.lastUpdated;
                 notifyLocalTabs();
                 return true;
@@ -171,6 +192,8 @@ const API = (function () {
                 const localResetTs = Number(localStorage.getItem('ar_last_reset_ts') || 0);
 
                 if (cloudResetTs > 0 && cloudResetTs > localResetTs) {
+                    _pushQueue = []; // تفريغ ركام الرفع لمنع إرسال داتا قديمة للسيرفر
+                    if (_pushTimer) clearTimeout(_pushTimer);
                     localStorage.setItem('ar_last_reset_ts', String(cloudResetTs));
                     _lastSyncTimestamp = json.lastUpdated || cloudResetTs;
                     await ARDB.clearAllData();
@@ -289,6 +312,8 @@ const API = (function () {
     }
 
     async function resetAllData() {
+        _pushQueue = []; // تفريغ كلي لصف الرفع لمنع إرسال أي داتا سابقة
+        if (_pushTimer) clearTimeout(_pushTimer);
         let now = Date.now();
         try {
             const res = await fetch(`${getBaseUrl()}/sync/reset`, { method: 'POST', headers: getAuthHeaders() });
@@ -303,6 +328,7 @@ const API = (function () {
             await ARDB.seed();
         }
         _lastSyncTimestamp = now;
+        notifyLocalTabs('reset_now');
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: {} }));
         }

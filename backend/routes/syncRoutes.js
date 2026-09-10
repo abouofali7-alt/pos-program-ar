@@ -126,8 +126,22 @@ function isMatch(x, y) {
 // 1. POST /api/sync/push — أي جهاز يرفع معاملة أو صنف جديد
 router.post('/push', async (req, res) => {
     try {
-        const { store, item, action, fullData, batch } = req.body || {};
+        const { store, item, action, fullData, batch, clientResetTs } = req.body || {};
         const cloud = getCloudData();
+
+        const cloudResetTs = Number(cloud.resetTimestamp || 0);
+        const reqClientResetTs = Number(clientResetTs || 0);
+
+        // حماية ضد استرجاع البيانات القديمة بعد عملية الحذف الكلي: نرفض أي رفع محلي قديم سُجل قبل وقت الرسترة
+        if (cloudResetTs > 0 && reqClientResetTs < cloudResetTs) {
+            return res.json({
+                success: false,
+                reset: true,
+                resetTimestamp: cloudResetTs,
+                message: 'Stale push rejected due to prior cloud reset'
+            });
+        }
+
         if (!cloud.data) cloud.data = {};
         if (!cloud.deleted) cloud.deleted = {};
 
