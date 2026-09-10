@@ -110,11 +110,11 @@ const ARDB = (function () {
         }));
     }
 
-    function localAdd(store, data) {
+    function localAdd(store, data, skipPush = false) {
         return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
             const r = os.add(data);
             r.onsuccess = () => {
-                if (typeof API !== 'undefined' && API.pushItemToCloud) {
+                if (!skipPush && typeof API !== 'undefined' && API.pushItemToCloud) {
                     API.pushItemToCloud(store, data, 'save');
                 }
                 res(r.result);
@@ -123,11 +123,11 @@ const ARDB = (function () {
         }));
     }
 
-    function localPut(store, data) {
+    function localPut(store, data, skipPush = false) {
         return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
             const r = os.put(data);
             r.onsuccess = () => {
-                if (typeof API !== 'undefined' && API.pushItemToCloud) {
+                if (!skipPush && typeof API !== 'undefined' && API.pushItemToCloud) {
                     API.pushItemToCloud(store, data, 'save');
                 }
                 res(r.result);
@@ -136,21 +136,52 @@ const ARDB = (function () {
         }));
     }
 
-    function localUpdate(store, id, patch) {
+    function bulkPut(store, items, skipPush = true) {
+        if (!items || !items.length) return Promise.resolve();
+        return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
+            for (const item of items) {
+                if (item) os.put(item);
+            }
+            if (!skipPush && typeof API !== 'undefined' && API.pushItemToCloud) {
+                for (const item of items) {
+                    if (item) API.pushItemToCloud(store, item, 'save');
+                }
+            }
+            res();
+        }));
+    }
+
+    function localUpdate(store, id, patch, skipPush = false) {
         return localGetById(store, id).then((rec) => {
             if (!rec) throw new Error('record not found: ' + id);
             const merged = Object.assign({}, rec, patch, { id: rec.id });
-            return localPut(store, merged);
+            return localPut(store, merged, skipPush);
         });
     }
 
-    function localRemove(store, id) {
+    function localRemove(store, id, skipPush = false) {
         return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
             os.delete(id);
             if (typeof id === 'number') {
                 os.delete(String(id));
             } else if (typeof id === 'string' && !isNaN(Number(id))) {
                 os.delete(Number(id));
+            }
+            if (!skipPush && typeof API !== 'undefined' && API.pushItemToCloud) {
+                API.pushItemToCloud(store, { id }, 'delete');
+            }
+            res();
+        }));
+    }
+
+    function bulkRemove(store, ids, skipPush = true) {
+        if (!ids || !ids.length) return Promise.resolve();
+        return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
+            for (const id of ids) {
+                if (id == null) continue;
+                os.delete(id);
+                if (typeof id === 'number') os.delete(String(id));
+                else if (typeof id === 'string' && !isNaN(Number(id))) os.delete(Number(id));
             }
             res();
         }));
@@ -418,7 +449,7 @@ const ARDB = (function () {
 
     return {
         openDB, getAll, getById, getByIndex, add, put, update, remove,
-        localGetAll, localGetById, localAdd, localPut, localUpdate, localRemove, clearAllData,
+        localGetAll, localGetById, localAdd, localPut, localUpdate, localRemove, bulkPut, bulkRemove, clearAllData,
         nextSeq, seed, syncOpeningBalances, hashPassword, currentUser, setSession, clearSession, money
     };
 })();

@@ -43,46 +43,41 @@ async function createRemoteObject(cloudObj) {
     return false;
 }
 
-async function loadCloudData() {
-    if (_isLoadedFromRemote && global._ar_cloud_data) {
-        return global._ar_cloud_data;
-    }
-    try {
-        if (fs.existsSync(SYNC_FILE)) {
-            const raw = fs.readFileSync(SYNC_FILE, 'utf8');
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === 'object' && parsed.data) {
-                global._ar_cloud_data = parsed;
-                _isLoadedFromRemote = true;
-                return global._ar_cloud_data;
-            }
-        }
-    } catch(e) {}
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
-        const res = await fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-            const json = await res.json();
-            if (json && json.data && typeof json.data === 'object' && json.data.lastUpdated !== undefined) {
-                global._ar_cloud_data = json.data;
-                _isLoadedFromRemote = true;
-                try { fs.writeFileSync(SYNC_FILE, JSON.stringify(global._ar_cloud_data), 'utf8'); } catch(e) {}
-                return global._ar_cloud_data;
-            }
-        } else if (res.status === 404) {
-            // Object expired or missing, auto-create a new one!
-            await createRemoteObject(global._ar_cloud_data);
-        }
-    } catch(e) {}
-
+function getCloudData() {
     if (!global._ar_cloud_data) {
         global._ar_cloud_data = { lastUpdated: Date.now(), resetTimestamp: 0, data: {}, deleted: {} };
+        try {
+            if (fs.existsSync(SYNC_FILE)) {
+                const raw = fs.readFileSync(SYNC_FILE, 'utf8');
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object' && parsed.data) {
+                    global._ar_cloud_data = parsed;
+                }
+            }
+        } catch(e) {}
     }
     return global._ar_cloud_data;
 }
+
+function initRemoteHydration() {
+    if (_isLoadedFromRemote) return;
+    _isLoadedFromRemote = true;
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, { signal: controller.signal })
+            .then(r => r.ok ? r.json() : null)
+            .then(json => {
+                if (json && json.data && json.data.lastUpdated) {
+                    if (!global._ar_cloud_data || (json.data.lastUpdated > (global._ar_cloud_data.lastUpdated || 0))) {
+                        global._ar_cloud_data = json.data;
+                        try { fs.writeFileSync(SYNC_FILE, JSON.stringify(global._ar_cloud_data), 'utf8'); } catch(e){}
+                    }
+                }
+            }).catch(() => {});
+    } catch(e) {}
+}
+initRemoteHydration();
 
 async function saveToRemote(cloudObj) {
     try {
@@ -103,7 +98,7 @@ async function saveToRemote(cloudObj) {
     }
 }
 
-async function saveCloudData(cloudObj) {
+function saveCloudData(cloudObj) {
     global._ar_cloud_data = cloudObj;
     _isLoadedFromRemote = true;
     try {
@@ -132,7 +127,7 @@ function isMatch(x, y) {
 router.post('/push', async (req, res) => {
     try {
         const { store, item, action, fullData, batch } = req.body || {};
-        const cloud = await loadCloudData();
+        const cloud = getCloudData();
         if (!cloud.data) cloud.data = {};
         if (!cloud.deleted) cloud.deleted = {};
 
@@ -205,7 +200,7 @@ router.post('/push', async (req, res) => {
 // 2. GET /api/sync/pull — الأجهزة الأخرى تسحب أحدث حركة فوراً
 router.get('/pull', async (req, res) => {
     try {
-        const cloud = await loadCloudData();
+        const cloud = getCloudData();
         res.json({
             success: true,
             lastUpdated: cloud.lastUpdated || Date.now(),

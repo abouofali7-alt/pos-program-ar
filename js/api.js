@@ -179,12 +179,10 @@ const API = (function () {
                     const cloudData = json.data || {};
                     let updatedAny = false;
                     for (const s of Object.keys(cloudData)) {
-                        const items = cloudData[s] || [];
-                        if (!items || !items.length) continue;
-                        for (const item of items) {
-                            if (!item) continue;
+                        const items = (cloudData[s] || []).filter(Boolean);
+                        if (items.length) {
                             try {
-                                await ARDB.localPut(s, item);
+                                await ARDB.bulkPut(s, items, true);
                                 updatedAny = true;
                             } catch(e){}
                         }
@@ -203,28 +201,23 @@ const API = (function () {
 
                     let updatedAny = false;
 
-                    // 1. تحديث أو إضافة العناصر الواردة من السحابة إلى IndexedDB المحلي
+                    // 1. تحديث أو إضافة العناصر الواردة من السحابة إلى IndexedDB المحلي دفعة واحدة (Bulk) بدون إعادة الرفع للسحابة
                     for (const s of Object.keys(cloudData)) {
-                        const items = cloudData[s] || [];
-                        if (!items || !items.length) continue;
-                        for (const item of items) {
-                            if (!item) continue;
+                        const items = (cloudData[s] || []).filter(Boolean);
+                        if (items.length) {
                             try {
-                                await ARDB.localPut(s, item);
+                                await ARDB.bulkPut(s, items, true);
                                 updatedAny = true;
                             } catch(e){}
                         }
                     }
 
-                    // 2. حذف العناصر التي تم حذفها صراحةً من السحابة في الأجهزة الأخرى
+                    // 2. حذف العناصر التي تم حذفها صراحةً من السحابة في الأجهزة الأخرى دفعة واحدة (Bulk) بدون إعادة الرفع للسحابة
                     for (const s of Object.keys(cloudDeleted)) {
-                        const deletedIds = cloudDeleted[s] || [];
-                        for (const delId of deletedIds) {
-                            if (delId == null) continue;
+                        const deletedIds = (cloudDeleted[s] || []).filter(id => id != null);
+                        if (deletedIds.length) {
                             try {
-                                const numId = Number(delId);
-                                if (!isNaN(numId)) await ARDB.localRemove(s, numId);
-                                await ARDB.localRemove(s, String(delId));
+                                await ARDB.bulkRemove(s, deletedIds, true);
                                 updatedAny = true;
                             } catch(e){}
                         }
