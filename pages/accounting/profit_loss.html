@@ -11,18 +11,74 @@
 </head>
 <body class="dark-mode">
     <div id="appHeaderHost"></div>
-    <main class="pagewrap" style="padding:22px;max-width:1000px;margin:0 auto;">
+    <main class="pagewrap" style="padding:22px;max-width:1100px;margin:0 auto;">
         <div class="page-head">
             <div>
-                <h2>قائمة الدخل</h2>
-                <div class="sub">الإيرادات والمصروفات وصافي الربح/الخسارة</div>
+                <h2>قائمة الدخل (الأرباح والخسائر)</h2>
+                <div class="sub">تجميع كافة الإيرادات والتكاليف والمصروفات لحساب صافي الربح الدقيق</div>
+            </div>
+            <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-secondary" onclick="ARExport.tableToCSV('plTable', 'قائمة_الدخل')"><i class="fa-solid fa-file-excel"></i> تصدير Excel</button>
+                <button class="btn btn-secondary" onclick="ARExport.printTable('plTable', 'تقرير قائمة الدخل')"><i class="fa-solid fa-print"></i> طباعة التقرير</button>
             </div>
         </div>
+
+        <!-- فلاتر التصفية الزمنية -->
+        <div style="background:var(--card-dark);border:1px solid var(--border-color);border-radius:14px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow-card);">
+            <div style="font-weight:700;margin-bottom:10px;font-size:0.9rem;color:var(--accent-cyan);display:flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-filter"></i> تصفية الفترات المالية:
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button class="btn btn-secondary filter-preset active" onclick="setPreset('all', this)">الكل</button>
+                    <button class="btn btn-secondary filter-preset" onclick="setPreset('today', this)">اليوم</button>
+                    <button class="btn btn-secondary filter-preset" onclick="setPreset('month', this)">هذا الشهر</button>
+                    <button class="btn btn-secondary filter-preset" onclick="setPreset('year', this)">هذه السنة</button>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;margin-inline-start:auto;flex-wrap:wrap;">
+                    <label style="font-size:0.82rem;color:var(--text-secondary);">من:</label>
+                    <input type="date" id="startDate" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);font-size:0.85rem;">
+                    <label style="font-size:0.82rem;color:var(--text-secondary);">إلى:</label>
+                    <input type="date" id="endDate" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);font-size:0.85rem;">
+                    <button class="btn btn-primary-soft" onclick="applyCustomFilter()"><i class="fa-solid fa-check"></i> تطبيق</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- كروت الملخص المالي السريع -->
+        <div class="stat-grid" style="grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;margin-bottom:20px;">
+            <div class="stat-card">
+                <div class="label"><i class="fa-solid fa-cash-register"></i> صافي المبيعات</div>
+                <div class="value green" id="statNetSales">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><i class="fa-solid fa-chart-pie"></i> مجمل الربح</div>
+                <div class="value cyan" id="statGrossProfit">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><i class="fa-solid fa-arrow-trend-down"></i> التكاليف والمصروفات</div>
+                <div class="value red" id="statTotalExpenses">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><i class="fa-solid fa-scale-balanced"></i> صافي الربح / الخسارة</div>
+                <div class="value" id="statNetProfit">0.00</div>
+            </div>
+        </div>
+
+        <!-- جدول قائمة الدخل التفصيلي -->
         <div class="table-card">
-            <div class="table-head">قائمة الدخل</div>
+            <div class="table-head" style="display:flex;justify-content:space-between;align-items:center;">
+                <span><i class="fa-solid fa-file-invoice-dollar" style="color:var(--accent-cyan);"></i> جدول قائمة الدخل الشامل</span>
+                <span id="periodLabel" style="font-size:0.8rem;color:var(--text-secondary);font-weight:normal;">كافة الفترات المالية</span>
+            </div>
             <div class="table-scroll">
-                <table class="data-table">
-                    <thead><tr><th>البند</th><th>المبلغ</th></tr></thead>
+                <table class="data-table" id="plTable">
+                    <thead>
+                        <tr>
+                            <th style="width:70%;">البند / الحساب</th>
+                            <th style="width:30%;text-align:left;">المبلغ (ج.م)</th>
+                        </tr>
+                    </thead>
                     <tbody id="plBody"></tbody>
                 </table>
             </div>
@@ -31,94 +87,264 @@
 
     <script src="../../js/ui.js"></script>
     <script src="../../js/db.js"></script>
+    <script src="../../js/export.js"></script>
     <script src="../../js/app.js"></script>
     <script>
+        let _startDate = null;
+        let _endDate = null;
+
+        function setPreset(type, btn) {
+            document.querySelectorAll('.filter-preset').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            const now = new Date();
+            if (type === 'today') {
+                const s = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                const e = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+                _startDate = s.getTime();
+                _endDate = e.getTime();
+                document.getElementById('startDate').value = UI.todayInput();
+                document.getElementById('endDate').value = UI.todayInput();
+                document.getElementById('periodLabel').textContent = 'عن اليوم (' + UI.todayInput() + ')';
+            } else if (type === 'month') {
+                const s = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+                const e = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                _startDate = s.getTime();
+                _endDate = e.getTime();
+                document.getElementById('periodLabel').textContent = 'عن شهر ' + (now.getMonth() + 1) + ' / ' + now.getFullYear();
+            } else if (type === 'year') {
+                const s = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+                const e = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+                _startDate = s.getTime();
+                _endDate = e.getTime();
+                document.getElementById('periodLabel').textContent = 'عن سنة ' + now.getFullYear();
+            } else {
+                _startDate = null;
+                _endDate = null;
+                document.getElementById('startDate').value = '';
+                document.getElementById('endDate').value = '';
+                document.getElementById('periodLabel').textContent = 'كافة الفترات المالية';
+            }
+            load();
+        }
+
+        function applyCustomFilter() {
+            document.querySelectorAll('.filter-preset').forEach(b => b.classList.remove('active'));
+            const sVal = document.getElementById('startDate').value;
+            const eVal = document.getElementById('endDate').value;
+
+            _startDate = sVal ? new Date(sVal + 'T00:00:00').getTime() : null;
+            _endDate = eVal ? new Date(eVal + 'T23:59:59').getTime() : null;
+
+            if (sVal || eVal) {
+                document.getElementById('periodLabel').textContent = 'من ' + (sVal || 'البداية') + ' إلى ' + (eVal || 'الآن');
+            } else {
+                document.getElementById('periodLabel').textContent = 'كافة الفترات المالية';
+            }
+            load();
+        }
+
+        function inRange(dateVal) {
+            if (!dateVal) return true;
+            const t = new Date(dateVal).getTime();
+            if (isNaN(t)) return true;
+            if (_startDate && t < _startDate) return false;
+            if (_endDate && t > _endDate) return false;
+            return true;
+        }
+
         async function load() {
             try { await ARDB.seed(); } catch (e) {}
 
-            const [accounts, entries, invoices, expenses, products, returns] = await Promise.all([
+            const [accounts, entries, invoices, invoiceReturns, expenses, products, payrolls] = await Promise.all([
                 ARDB.getAll('accounts'),
                 ARDB.getAll('journalEntries'),
                 ARDB.getAll('invoices'),
+                ARDB.getAll('invoiceReturns'),
                 ARDB.getAll('expenses'),
                 ARDB.getAll('products'),
-                ARDB.getAll('invoiceReturns')
+                ARDB.getAll('payroll')
             ]);
-            const credits = {}, debits = {};
-            (entries || []).forEach(en => (en.lines || []).forEach(l => {
-                if (!credits[l.accountId]) credits[l.accountId] = 0;
-                if (!debits[l.accountId]) debits[l.accountId] = 0;
-                credits[l.accountId] += (l.credit || 0);
-                debits[l.accountId] += (l.debit || 0);
-            }));
 
-            // تجميع تشغيلي إن لم تكن القيود الصريحة منشأة
-            if (!entries || !entries.length) {
-                (invoices || []).forEach(inv => {
-                    if (inv.total > 0) credits[11] = (credits[11] || 0) + inv.total; // 11: مبيعات
-                });
-                (expenses || []).forEach(exp => {
-                    if (exp.amount > 0) debits[13] = (debits[13] || 0) + exp.amount; // 13: مصروفات
-                });
-            }
-
-            // حساب تكلفة البضاعة المباعة (COGS)
-            const pById = {};
-            (products || []).forEach(p => pById[p.id] = p);
-            let cogs = 0;
+            // 1. حساب المبيعات ومرتجعاتها (Sales & Returns)
+            let grossSales = 0;
             (invoices || []).forEach(inv => {
-                (inv.items || []).forEach(it => {
-                    const pid = it.productId || it.id;
-                    const q = it.quantity || it.qty || 1;
-                    const unitCost = (it.cost !== undefined) ? it.cost : (pById[pid] ? pById[pid].cost || 0 : 0);
-                    cogs += q * unitCost;
-                });
-            });
-            (returns || []).forEach(ret => {
-                (ret.items || []).forEach(it => {
-                    const pid = it.productId || it.id;
-                    const q = it.quantity || it.qty || 1;
-                    const unitCost = (it.cost !== undefined) ? it.cost : (pById[pid] ? pById[pid].cost || 0 : 0);
-                    cogs -= q * unitCost;
-                });
-            });
-
-            let income = 0, expense = 0;
-            const rows = [];
-            if (cogs > 0) {
-                expense += cogs;
-                rows.push({ name: 'تكلفة المبيعات (تكلفة البضاعة المباعة)', amt: cogs, kind: 'expense' });
-            }
-
-            accounts.filter(a => a.parentId).forEach(a => {
-                if (a.type === 'income') {
-                    const amt = (credits[a.id] || 0) - (debits[a.id] || 0);
-                    if (amt > 0) {
-                        income += amt;
-                        rows.push({ name: a.name, amt, kind: 'income' });
-                    }
-                } else if (a.type === 'expense') {
-                    const amt = (debits[a.id] || 0) - (credits[a.id] || 0);
-                    if (amt > 0) {
-                        expense += amt;
-                        rows.push({ name: a.name, amt, kind: 'expense' });
-                    }
+                if (inRange(inv.date)) {
+                    grossSales += Number(inv.total || inv.grandTotal || inv.netTotal || 0);
                 }
             });
 
-            const net = income - expense;
-            const body = document.getElementById('plBody');
-            body.innerHTML =
-                '<tr style="background:var(--card-hover);"><td colspan="2" style="font-weight:800;color:var(--success);"><i class="fa-solid fa-arrow-up"></i> الإيرادات</td></tr>' +
-                rows.filter(r => r.kind === 'income').map(r => '<tr><td style="padding-right:30px;">' + r.name + '</td><td class="num">' + UI.money(r.amt) + '</td></tr>').join('') +
-                '<tr><td style="font-weight:700;">إجمالي الإيرادات</td><td class="num" style="font-weight:700;color:var(--success);">' + UI.money(income) + '</td></tr>' +
-                '<tr style="background:var(--card-hover);"><td colspan="2" style="font-weight:800;color:var(--danger);"><i class="fa-solid fa-arrow-down"></i> المصروفات والتكاليف</td></tr>' +
-                rows.filter(r => r.kind === 'expense').map(r => '<tr><td style="padding-right:30px;">' + r.name + '</td><td class="num">' + UI.money(r.amt) + '</td></tr>').join('') +
-                '<tr><td style="font-weight:700;">إجمالي المصروفات والتكاليف</td><td class="num" style="font-weight:700;color:var(--danger);">' + UI.money(expense) + '</td></tr>' +
-                '<tr style="background:var(--card-hover);font-weight:800;font-size:1.05rem;">' +
-                '<td>صافي ' + (net >= 0 ? 'الربح' : 'الخسارة') + '</td>' +
-                '<td class="num" style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + ';">' + UI.money(Math.abs(net)) + '</td></tr>';
+            let salesReturns = 0;
+            (invoiceReturns || []).forEach(ret => {
+                if (inRange(ret.date)) {
+                    salesReturns += Number(ret.total || ret.amount || ret.grandTotal || 0);
+                }
+            });
+
+            const netSales = Math.max(0, grossSales - salesReturns);
+
+            // 2. حساب تكلفة البضاعة المباعة (COGS)
+            const pById = {};
+            (products || []).forEach(p => pById[p.id] = p);
+
+            let cogs = 0;
+            (invoices || []).forEach(inv => {
+                if (inRange(inv.date) && inv.items) {
+                    inv.items.forEach(it => {
+                        const pid = it.productId || it.id;
+                        const q = Number(it.quantity || it.qty || 1);
+                        const unitCost = (it.cost !== undefined && !isNaN(Number(it.cost))) ? Number(it.cost) : (pById[pid] ? Number(pById[pid].cost || 0) : 0);
+                        cogs += q * unitCost;
+                    });
+                }
+            });
+
+            (invoiceReturns || []).forEach(ret => {
+                if (inRange(ret.date) && ret.items) {
+                    ret.items.forEach(it => {
+                        const pid = it.productId || it.id;
+                        const q = Number(it.quantity || it.qty || 1);
+                        const unitCost = (it.cost !== undefined && !isNaN(Number(it.cost))) ? Number(it.cost) : (pById[pid] ? Number(pById[pid].cost || 0) : 0);
+                        cogs -= q * unitCost;
+                    });
+                }
+            });
+
+            cogs = Math.max(0, cogs);
+            const grossProfit = netSales - cogs;
+
+            // 3. تجميع المصروفات النثرية والعمومية من شاشة المصروفات
+            let totalGeneralExpenses = 0;
+            const expCatMap = {};
+            (expenses || []).forEach(exp => {
+                if (inRange(exp.date)) {
+                    const amt = Number(exp.amount || 0);
+                    totalGeneralExpenses += amt;
+                    const catName = (exp.category || exp.title || 'مصروفات تشغيلية وعمومية').trim();
+                    expCatMap[catName] = (expCatMap[catName] || 0) + amt;
+                }
+            });
+
+            // 4. تجميع رواتب وأجور الموظفين
+            let totalPayroll = 0;
+            (payrolls || []).forEach(p => {
+                if (inRange(p.date || p.periodDate)) {
+                    totalPayroll += Number(p.netSalary || p.totalSalary || p.amount || 0);
+                }
+            });
+
+            // 5. تجميع الإيرادات والمصروفات الإضافية من القيود وشجرة الحسابات
+            const extraIncomeMap = {};
+            const extraExpenseMap = {};
+
+            if (entries && entries.length) {
+                const accById = {};
+                (accounts || []).forEach(a => accById[a.id] = a);
+
+                (entries || []).forEach(en => {
+                    if (inRange(en.date) && en.lines) {
+                        en.lines.forEach(l => {
+                            const a = accById[l.accountId];
+                            if (a) {
+                                if (a.type === 'income' && String(a.code) !== '4101' && !a.name.includes('مبيعات')) {
+                                    const net = (Number(l.credit) || 0) - (Number(l.debit) || 0);
+                                    if (net !== 0) extraIncomeMap[a.name] = (extraIncomeMap[a.name] || 0) + net;
+                                } else if (a.type === 'expense' && String(a.code) !== '5101' && !a.name.includes('تكلفة المبيعات') && !a.name.includes('عمومية')) {
+                                    const net = (Number(l.debit) || 0) - (Number(l.credit) || 0);
+                                    if (net !== 0) extraExpenseMap[a.name] = (extraExpenseMap[a.name] || 0) + net;
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+
+            let extraIncomeTotal = 0;
+            Object.values(extraIncomeMap).forEach(v => extraIncomeTotal += v);
+
+            let extraExpenseTotal = 0;
+            Object.values(extraExpenseMap).forEach(v => extraExpenseTotal += v);
+
+            // 6. الحسابات الإجمالية النهائية
+            const totalRevenues = netSales + extraIncomeTotal;
+            const totalOperatingExpenses = totalGeneralExpenses + totalPayroll + extraExpenseTotal;
+            const totalExpensesAndCosts = cogs + totalOperatingExpenses;
+            const netProfit = totalRevenues - totalExpensesAndCosts;
+
+            // تحديث الكروت العلوية
+            document.getElementById('statNetSales').innerHTML = UI.money(netSales);
+            document.getElementById('statGrossProfit').innerHTML = UI.money(grossProfit);
+            document.getElementById('statTotalExpenses').innerHTML = UI.money(totalExpensesAndCosts);
+
+            const netEl = document.getElementById('statNetProfit');
+            netEl.innerHTML = UI.money(netProfit);
+            netEl.className = 'value ' + (netProfit >= 0 ? 'green' : 'red');
+
+            // بناء جدول قائمة الدخل التفصيلي
+            let html = '';
+
+            // --- قسم 1: الإيرادات (Revenues) ---
+            html += '<tr style="background:rgba(34,197,94,0.15);font-weight:800;color:var(--success);"><td colspan="2"><i class="fa-solid fa-arrow-trend-up"></i> أولاً: الإيرادات والداخل</td></tr>';
+            html += '<tr><td style="padding-inline-start:24px;">إجمالي فواتير المبيعات</td><td class="num">' + UI.money(grossSales) + '</td></tr>';
+            if (salesReturns > 0) {
+                html += '<tr><td style="padding-inline-start:24px;color:var(--danger);">مخصوماً منه: مرتجعات المبيعات (-)</td><td class="num" style="color:var(--danger);">- ' + UI.money(salesReturns) + '</td></tr>';
+            }
+            html += '<tr style="font-weight:700;background:var(--card-hover);"><td style="padding-inline-start:24px;">صافي إجمالي المبيعات</td><td class="num" style="color:var(--success);">' + UI.money(netSales) + '</td></tr>';
+
+            if (Object.keys(extraIncomeMap).length) {
+                Object.keys(extraIncomeMap).forEach(name => {
+                    html += '<tr><td style="padding-inline-start:24px;">' + name + '</td><td class="num">' + UI.money(extraIncomeMap[name]) + '</td></tr>';
+                });
+            }
+
+            html += '<tr style="font-weight:800;background:rgba(34,197,94,0.08);border-top:1px solid var(--border-color);"><td>إجمالي الإيرادات والداخل</td><td class="num" style="color:var(--success);font-size:1rem;">' + UI.money(totalRevenues) + '</td></tr>';
+
+            // --- قسم 2: تكلفة المبيعات ومجمل الربح (COGS & Gross Profit) ---
+            html += '<tr style="background:rgba(56,189,248,0.15);font-weight:800;color:var(--accent-cyan);"><td colspan="2"><i class="fa-solid fa-boxes-stacked"></i> ثانياً: تكلفة المبيعات والتكاليف المباشرة</td></tr>';
+            html += '<tr><td style="padding-inline-start:24px;">تكلفة البضاعة المباعة (تكلفة المنتجات المباعة)</td><td class="num" style="color:var(--danger);">' + UI.money(cogs) + '</td></tr>';
+
+            const grossMarginPct = netSales > 0 ? ((grossProfit / netSales) * 100).toFixed(1) : '0.0';
+            html += '<tr style="font-weight:800;background:var(--card-hover);"><td style="padding-inline-start:24px;">مجمل الربح / الهامش التجاري (Gross Profit) <span class="badge badge-purple" style="margin-inline-start:8px;">' + grossMarginPct + '% هامش</span></td><td class="num" style="color:' + (grossProfit >= 0 ? 'var(--accent-cyan)' : 'var(--danger)') + ';font-size:1.02rem;">' + UI.money(grossProfit) + '</td></tr>';
+
+            // --- قسم 3: المصروفات التشغيلية والعمومية (Operating Expenses) ---
+            html += '<tr style="background:rgba(239,68,68,0.15);font-weight:800;color:var(--danger);"><td colspan="2"><i class="fa-solid fa-arrow-trend-down"></i> ثالثاً: المصروفات والتكاليف التشغيلية والخارج</td></tr>';
+
+            if (Object.keys(expCatMap).length) {
+                Object.keys(expCatMap).forEach(cat => {
+                    html += '<tr><td style="padding-inline-start:24px;">مصروفات: ' + cat + '</td><td class="num">' + UI.money(expCatMap[cat]) + '</td></tr>';
+                });
+            } else if (totalGeneralExpenses > 0) {
+                html += '<tr><td style="padding-inline-start:24px;">المصروفات العمومية والتشغيلية</td><td class="num">' + UI.money(totalGeneralExpenses) + '</td></tr>';
+            }
+
+            if (totalPayroll > 0) {
+                html += '<tr><td style="padding-inline-start:24px;">رواتب وأجور الموظفين (مسيرات الرواتب)</td><td class="num">' + UI.money(totalPayroll) + '</td></tr>';
+            }
+
+            if (Object.keys(extraExpenseMap).length) {
+                Object.keys(extraExpenseMap).forEach(name => {
+                    html += '<tr><td style="padding-inline-start:24px;">' + name + '</td><td class="num">' + UI.money(extraExpenseMap[name]) + '</td></tr>';
+                });
+            }
+
+            if (totalOperatingExpenses === 0) {
+                html += '<tr><td style="padding-inline-start:24px;color:var(--text-secondary);font-style:italic;">لا توجد مصروفات تشغيلية مسجلة لهذه الفترة</td><td class="num">0.00</td></tr>';
+            }
+
+            html += '<tr style="font-weight:700;background:var(--card-hover);"><td style="padding-inline-start:24px;">إجمالي المصروفات التشغيلية والعمومية</td><td class="num" style="color:var(--danger);">' + UI.money(totalOperatingExpenses) + '</td></tr>';
+            html += '<tr style="font-weight:800;background:rgba(239,68,68,0.08);border-top:1px solid var(--border-color);"><td>إجمالي كافة التكاليف والمصروفات (تكلفة + مصروفات)</td><td class="num" style="color:var(--danger);font-size:1rem;">' + UI.money(totalExpensesAndCosts) + '</td></tr>';
+
+            // --- قسم 4: النتيجة النهائية (Net Profit / Loss) ---
+            const netMarginPct = netSales > 0 ? ((netProfit / netSales) * 100).toFixed(1) : '0.0';
+            const isProfit = netProfit >= 0;
+
+            html += '<tr style="background:' + (isProfit ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)') + ';font-weight:800;font-size:1.15rem;border-top:2px solid ' + (isProfit ? 'var(--success)' : 'var(--danger)') + ';">' +
+                '<td>صافي ' + (isProfit ? 'الربح' : 'الخسارة') + ' النهائي (Net Profit / Loss) <span class="badge ' + (isProfit ? 'badge-green' : 'badge-red') + '" style="margin-inline-start:8px;">' + netMarginPct + '% نسبة الربح</span></td>' +
+                '<td class="num" style="color:' + (isProfit ? 'var(--success)' : 'var(--danger)') + ';font-weight:900;">' + UI.money(netProfit) + '</td></tr>';
+
+            document.getElementById('plBody').innerHTML = html;
         }
+
         load();
         window.addEventListener('ar_cloud_data_updated', load);
     </script>
