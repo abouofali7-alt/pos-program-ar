@@ -72,6 +72,24 @@ const API = (function () {
     let _pushQueue = [];
     let _pushTimer = null;
     let _isPushing = false;
+    let _broadcastChannel = null;
+
+    try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+            _broadcastChannel = new BroadcastChannel('ar_pos_sync');
+            _broadcastChannel.onmessage = (event) => {
+                if (event.data === 'sync_now') {
+                    pullCloudSync(true);
+                }
+            };
+        }
+    } catch(e) {}
+
+    function notifyLocalTabs() {
+        if (_broadcastChannel) {
+            try { _broadcastChannel.postMessage('sync_now'); } catch(e) {}
+        }
+    }
 
     async function processPushQueue() {
         if (_isPushing || _pushQueue.length === 0) return;
@@ -88,6 +106,7 @@ const API = (function () {
                 if (json && json.lastUpdated) {
                     _lastSyncTimestamp = json.lastUpdated;
                 }
+                notifyLocalTabs();
             } else {
                 _pushQueue.unshift(...batch);
             }
@@ -96,7 +115,7 @@ const API = (function () {
         } finally {
             _isPushing = false;
             if (_pushQueue.length > 0) {
-                setTimeout(processPushQueue, 80);
+                setTimeout(processPushQueue, 0);
             }
         }
     }
@@ -104,7 +123,7 @@ const API = (function () {
     function pushItemToCloud(store, item, action = 'save') {
         _pushQueue.push({ store, item, action });
         if (_pushTimer) clearTimeout(_pushTimer);
-        _pushTimer = setTimeout(processPushQueue, 40);
+        _pushTimer = setTimeout(processPushQueue, 0);
     }
 
     async function pushFullDataToCloud() {
@@ -134,6 +153,7 @@ const API = (function () {
             if (res.ok) {
                 const json = await res.json();
                 if (json && json.lastUpdated) _lastSyncTimestamp = json.lastUpdated;
+                notifyLocalTabs();
                 return true;
             }
         } catch(e) {
@@ -228,7 +248,7 @@ const API = (function () {
 
         _syncTimer = setInterval(async () => {
             await pullCloudSync();
-        }, 1000);
+        }, 400);
 
         if (typeof window !== 'undefined') {
             window.addEventListener('focus', () => pullCloudSync(true));

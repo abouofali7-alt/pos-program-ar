@@ -84,16 +84,10 @@ async function loadCloudData() {
     return global._ar_cloud_data;
 }
 
-async function saveCloudData(cloudObj) {
-    global._ar_cloud_data = cloudObj;
-    _isLoadedFromRemote = true;
-    try {
-        fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
-    } catch(e) {}
-
+async function saveToRemote(cloudObj) {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
         const res = await fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -107,6 +101,17 @@ async function saveCloudData(cloudObj) {
     } catch(e) {
         await createRemoteObject(cloudObj);
     }
+}
+
+async function saveCloudData(cloudObj) {
+    global._ar_cloud_data = cloudObj;
+    _isLoadedFromRemote = true;
+    try {
+        fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
+    } catch(e) {}
+
+    // Async background persistence to external remote storage without delaying HTTP response
+    saveToRemote(cloudObj).catch(() => {});
 }
 
 function getItemId(x) {
