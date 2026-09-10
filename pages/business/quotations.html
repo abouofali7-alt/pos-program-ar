@@ -18,23 +18,27 @@
                 <div class="sub">العروض المقدمة للعملاء قبل إصدار الفواتير</div>
             </div>
             <div class="page-actions">
-                <button class="btn btn-primary-soft" onclick="openQuoModal()"><i class="fa-solid fa-plus"></i> عرض سعر</button>
+                <button class="btn btn-primary-soft" onclick="openQuoModal()"><i class="fa-solid fa-plus"></i> عرض سعر جديد</button>
             </div>
         </div>
         <div class="table-card">
             <div class="table-head">عروض الأسعار</div>
             <div class="table-scroll">
                 <table class="data-table">
-                    <thead><tr><th>الرقم</th><th>التاريخ</th><th>العميل</th><th>الإجمالي</th><th>الحالة</th><th></th></tr></thead>
+                    <thead><tr><th>الرقم</th><th>التاريخ</th><th>العميل</th><th>الإجمالي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
                     <tbody id="quoBody"></tbody>
                 </table>
             </div>
         </div>
     </main>
 
-    <div id="quoModal" class="modal-mask" style="visibility:hidden;opacity:0;">
-        <div class="modal-box" style="width:min(820px,94vw);">
-            <h3>عرض سعر جديد</h3>
+    <!-- نافذة إضافة وتعديل عرض السعر -->
+    <div id="quoModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closeQuoModal()">
+        <div class="modal-box" style="width:min(840px,94vw);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 id="quoModalTitle" style="margin:0;">عرض سعر جديد</h3>
+                <button class="icon-btn" onclick="closeQuoModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
             <div class="form-grid">
                 <div class="form-item"><label>التاريخ</label><input type="date" id="quoDate"></div>
                 <div class="form-item"><label>العميل</label><select id="quoCustomer"></select></div>
@@ -42,7 +46,7 @@
                 <div class="form-item"><label>الحالة</label>
                     <select id="quoStatus"><option value="open">مفتوح</option><option value="accepted">مقبول</option><option value="rejected">مرفوض</option><option value="cancelled">ملغى</option></select>
                 </div>
-                <div class="form-item" style="grid-column:1/-1;"><label>ملاحظة</label><input id="quoNote"></div>
+                <div class="form-item" style="grid-column:1/-1;"><label>ملاحظة</label><input id="quoNote" placeholder="ملاحظات توضيحية للعميل..."></div>
             </div>
             <div style="margin-bottom:10px;"><button class="btn btn-sm" onclick="addQuoLine()"><i class="fa-solid fa-plus"></i> إضافة صنف</button></div>
             <div class="table-scroll" style="margin-bottom:12px;">
@@ -52,11 +56,29 @@
                 </table>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                <span>الإجمالي: <b id="quoTotal">0.00</b></span>
+                <span style="font-size:1.1rem;font-weight:700;">الإجمالي: <b id="quoTotal" style="color:var(--accent-cyan);">0.00</b></span>
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button class="btn btn-secondary" onclick="closeQuoModal()">إلغاء</button>
-                <button class="btn btn-primary-soft" onclick="saveQuo()">حفظ العرض</button>
+                <button class="btn btn-primary-soft" onclick="saveQuo()"><i class="fa-solid fa-floppy-disk"></i> حفظ العرض</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة اختيار السريالات المطلوبة عند تحويل العرض إلى فاتورة -->
+    <div id="quoSerialModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closeQuoSerialModal()">
+        <div class="modal-box" style="width:min(680px,94vw);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;"><i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> اختيار الأرقام التسلسلية (S/N) للفاتورة</h3>
+                <button class="icon-btn" onclick="closeQuoSerialModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:14px;">
+                يتضمن هذا العرض منتجات تتطلب أرقاماً تسلسلية. يرجى تحديد السريالات المباعة لكل صنف قبل إتمام تحويل العرض إلى فاتورة:
+            </div>
+            <div id="quoSerialItemsWrap" style="display:flex;flex-direction:column;gap:14px;max-height:360px;overflow-y:auto;margin-bottom:14px;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeQuoSerialModal()">إلغاء</button>
+                <button class="btn btn-primary-soft" onclick="confirmQuoSerialConversion()"><i class="fa-solid fa-file-circle-check"></i> تأكيد وإصدار الفاتورة</button>
             </div>
         </div>
     </div>
@@ -66,7 +88,16 @@
     <script src="../../js/app.js"></script>
     <script>
         let quoLineCount = 0;
-        const quoStatusInfo = { open: ['badge-blue', 'مفتوح'], accepted: ['badge-green', 'مقبول'], rejected: ['badge-red', 'مرفوض'], cancelled: ['badge-amber', 'ملغى'] };
+        let editingQuoId = null;
+        let currentConvertingQuo = null;
+        let currentSerialNeeds = [];
+
+        const quoStatusInfo = {
+            open: ['badge-blue', 'مفتوح'],
+            accepted: ['badge-green', 'مقبول'],
+            rejected: ['badge-red', 'مرفوض'],
+            cancelled: ['badge-amber', 'ملغى']
+        };
 
         async function load() {
             const [quotes, customers] = await Promise.all([ARDB.getAll('quotations'), ARDB.getAll('customers')]);
@@ -81,7 +112,7 @@
                     '<td><span class="badge ' + si[0] + '">' + si[1] + '</span></td>' +
                     '<td style="text-align:left;white-space:nowrap;">' +
                     '<button class="btn btn-sm btn-primary-soft" title="تحويل لفاتورة بيع" onclick="convertToInvoice(' + q.id + ')"><i class="fa-solid fa-file-circle-check"></i> تحويل لفاتورة</button> ' +
-                    '<button class="btn btn-sm" title="قبول العرض" onclick="setQuoStatus(' + q.id + ',\'accepted\')"><i class="fa-solid fa-check"></i></button> ' +
+                    '<button class="btn btn-sm" title="تعديل عرض السعر" onclick="editQuo(' + q.id + ')"><i class="fa-solid fa-pen"></i> تعديل</button> ' +
                     '<button class="btn btn-sm btn-danger" title="حذف" onclick="delQuo(' + q.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
             }).join('') || '<tr><td colspan="6" class="empty-state">لا توجد عروض أسعار</td></tr>';
 
@@ -89,19 +120,36 @@
             sel.innerHTML = '<option value="">— بدون عميل —</option>' + customers.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
         }
 
-        async function addQuoLine() {
+        async function addQuoLine(pid = '', qty = 1, price = '') {
             const i = quoLineCount++;
             const products = await ARDB.getAll('products');
             const tr = document.createElement('tr');
             tr.innerHTML =
-                '<td><select id="qProd_' + i + '" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);">' +
-                '<option value="">— اختر —</option>' +
-                products.map(p => '<option value="' + p.id + '" data-price="' + (p.price || 0) + '">' + p.name + '</option>').join('') + '</select></td>' +
-                '<td><input id="qQty_' + i + '" type="number" step="1" min="0" value="1" style="width:70px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcQuo()"></td>' +
-                '<td><input id="qPrice_' + i + '" type="number" step="0.01" min="0" style="width:90px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcQuo()"></td>' +
+                '<td><select id="qProd_' + i + '" onchange="onProdSelect(' + i + ')" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);">' +
+                '<option value="">— اختر المنتج —</option>' +
+                products.map(p => '<option value="' + p.id + '" data-price="' + (p.price || 0) + '"' + (String(p.id) === String(pid) ? ' selected' : '') + '>' + p.name + (p.hasSerials ? ' (S/N)' : '') + '</option>').join('') + '</select></td>' +
+                '<td><input id="qQty_' + i + '" type="number" step="1" min="1" value="' + qty + '" style="width:70px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcQuo()"></td>' +
+                '<td><input id="qPrice_' + i + '" type="number" step="0.01" min="0" value="' + price + '" style="width:90px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcQuo()"></td>' +
                 '<td class="num" id="qSub_' + i + '" style="font-weight:700;">0.00</td>' +
                 '<td><button class="btn btn-sm btn-danger" onclick="this.closest(\'tr\').remove();recalcQuo();"><i class="fa-solid fa-xmark"></i></button></td>';
             document.getElementById('quoLinesBody').appendChild(tr);
+            if (pid && price === '') {
+                onProdSelect(i);
+            } else {
+                recalcQuo();
+            }
+        }
+
+        function onProdSelect(i) {
+            const sel = document.getElementById('qProd_' + i);
+            const priceInput = document.getElementById('qPrice_' + i);
+            if (sel && priceInput) {
+                const opt = sel.options[sel.selectedIndex];
+                if (opt && opt.dataset.price) {
+                    priceInput.value = opt.dataset.price;
+                }
+            }
+            recalcQuo();
         }
 
         function recalcQuo() {
@@ -111,8 +159,6 @@
                 const qty = tr.querySelector('input[id^="qQty_"]');
                 const price = tr.querySelector('input[id^="qPrice_"]');
                 if (sel && price && qty) {
-                    const oc = sel.options[sel.selectedIndex];
-                    if (oc && oc.dataset.price && !price.value) price.value = oc.dataset.price;
                     const sub = (Number(qty.value) || 0) * (Number(price.value) || 0);
                     total += sub;
                     const subEl = tr.querySelector('[id^="qSub_"]');
@@ -123,6 +169,8 @@
         }
 
         async function openQuoModal() {
+            editingQuoId = null;
+            document.getElementById('quoModalTitle').textContent = 'عرض سعر جديد';
             document.getElementById('quoModal').style.visibility = 'visible';
             document.getElementById('quoModal').style.opacity = '1';
             document.getElementById('quoDate').value = UI.todayInput();
@@ -132,17 +180,45 @@
             document.getElementById('quoNote').value = '';
             document.getElementById('quoLinesBody').innerHTML = '';
             quoLineCount = 0;
+            await addQuoLine();
             recalcQuo();
-            await load();
-        window.addEventListener('ar_cloud_data_updated', load);
         }
+
+        async function editQuo(id) {
+            const q = await ARDB.getById('quotations', id);
+            if (!q) { UI.toast('تعذر العثور على عرض السعر', 'warn'); return; }
+            editingQuoId = q.id;
+            document.getElementById('quoModalTitle').textContent = 'تعديل عرض سعر: ' + q.number;
+            document.getElementById('quoDate').value = q.date ? UI.dateInput(q.date) : UI.todayInput();
+            document.getElementById('quoCustomer').value = q.customerId || '';
+            document.getElementById('quoExpiry').value = q.expiry ? UI.dateInput(q.expiry) : '';
+            document.getElementById('quoStatus').value = q.status || 'open';
+            document.getElementById('quoNote').value = q.note || '';
+            document.getElementById('quoLinesBody').innerHTML = '';
+            quoLineCount = 0;
+
+            if (q.items && q.items.length) {
+                for (const it of q.items) {
+                    await addQuoLine(it.productId, it.quantity, it.price);
+                }
+            } else {
+                await addQuoLine();
+            }
+
+            document.getElementById('quoModal').style.visibility = 'visible';
+            document.getElementById('quoModal').style.opacity = '1';
+            recalcQuo();
+        }
+
         function closeQuoModal() {
             document.getElementById('quoModal').style.visibility = 'hidden';
             document.getElementById('quoModal').style.opacity = '0';
+            editingQuoId = null;
         }
 
         async function saveQuo() {
-            const date = new Date(document.getElementById('quoDate').value + 'T12:00:00').getTime();
+            const dateInput = document.getElementById('quoDate').value;
+            const date = dateInput ? new Date(dateInput + 'T12:00:00').getTime() : Date.now();
             const customerId = document.getElementById('quoCustomer').value ? Number(document.getElementById('quoCustomer').value) : null;
             const expiry = document.getElementById('quoExpiry').value;
             const status = document.getElementById('quoStatus').value;
@@ -167,48 +243,196 @@
                     }
                 }
             });
-            if (!items.length) { UI.toast('أضف صنفًا واحدًا على الأقل', 'warn'); return; }
+            if (!items.length) { UI.toast('أضف صنفًا واحدًا على الأقل لتقديم عرض السعر', 'warn'); return; }
 
-            const number = await ARDB.nextSeq('quotation', 'QUO-', 6);
-            await ARDB.add('quotations', { number, date, expiry: expiryTs, customerId, status, note, items, total, createdAt: Date.now() });
-            UI.toast('تم حفظ العرض ' + number, 'ok');
-            closeQuoModal(); load();
+            if (editingQuoId) {
+                const q = await ARDB.getById('quotations', editingQuoId);
+                if (q) {
+                    q.date = date;
+                    q.customerId = customerId;
+                    q.expiry = expiryTs;
+                    q.status = status;
+                    q.note = note;
+                    q.items = items;
+                    q.total = total;
+                    await ARDB.put('quotations', q);
+                    UI.toast('تم تعديل عرض السعر ' + q.number + ' بنجاح', 'ok');
+                }
+            } else {
+                const number = await ARDB.nextSeq('quotation', 'QUO-', 6);
+                await ARDB.add('quotations', { number, date, expiry: expiryTs, customerId, status, note, items, total, createdAt: Date.now() });
+                UI.toast('تم حفظ عرض السعر ' + number + ' بنجاح', 'ok');
+            }
+
+            closeQuoModal();
+            load();
         }
 
         async function convertToInvoice(id) {
-            const q = await ARDB.getById('quotations', id);
+            const [q, products, movements, serials] = await Promise.all([
+                ARDB.getById('quotations', id),
+                ARDB.getAll('products'),
+                ARDB.getAll('stockMovements'),
+                ARDB.getAll('serials')
+            ]);
             if (!q) return;
-            const ok = await UI.confirmBox('هل تريد تحويل عرض السعر ' + q.number + ' إلى فاتورة بيع فعلية؟');
-            if (!ok) return;
 
-            const invNumber = await ARDB.nextSeq('invoice', 'INV-', 6);
-            await ARDB.add('invoices', {
-                number: invNumber,
-                date: Date.now(),
-                customerId: q.customerId,
-                items: q.items || [],
-                total: q.total || 0,
-                note: 'محولة من عرض السعر ' + q.number,
-                createdAt: Date.now()
+            // 1. التحقق من وجود كميات كافية في المخزن لكل المنتجات بالعرض
+            const reqQty = {};
+            (q.items || []).forEach(it => {
+                if (it.productId) {
+                    reqQty[it.productId] = (reqQty[it.productId] || 0) + (Number(it.quantity) || 0);
+                }
             });
 
-            if (q.items) {
-                for (const it of q.items) {
-                    await ARDB.add('stockMovements', {
-                        date: Date.now(),
+            const prodById = {};
+            (products || []).forEach(p => prodById[p.id] = p);
+
+            for (const pid of Object.keys(reqQty)) {
+                const needed = reqQty[pid];
+                let available = 0;
+                (movements || []).forEach(m => {
+                    if (m && m.productId != null && String(m.productId) === String(pid)) {
+                        const mQty = (Number(m.quantity) || Number(m.qty) || 0);
+                        available += mQty * (m.direction === 'in' ? 1 : -1);
+                    }
+                });
+
+                const p = prodById[pid];
+                const pName = p ? p.name : ('منتج #' + pid);
+                if (available < needed) {
+                    UI.toast('عذراً! لا تتوفر كمية كافية بالمخزن للمنتج ("' + pName + '"). الكمية المتاحة: (' + available + ')، والكمية المطلوبة بالعرض: (' + needed + ')', 'warn');
+                    return;
+                }
+            }
+
+            // 2. التحقق من توفر الأرقام التسلسلية للمنتجات المقيدة بالسريال
+            const serialItemsNeeded = [];
+            for (let i = 0; i < (q.items || []).length; i++) {
+                const it = q.items[i];
+                const p = prodById[it.productId];
+                if (p && p.hasSerials) {
+                    const availS = (serials || []).filter(s => String(s.productId) === String(it.productId) && s.status === 'available');
+                    const neededCount = Number(it.quantity) || 1;
+                    if (availS.length < neededCount) {
+                        UI.toast('عذراً! السريالات المتاحة بالمخزن للمنتج ("' + p.name + '") هما ' + availS.length + ' فقط، وتطلب الفاتورة ' + neededCount + ' سريال!', 'warn');
+                        return;
+                    }
+                    serialItemsNeeded.push({
+                        itemIndex: i,
                         productId: it.productId,
-                        direction: 'out',
-                        type: 'sale',
-                        quantity: it.quantity || 1,
-                        note: 'فاتورة ' + invNumber + ' (من عرض ' + q.number + ')'
+                        productName: p.name,
+                        reqQty: neededCount,
+                        availSerials: availS
                     });
                 }
             }
 
+            // إذا كان العرض يحتوي على منتجات سريال، نفتح نافذة اختيار السريالات قبل الفاتورة
+            if (serialItemsNeeded.length > 0) {
+                openQuoSerialPicker(q, serialItemsNeeded);
+                return;
+            }
+
+            const ok = await UI.confirmBox('هل أنت تأكد من تحويل عرض السعر ' + q.number + ' إلى فاتورة بيع فعلية وتنزيل الرصيد من المخزن؟');
+            if (!ok) return;
+
+            await executeInvoiceConversion(q);
+        }
+
+        function openQuoSerialPicker(q, needs) {
+            currentConvertingQuo = q;
+            currentSerialNeeds = needs;
+
+            const wrap = document.getElementById('quoSerialItemsWrap');
+            wrap.innerHTML = needs.map((nd, idx) => {
+                const opts = nd.availSerials.map(s => '<option value="' + s.id + '" data-sn="' + s.serialNumber + '">' + s.serialNumber + '</option>').join('');
+                return '<div style="background:var(--card-hover);padding:12px;border-radius:10px;border:1px solid var(--border-color);">' +
+                    '<div style="font-weight:700;margin-bottom:6px;color:var(--text-primary);"><i class="fa-solid fa-box"></i> ' + nd.productName + ' <span class="badge badge-blue" style="margin-right:8px;">المطلوب: ' + nd.reqQty + ' سريال</span></div>' +
+                    '<div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:6px;">اختر السريالات المباعة (اضغط Ctrl أو Shift لاختيار أكثر من سريال):</div>' +
+                    '<select id="qPickSerial_' + idx + '" multiple style="width:100%;height:110px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-dark);color:var(--text-primary);font-size:0.9rem;">' + opts + '</select>' +
+                    '</div>';
+            }).join('');
+
+            document.getElementById('quoSerialModal').style.visibility = 'visible';
+            document.getElementById('quoSerialModal').style.opacity = '1';
+        }
+
+        function closeQuoSerialModal() {
+            document.getElementById('quoSerialModal').style.visibility = 'hidden';
+            document.getElementById('quoSerialModal').style.opacity = '0';
+            currentConvertingQuo = null;
+            currentSerialNeeds = [];
+        }
+
+        async function confirmQuoSerialConversion() {
+            if (!currentConvertingQuo || !currentSerialNeeds.length) return;
+            const q = currentConvertingQuo;
+
+            for (let idx = 0; idx < currentSerialNeeds.length; idx++) {
+                const nd = currentSerialNeeds[idx];
+                const sel = document.getElementById('qPickSerial_' + idx);
+                if (!sel) return;
+                const selectedOpts = Array.from(sel.selectedOptions);
+                if (selectedOpts.length !== nd.reqQty) {
+                    UI.toast('يرجى تحديد بالضبط (' + nd.reqQty + ') سريال للمنتج "' + nd.productName + '" (المحدد حالياً: ' + selectedOpts.length + ')', 'warn');
+                    return;
+                }
+                const serialIds = selectedOpts.map(o => o.value);
+                const serialSNs = selectedOpts.map(o => o.dataset.sn);
+
+                if (!q.items[nd.itemIndex]) q.items[nd.itemIndex] = {};
+                q.items[nd.itemIndex].serialIds = serialIds;
+                q.items[nd.itemIndex].serials = serialSNs;
+            }
+
+            closeQuoSerialModal();
+            await executeInvoiceConversion(q);
+        }
+
+        async function executeInvoiceConversion(q) {
+            const invNumber = await ARDB.nextSeq('invoice', 'INV-', 6);
+            const date = Date.now();
+            const invId = await ARDB.add('invoices', {
+                number: invNumber,
+                date: date,
+                customerId: q.customerId,
+                items: q.items || [],
+                total: q.total || 0,
+                note: 'محولة من عرض السعر ' + q.number,
+                createdAt: date
+            });
+
+            // 1. تحديث حالة السريالات المحددة إلى sold وتعيين رقم الفاتورة
+            if (q.items) {
+                for (const it of q.items) {
+                    if (it.serialIds && it.serialIds.length) {
+                        for (const sid of it.serialIds) {
+                            await ARDB.update('serials', sid, { status: 'sold', invoiceId: invId, invoiceDate: date });
+                        }
+                    }
+                }
+            }
+
+            // 2. تسجيل حركة صادر للمخزون
+            if (q.items) {
+                for (const it of q.items) {
+                    await ARDB.add('stockMovements', {
+                        date: date,
+                        productId: it.productId,
+                        direction: 'out',
+                        type: 'sale',
+                        quantity: it.quantity || 1,
+                        note: 'فاتورة بيع ' + invNumber + ' (من عرض ' + q.number + ')'
+                    });
+                }
+            }
+
+            // 3. إنشاء قيد المحاسبة الآلي
             if (q.total > 0) {
                 await ARDB.add('journalEntries', {
                     number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
-                    date: Date.now(),
+                    date: date,
                     desc: 'فاتورة بيع ' + invNumber + ' (من عرض ' + q.number + ')',
                     lines: [
                         { accountId: 3, debit: q.total, credit: 0 },
@@ -217,10 +441,11 @@
                 });
             }
 
+            // 4. تحديث حالة عرض السعر إلى مقبول
             q.status = 'accepted';
             await ARDB.put('quotations', q);
 
-            UI.toast('تمت تحويل عرض السعر إلى الفاتورة ' + invNumber + ' بنجاح!', 'ok');
+            UI.toast('تمت تحويل عرض السعر إلى الفاتورة (' + invNumber + ') وتحديث الرصيد بالمخزن بنجاح!', 'ok');
             load();
         }
 
@@ -229,15 +454,20 @@
             if (!q) return;
             q.status = status;
             await ARDB.put('quotations', q);
-            UI.toast('تم تحديث الحالة', 'ok'); load();
+            UI.toast('تم تحديث حالة عرض السعر', 'ok');
+            load();
         }
+
         async function delQuo(id) {
-            const ok = await UI.confirmBox('حذف عرض السعر؟');
+            const ok = await UI.confirmBox('هل أنت تأكد من حذف عرض السعر هذا؟');
             if (!ok) return;
             await ARDB.remove('quotations', id);
-            UI.toast('تم الحذف', 'ok'); load();
+            UI.toast('تم حذف عرض السعر', 'ok');
+            load();
         }
+
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>
