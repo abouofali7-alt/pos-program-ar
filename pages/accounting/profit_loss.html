@@ -15,7 +15,7 @@
         <div class="page-head">
             <div>
                 <h2>قائمة الدخل (الأرباح والخسائر)</h2>
-                <div class="sub">تجميع كافة الإيرادات والتكاليف والمصروفات لحساب صافي الربح الدقيق</div>
+                <div class="sub">تجميع كافة الإيرادات والتكاليف والمصروفات لحساب صافي الربح الدقيق دون تكرار</div>
             </div>
             <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button class="btn btn-secondary" onclick="ARExport.tableToCSV('plTable', 'قائمة_الدخل')"><i class="fa-solid fa-file-excel"></i> تصدير Excel</button>
@@ -156,15 +156,17 @@
         async function load() {
             try { await ARDB.seed(); } catch (e) {}
 
-            const [accounts, entries, invoices, invoiceReturns, expenses, products, payrolls] = await Promise.all([
+            const [accounts, entries, invoices, invoiceReturns, expenses, products] = await Promise.all([
                 ARDB.getAll('accounts'),
                 ARDB.getAll('journalEntries'),
                 ARDB.getAll('invoices'),
                 ARDB.getAll('invoiceReturns'),
                 ARDB.getAll('expenses'),
-                ARDB.getAll('products'),
-                ARDB.getAll('payroll')
+                ARDB.getAll('products')
             ]);
+
+            const accById = {};
+            (accounts || []).forEach(a => accById[a.id] = a);
 
             // 1. حساب المبيعات ومرتجعاتها (Sales & Returns)
             let grossSales = 0;
@@ -213,48 +215,44 @@
             cogs = Math.max(0, cogs);
             const grossProfit = netSales - cogs;
 
-            // 3. تجميع المصروفات النثرية والعمومية من شاشة المصروفات
+            // 3. تجميع المصروفات من جدول المصروفات (Expenses Store - المصدر الرئيسي للمصروفات)
             let totalGeneralExpenses = 0;
             const expCatMap = {};
             (expenses || []).forEach(exp => {
                 if (inRange(exp.date)) {
                     const amt = Number(exp.amount || 0);
                     totalGeneralExpenses += amt;
-                    const catName = (exp.category || exp.title || 'مصروفات تشغيلية وعمومية').trim();
+                    const accObj = exp.accountId ? accById[exp.accountId] : null;
+                    const catName = (exp.category || (accObj ? accObj.name : null) || exp.title || exp.note || 'مصروفات تشغيلية وعمومية').trim();
                     expCatMap[catName] = (expCatMap[catName] || 0) + amt;
                 }
             });
 
-            // 4. تجميع رواتب وأجور الموظفين
-            let totalPayroll = 0;
-            (payrolls || []).forEach(p => {
-                if (inRange(p.date || p.periodDate)) {
-                    totalPayroll += Number(p.netSalary || p.totalSalary || p.amount || 0);
-                }
-            });
-
-            // 5. تجميع الإيرادات والمصروفات الإضافية من القيود وشجرة الحسابات
+            // 4. تجميع الإيرادات والمصروفات الإضافية من القيود اليومية (مع منع التكرار)
             const extraIncomeMap = {};
             const extraExpenseMap = {};
 
             if (entries && entries.length) {
-                const accById = {};
-                (accounts || []).forEach(a => accById[a.id] = a);
-
                 (entries || []).forEach(en => {
                     if (inRange(en.date) && en.lines) {
-                        en.lines.forEach(l => {
-                            const a = accById[l.accountId];
-                            if (a) {
-                                if (a.type === 'income' && String(a.code) !== '4101' && !a.name.includes('مبيعات')) {
-                                    const net = (Number(l.credit) || 0) - (Number(l.debit) || 0);
-                                    if (net !== 0) extraIncomeMap[a.name] = (extraIncomeMap[a.name] || 0) + net;
-                                } else if (a.type === 'expense' && String(a.code) !== '5101' && !a.name.includes('تكلفة المبيعات') && !a.name.includes('عمومية')) {
-                                    const net = (Number(l.debit) || 0) - (Number(l.credit) || 0);
-                                    if (net !== 0) extraExpenseMap[a.name] = (extraExpenseMap[a.name] || 0) + net;
+                        const desc = (en.desc || '').trim();
+                        // استبعاد القيود التلقائية التي أُضيفت بالفعل من جدول المصروفات أو الفواتير لمنع تكرار الحساب
+                        const isAutoExpenseEntry = desc.startsWith('مصروف:') || desc.startsWith('صرف راتب:');
+                        
+                        if (!isAutoExpenseEntry) {
+                            en.lines.forEach(l => {
+                                const a = accById[l.accountId];
+                                if (a) {
+                                    if (a.type === 'income' && String(a.code) !== '4101' && !a.name.includes('مبيعات')) {
+                                        const net = (Number(l.credit) || 0) - (Number(l.debit) || 0);
+                                        if (net > 0) extraIncomeMap[a.name] = (extraIncomeMap[a.name] || 0) + net;
+                                    } else if (a.type === 'expense' && String(a.code) !== '5101' && !a.name.includes('تكلفة المبيعات')) {
+                                        const net = (Number(l.debit) || 0) - (Number(l.credit) || 0);
+                                        if (net > 0) extraExpenseMap[a.name] = (extraExpenseMap[a.name] || 0) + net;
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
                 });
             }
@@ -265,9 +263,9 @@
             let extraExpenseTotal = 0;
             Object.values(extraExpenseMap).forEach(v => extraExpenseTotal += v);
 
-            // 6. الحسابات الإجمالية النهائية
+            // 5. الحسابات الإجمالية النهائية
             const totalRevenues = netSales + extraIncomeTotal;
-            const totalOperatingExpenses = totalGeneralExpenses + totalPayroll + extraExpenseTotal;
+            const totalOperatingExpenses = totalGeneralExpenses + extraExpenseTotal;
             const totalExpensesAndCosts = cogs + totalOperatingExpenses;
             const netProfit = totalRevenues - totalExpensesAndCosts;
 
@@ -307,7 +305,7 @@
             html += '<tr style="font-weight:800;background:var(--card-hover);"><td style="padding-inline-start:24px;">مجمل الربح / الهامش التجاري (Gross Profit) <span class="badge badge-purple" style="margin-inline-start:8px;">' + grossMarginPct + '% هامش</span></td><td class="num" style="color:' + (grossProfit >= 0 ? 'var(--accent-cyan)' : 'var(--danger)') + ';font-size:1.02rem;">' + UI.money(grossProfit) + '</td></tr>';
 
             // --- قسم 3: المصروفات التشغيلية والعمومية (Operating Expenses) ---
-            html += '<tr style="background:rgba(239,68,68,0.15);font-weight:800;color:var(--danger);"><td colspan="2"><i class="fa-solid fa-arrow-trend-down"></i> ثالثاً: المصروفات والتكاليف التشغيلية والخارج</td></tr>';
+            html += '<tr style="background:rgba(239,68,68,0.15);font-weight:800;color:var(--danger);"><td colspan="2"><i class="fa-solid fa-arrow-trend-down"></i> ثالثاً: المصروفات والتكاليف التشغيلية وخارج الصندوق</td></tr>';
 
             if (Object.keys(expCatMap).length) {
                 Object.keys(expCatMap).forEach(cat => {
@@ -315,10 +313,6 @@
                 });
             } else if (totalGeneralExpenses > 0) {
                 html += '<tr><td style="padding-inline-start:24px;">المصروفات العمومية والتشغيلية</td><td class="num">' + UI.money(totalGeneralExpenses) + '</td></tr>';
-            }
-
-            if (totalPayroll > 0) {
-                html += '<tr><td style="padding-inline-start:24px;">رواتب وأجور الموظفين (مسيرات الرواتب)</td><td class="num">' + UI.money(totalPayroll) + '</td></tr>';
             }
 
             if (Object.keys(extraExpenseMap).length) {
