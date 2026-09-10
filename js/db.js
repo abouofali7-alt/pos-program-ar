@@ -112,13 +112,27 @@ const ARDB = (function () {
 
     function localAdd(store, data) {
         return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
-            const r = os.add(data); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+            const r = os.add(data);
+            r.onsuccess = () => {
+                if (typeof API !== 'undefined' && API.pushItemToCloud) {
+                    API.pushItemToCloud(store, data, 'save');
+                }
+                res(r.result);
+            };
+            r.onerror = () => rej(r.error);
         }));
     }
 
     function localPut(store, data) {
         return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
-            const r = os.put(data); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+            const r = os.put(data);
+            r.onsuccess = () => {
+                if (typeof API !== 'undefined' && API.pushItemToCloud) {
+                    API.pushItemToCloud(store, data, 'save');
+                }
+                res(r.result);
+            };
+            r.onerror = () => rej(r.error);
         }));
     }
 

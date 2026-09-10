@@ -38,11 +38,7 @@
                 <h2><i class="fa-solid fa-cash-register" style="color:var(--success);"></i> نقطة البيع (POS)</h2>
                 <div class="sub">نظام الكاشير والمبيعات السريعة</div>
             </div>
-            <div style="display:flex;gap:10px;align-items:center;">
-                <div class="sale-type-toggle" style="display:flex;background:var(--card-dark);border:1px solid var(--border-color);border-radius:8px;padding:3px;gap:2px;">
-                    <button id="btnSaleRetail" class="btn btn-sm btn-primary-soft" onclick="setSaleType('retail')" style="border-radius:6px;font-size:0.8rem;padding:6px 12px;"><i class="fa-solid fa-user"></i> بيع قطاعي</button>
-                    <button id="btnSaleWholesale" class="btn btn-sm btn-secondary" onclick="setSaleType('wholesale')" style="border-radius:6px;font-size:0.8rem;padding:6px 12px;"><i class="fa-solid fa-boxes-stacked"></i> بيع جملة</button>
-                </div>
+                <button class="btn btn-secondary" onclick="syncPosData()" title="تحديث وسحب المنتجات والبيانات من السحابة"><i class="fa-solid fa-arrows-rotate"></i> تحديث المزامنة</button>
                 <input id="barcodeSearch" placeholder="🔍 ابحث بالاسم أو الباركوود (أو امسح الباركوود مباشرة)..." style="padding:8px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-dark);color:var(--text-primary);width:320px;" autofocus>
             </div>
         </div>
@@ -129,6 +125,16 @@
             });
             renderCart();
             renderProducts(document.getElementById('barcodeSearch') ? document.getElementById('barcodeSearch').value.trim().toLowerCase() : '');
+        }
+
+        async function syncPosData() {
+            UI.toast('جاري تجميع وتحديث المنتجات من السحابة...', 'info');
+            if (typeof API !== 'undefined') {
+                await API.pullCloudSync(true);
+                await API.pushFullDataToCloud();
+            }
+            await initPOS();
+            UI.toast('تمت تحديث المنتجات والمزامنة بنجاح!', 'ok');
         }
 
         async function initPOS() {
