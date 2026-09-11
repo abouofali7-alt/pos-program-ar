@@ -177,9 +177,24 @@
             document.getElementById('retInvSearch').value = inv.number || ('INV-' + inv.id);
             document.getElementById('retInvResults').style.display = 'none';
             
+            const items = inv.items || [];
+            const grossSubtotal = inv.subtotal || items.reduce((s, it) => s + ((Number(it.price) || 0) * (Number(it.quantity || it.qty) || 1)), 0);
+            let invDiscount = Number(inv.discount || inv.discountAmount || 0);
+            if (!invDiscount && inv.discountType === 'percent' && inv.discountValue) {
+                invDiscount = (grossSubtotal * Number(inv.discountValue)) / 100;
+            }
+            if (!invDiscount && inv.total && grossSubtotal > inv.total) {
+                invDiscount = grossSubtotal - inv.total;
+            }
+
             const badge = document.getElementById('retInvBadge');
             badge.style.display = 'block';
-            badge.innerHTML = `<span class="badge badge-green"><i class="fa-solid fa-check"></i> تم تحديد الفاتورة: ${inv.number} (${custName}) — الإجمالي: ${UI.money(inv.total)}</span>`;
+            let badgeHtml = `<span class="badge badge-green"><i class="fa-solid fa-check"></i> تم تحديد الفاتورة: ${inv.number} (${custName}) — الإجمالي: ${UI.money(inv.total)}</span>`;
+            if (invDiscount > 0) {
+                const discPct = grossSubtotal > 0 ? (invDiscount / grossSubtotal * 100).toFixed(1).replace(/\.0$/, '') : 0;
+                badgeHtml += ` <span class="badge badge-amber" style="background:rgba(245,158,11,0.15);color:var(--warning);border:1px solid rgba(245,158,11,0.3);margin-inline-start:6px;"><i class="fa-solid fa-tags"></i> خصم الفاتورة: ${UI.money(invDiscount)} (${discPct}% — مقسّم تلقائياً على الأصناف)</span>`;
+            }
+            badge.innerHTML = badgeHtml;
 
             loadInvLines(inv.id);
         }
@@ -224,17 +239,39 @@
             if (!pickedInvoice) return;
             const products = await ARDB.getAll('products');
             const pById = {}; products.forEach(p => pById[p.id] = p);
-            document.getElementById('retLinesBody').innerHTML = pickedInvoice.items.map((it, i) => {
+
+            const items = pickedInvoice.items || [];
+            const grossSubtotal = pickedInvoice.subtotal || items.reduce((s, it) => s + ((Number(it.price) || 0) * (Number(it.quantity || it.qty) || 1)), 0);
+            let invDiscount = Number(pickedInvoice.discount || pickedInvoice.discountAmount || 0);
+            if (!invDiscount && pickedInvoice.discountType === 'percent' && pickedInvoice.discountValue) {
+                invDiscount = (grossSubtotal * Number(pickedInvoice.discountValue)) / 100;
+            }
+            if (!invDiscount && pickedInvoice.total && grossSubtotal > pickedInvoice.total) {
+                invDiscount = grossSubtotal - pickedInvoice.total;
+            }
+            const discRatio = (grossSubtotal > 0 && invDiscount > 0) ? (invDiscount / grossSubtotal) : 0;
+
+            document.getElementById('retLinesBody').innerHTML = items.map((it, i) => {
                 const pid = it.productId || it.id;
                 const pName = it.name || (pById[pid] ? pById[pid].name : 'صنف ' + pid);
                 const qty = it.quantity || it.qty || 1;
+                const origPrice = Number(it.price) || 0;
                 const serialsText = (it.serials && it.serials.length) ? ' (S/N: ' + it.serials.join(', ') + ')' : '';
+                
+                const unitDisc = origPrice * discRatio;
+                const netReturnPrice = Math.max(0, origPrice - unitDisc);
+                const roundedNetPrice = Number(netReturnPrice.toFixed(2));
+
+                const discHint = discRatio > 0
+                    ? '<div style="font-size:0.75rem;color:var(--warning);margin-top:2px;"><i class="fa-solid fa-tag"></i> قبل الخصم: ' + UI.money(origPrice) + ' (خصم: -' + UI.money(unitDisc) + ')</div>'
+                    : '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">(السعر الأصلي: ' + UI.money(origPrice) + ')</div>';
+
                 return '<tr>' +
                 '<td>' + pName + serialsText + '</td>' +
                 '<td class="num">' + qty + '</td>' +
-                '<td><input type="number" min="0" max="' + qty + '" value="' + qty + '" class="ret-qty" data-price="' + it.price + '" style="width:70px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcRet()"></td>' +
-                '<td><input type="number" step="0.01" min="0" value="' + it.price + '" class="ret-price" style="width:90px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcRet()"><div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">(السعر الأصلي: ' + UI.money(it.price) + ')</div></td>' +
-                '<td class="num ret-sub" style="font-weight:700;">' + UI.money(qty * it.price) + '</td>' +
+                '<td><input type="number" min="0" max="' + qty + '" value="' + qty + '" class="ret-qty" style="width:70px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcRet()"></td>' +
+                '<td><input type="number" step="0.01" min="0" value="' + roundedNetPrice + '" class="ret-price" data-orig="' + origPrice + '" style="width:90px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);" oninput="recalcRet()">' + discHint + '</td>' +
+                '<td class="num ret-sub" style="font-weight:700;">' + UI.money(qty * roundedNetPrice) + '</td>' +
                 '</tr>';
             }).join('');
             recalcRet();
@@ -246,7 +283,7 @@
                 const p = tr.querySelector('.ret-price');
                 const sub = tr.querySelector('.ret-sub');
                 if (q && sub) {
-                    const priceVal = p ? (Number(p.value) || 0) : (Number(q.dataset.price) || 0);
+                    const priceVal = p ? (Number(p.value) || 0) : 0;
                     const v = (Number(q.value) || 0) * priceVal;
                     total += v;
                     sub.innerHTML = UI.money(v);
@@ -272,7 +309,7 @@
                 const pid = it.productId || it.id;
                 const origQty = it.quantity || it.qty || 1;
                 if (q < 0 || q > origQty) { UI.toast('كمية مرتجعة أكبر من المباعة', 'error'); anyQty = false; total = -1; return; }
-                if (q > 0) { items.push({ productId: pid, quantity: q, price: returnPrice, originalPrice: it.price, total: q * returnPrice }); total += q * returnPrice; anyQty = true; }
+                if (q > 0) { items.push({ productId: pid, quantity: q, price: returnPrice, originalPrice: it.price, discountApportioned: Number((it.price - returnPrice).toFixed(2)), total: q * returnPrice }); total += q * returnPrice; anyQty = true; }
             });
             if (total < 0) return;
             if (!anyQty) { UI.toast('حدد كمية مرتجعة واحدة على الأقل', 'warn'); return; }
