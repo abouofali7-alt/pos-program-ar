@@ -44,13 +44,15 @@
                 width: 100% !important;
                 max-width: 100% !important;
                 margin: 0 !important;
-                padding: 3mm 3mm 25mm 3mm !important;
+                padding: 2mm 2mm 22mm 2mm !important;
                 box-sizing: border-box !important;
                 background: #fff !important;
                 color: #000 !important;
-                font-family: 'Courier New', Courier, monospace, Tahoma, sans-serif !important;
-                font-size: 16px !important;
-                font-weight: 900 !important;
+                font-family: 'Courier New', Monaco, 'Lucida Console', monospace !important;
+                font-size: 13px !important;
+                font-weight: 800 !important;
+                -webkit-font-smoothing: none !important;
+                font-smooth: never !important;
                 direction: rtl !important;
                 text-align: right !important;
                 page-break-after: always !important;
@@ -680,18 +682,18 @@
             }).join('');
 
             const receiptHtml = `
-                <div style="font-family:'Courier New', Courier, monospace, Tahoma, sans-serif;font-size:16px;font-weight:900;color:#000;line-height:1.55;direction:rtl;text-align:right;width:100%;box-sizing:border-box;background:#fff;padding:2px;">
+                <div style="font-family:'Courier New', Monaco, 'Lucida Console', monospace;font-size:13px;font-weight:800;color:#000;-webkit-font-smoothing:none;line-height:1.4;direction:rtl;text-align:right;width:100%;box-sizing:border-box;background:#fff;padding:2px;">
                     <!-- الترويسة الرئيسية للمحل/الشركة -->
-                    <div style="text-align:center;padding-bottom:8px;margin-bottom:8px;border-bottom:3px solid #000;">
-                        <div style="font-size:24px;font-weight:900;margin-bottom:4px;color:#000;letter-spacing:0.5px;">${_companySettings.name || 'AR-Program'}</div>
-                        ${_companySettings.address ? `<div style="font-size:14px;font-weight:900;margin-bottom:3px;color:#000;">📍 ${_companySettings.address}</div>` : ''}
-                        ${_companySettings.phone ? `<div style="font-size:14px;font-weight:900;margin-bottom:3px;color:#000;">📞 ${_companySettings.phone}</div>` : ''}
-                        ${_companySettings.taxNo ? `<div style="font-size:14px;font-weight:900;margin-bottom:3px;color:#000;">الرقم الضريبي: ${_companySettings.taxNo}</div>` : ''}
-                        <div style="font-size:16px;font-weight:900;margin-top:8px;background:#000;color:#fff;padding:5px 0;border-radius:4px;letter-spacing:1px;">إيصال مبيعات كاشير (POS)</div>
+                    <div style="text-align:center;padding-bottom:6px;margin-bottom:6px;border-bottom:2px solid #000;">
+                        <div style="font-size:17px;font-weight:900;margin-bottom:3px;color:#000;">${_companySettings.name || 'AR-Program'}</div>
+                        ${_companySettings.address ? `<div style="font-size:11.5px;font-weight:800;margin-bottom:2px;color:#000;">📍 ${_companySettings.address}</div>` : ''}
+                        ${_companySettings.phone ? `<div style="font-size:11.5px;font-weight:800;margin-bottom:2px;color:#000;">📞 ${_companySettings.phone}</div>` : ''}
+                        ${_companySettings.taxNo ? `<div style="font-size:11.5px;font-weight:800;margin-bottom:2px;color:#000;">الرقم الضريبي: ${_companySettings.taxNo}</div>` : ''}
+                        <div style="font-size:13px;font-weight:900;margin-top:6px;background:#eee;color:#000;padding:3px 0;border-radius:3px;border:1px solid #000;">إيصال مبيعات كاشير (POS)</div>
                     </div>
 
                     <!-- تفاصيل الفاتورة -->
-                    <table style="width:100%;font-size:14.5px;font-weight:900;color:#000;margin-bottom:8px;border-collapse:collapse;">
+                    <table style="width:100%;font-size:11.5px;font-weight:800;color:#000;margin-bottom:6px;border-collapse:collapse;">
                         <tr>
                             <td style="padding:2px 0;"><b>رقم الفاتورة:</b> ${invNumber}</td>
                             <td style="text-align:left;padding:2px 0;"><b>التاريخ:</b> ${invDateStr}</td>
@@ -706,75 +708,75 @@
                         ${customerAddress ? `<tr><td colspan="2" style="padding:2px 0;"><b>العنوان:</b> ${customerAddress}</td></tr>` : ''}
                     </table>
 
-                    <div style="border-top:2.5px solid #000;margin:8px 0;"></div>
+                    <div style="border-top:1.5px solid #000;margin:6px 0;"></div>
 
                     <!-- جدول الأصناف -->
-                    <table style="width:100%;font-size:15px;font-weight:900;color:#000;border-collapse:collapse;margin-bottom:8px;">
+                    <table style="width:100%;font-size:12.5px;font-weight:800;color:#000;border-collapse:collapse;margin-bottom:6px;">
                         <thead>
-                            <tr style="border-bottom:3px solid #000;font-size:16px;">
-                                <th style="text-align:right;padding:6px 0;width:45%;color:#000;">الصنف</th>
-                                <th style="text-align:center;padding:6px 0;width:30%;color:#000;">ك × سعر</th>
-                                <th style="text-align:left;padding:6px 0;width:25%;color:#000;">الإجمالي</th>
+                            <tr style="border-bottom:2px solid #000;font-size:13px;">
+                                <th style="text-align:right;padding:4px 0;width:45%;color:#000;">الصنف</th>
+                                <th style="text-align:center;padding:4px 0;width:30%;color:#000;">ك × سعر</th>
+                                <th style="text-align:left;padding:4px 0;width:25%;color:#000;">الإجمالي</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${invItems.map(c => `
-                                <tr style="border-bottom:1.5px solid #000;">
-                                    <td style="padding:6px 0;vertical-align:top;">
-                                        <div style="font-weight:900;font-size:16px;color:#000;">${c.name}</div>
-                                        ${(c.serials && c.serials.length) ? `<div style="font-size:13px;font-weight:900;color:#000;margin-top:3px;">S/N: ${c.serials.join(', ')}</div>` : ''}
+                                <tr style="border-bottom:1px dashed #000;">
+                                    <td style="padding:4px 0;vertical-align:top;">
+                                        <div style="font-weight:900;font-size:13px;color:#000;">${c.name}</div>
+                                        ${(c.serials && c.serials.length) ? `<div style="font-size:11px;font-weight:800;color:#000;margin-top:2px;">S/N: ${c.serials.join(', ')}</div>` : ''}
                                     </td>
-                                    <td style="text-align:center;padding:6px 0;vertical-align:top;font-size:15px;color:#000;">${c.quantity} × ${c.price.toFixed(2)}</td>
-                                    <td style="text-align:left;font-weight:900;padding:6px 0;vertical-align:top;font-size:16px;color:#000;">${c.total.toFixed(2)}</td>
+                                    <td style="text-align:center;padding:4px 0;vertical-align:top;font-size:12.5px;color:#000;">${c.quantity} × ${c.price.toFixed(2)}</td>
+                                    <td style="text-align:left;font-weight:900;padding:4px 0;vertical-align:top;font-size:13px;color:#000;">${c.total.toFixed(2)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
 
-                    <div style="border-top:2.5px solid #000;margin:8px 0;"></div>
+                    <div style="border-top:1.5px solid #000;margin:6px 0;"></div>
 
                     <!-- الملخص المالي والخصم -->
-                    <table style="width:100%;font-size:15px;font-weight:900;color:#000;margin-bottom:8px;">
+                    <table style="width:100%;font-size:13px;font-weight:800;color:#000;margin-bottom:6px;">
                         <tr>
-                            <td style="padding:4px 0;">المجموع الفرعي:</td>
-                            <td style="text-align:left;font-weight:900;padding:4px 0;">${subTotal.toFixed(2)} ج.م</td>
+                            <td style="padding:3px 0;">المجموع الفرعي:</td>
+                            <td style="text-align:left;font-weight:900;padding:3px 0;">${subTotal.toFixed(2)} ج.م</td>
                         </tr>
                         ${discountAmount > 0 ? `
                         <tr style="color:#000;">
-                            <td style="padding:4px 0;">الخصم المطبق ${discountType === 'percent' ? '(' + discountValue + '%)' : ''}:</td>
-                            <td style="text-align:left;font-weight:900;padding:4px 0;">-${discountAmount.toFixed(2)} ج.م</td>
+                            <td style="padding:3px 0;">الخصم المطبق ${discountType === 'percent' ? '(' + discountValue + '%)' : ''}:</td>
+                            <td style="text-align:left;font-weight:900;padding:3px 0;">-${discountAmount.toFixed(2)} ج.م</td>
                         </tr>
                         ` : ''}
-                        <tr style="font-size:22px;font-weight:900;color:#000;border-top:3px solid #000;border-bottom:4px double #000;">
-                            <td style="padding:8px 0;">الإجمالي النهائي:</td>
-                            <td style="text-align:left;padding:8px 0;">${grandTotal.toFixed(2)} ج.م</td>
+                        <tr style="font-size:16.5px;font-weight:900;color:#000;border-top:2px solid #000;border-bottom:3px double #000;">
+                            <td style="padding:6px 0;">الإجمالي النهائي:</td>
+                            <td style="text-align:left;padding:6px 0;">${grandTotal.toFixed(2)} ج.م</td>
                         </tr>
                     </table>
 
                     <!-- تفاصيل وطريقة السداد -->
-                    <div style="margin-top:8px;font-size:14px;font-weight:900;background:#fff;padding:8px;border-radius:4px;border:2px solid #000;color:#000;">
-                        <div style="font-weight:900;margin-bottom:4px;border-bottom:2px solid #000;padding-bottom:3px;font-size:15px;">تفاصيل الدفع:</div>
+                    <div style="margin-top:6px;font-size:11.5px;font-weight:800;background:#fff;padding:6px;border-radius:4px;border:1.5px solid #000;color:#000;">
+                        <div style="font-weight:900;margin-bottom:4px;border-bottom:1.5px solid #000;padding-bottom:2px;font-size:12.5px;">تفاصيل الدفع:</div>
                         <table style="width:100%;color:#000;">
                             ${payDetailsRows}
                             ${paidTotal > grandTotal ? `
-                            <tr style="border-top:1.5px solid #000;font-weight:900;">
-                                <td style="padding-top:4px;">المبلغ الباقي للعميل:</td>
-                                <td style="text-align:left;padding-top:4px;">${remainingBalance.toFixed(2)} ج.م</td>
+                            <tr style="border-top:1px dashed #000;font-weight:900;">
+                                <td style="padding-top:3px;">المبلغ الباقي للعميل:</td>
+                                <td style="text-align:left;padding-top:3px;">${remainingBalance.toFixed(2)} ج.م</td>
                             </tr>
                             ` : ''}
                         </table>
                     </div>
 
                     <!-- تذييل الفاتورة والسياسات والباركوود -->
-                    <div style="text-align:center;font-size:14px;font-weight:900;color:#000;margin-top:12px;padding-top:8px;border-top:2px dashed #000;">
-                        <div style="margin-bottom:4px;font-weight:900;font-size:15px;">${_companySettings.note || 'شكراً لزيارتكم وسعداء بملء ثقتكم!'}</div>
-                        <div style="font-size:12.5px;font-weight:900;color:#000;">الاسترجاع والاستبدال خلال 14 يوماً بموجب الفاتورة الأصلية</div>
-                        <div style="font-family:monospace;font-size:18px;letter-spacing:3px;margin-top:8px;font-weight:900;">||||| | ||||| |||||| |||</div>
-                        <div style="font-family:monospace;font-size:15px;font-weight:900;margin-top:2px;">* ${invNumber} *</div>
+                    <div style="text-align:center;font-size:11.5px;font-weight:800;color:#000;margin-top:10px;padding-top:6px;border-top:1.5px dashed #000;">
+                        <div style="margin-bottom:4px;font-weight:900;font-size:12.5px;">${_companySettings.note || 'شكراً لزيارتكم وسعداء بملء ثقتكم!'}</div>
+                        <div style="font-size:10.5px;font-weight:800;color:#000;">الاسترجاع والاستبدال خلال 14 يوماً بموجب الفاتورة الأصلية</div>
+                        <div style="font-family:monospace;font-size:15px;letter-spacing:2px;margin-top:6px;font-weight:900;">||||| | ||||| |||||| |||</div>
+                        <div style="font-family:monospace;font-size:12px;font-weight:900;margin-top:1px;">* ${invNumber} *</div>
                     </div>
 
-                    <!-- مسافة التلقيم الخاصة بقطع القص التلقائي للمقص (25mm Paper Feed for Cutter Blade) -->
-                    <div style="height:25mm;width:100%;page-break-after:always;break-after:page;"></div>
+                    <!-- مسافة التلقيم الخاصة بقطع القص التلقائي للمقص (22mm Paper Feed for Cutter Blade) -->
+                    <div style="height:22mm;width:100%;page-break-after:always;break-after:page;display:block;"></div>
                 </div>
             `;
 
