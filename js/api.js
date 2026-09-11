@@ -136,6 +136,10 @@ const API = (function () {
         _pushQueue.push({ store, item, action });
         if (_pushTimer) clearTimeout(_pushTimer);
         _pushTimer = setTimeout(processPushQueue, 0);
+        notifyLocalTabs('sync_now');
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', { detail: { store, item, action } }));
+        }
     }
 
     async function pushFullDataToCloud() {
@@ -264,7 +268,7 @@ const API = (function () {
 
         _syncTimer = setInterval(async () => {
             await pullCloudSync();
-        }, 400);
+        }, 250);
 
         if (typeof window !== 'undefined') {
             window.addEventListener('focus', () => pullCloudSync(true));

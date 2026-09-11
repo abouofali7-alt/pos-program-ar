@@ -521,6 +521,25 @@
         resetIdleTimer();
     }
 
+    function refreshCurrentPage() {
+        try {
+            if (typeof window.load === 'function') window.load();
+            else if (typeof load === 'function') load();
+        } catch(e){}
+
+        try {
+            if (typeof window.loadReport === 'function') window.loadReport();
+        } catch(e){}
+
+        try {
+            if (typeof window.loadData === 'function') window.loadData();
+        } catch(e){}
+
+        try {
+            if (typeof window.initPOS === 'function' && window.location.pathname.includes('pos.html')) window.initPOS();
+        } catch(e){}
+    }
+
     async function initApp() {
         await loadShared();
         await requireAuth();

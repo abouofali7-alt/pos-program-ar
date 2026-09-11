@@ -110,6 +110,16 @@ const ARDB = (function () {
         }));
     }
 
+    function notifyDataChange(store, data, action = 'save') {
+        if (typeof window !== 'undefined') {
+            try {
+                window.dispatchEvent(new CustomEvent('ar_cloud_data_updated', {
+                    detail: { store, data, action, timestamp: Date.now() }
+                }));
+            } catch(e) {}
+        }
+    }
+
     function localAdd(store, data, skipPush = false) {
         return txn(store, 'readwrite', (os) => new Promise((res, rej) => {
             const r = os.add(data);
@@ -117,6 +127,7 @@ const ARDB = (function () {
                 if (!skipPush && typeof API !== 'undefined' && API.pushItemToCloud) {
                     API.pushItemToCloud(store, data, 'save');
                 }
+                notifyDataChange(store, data, 'save');
                 res(r.result);
             };
             r.onerror = () => rej(r.error);
@@ -130,6 +141,7 @@ const ARDB = (function () {
                 if (!skipPush && typeof API !== 'undefined' && API.pushItemToCloud) {
                     API.pushItemToCloud(store, data, 'save');
                 }
+                notifyDataChange(store, data, 'save');
                 res(r.result);
             };
             r.onerror = () => rej(r.error);
@@ -147,6 +159,7 @@ const ARDB = (function () {
                     if (item) API.pushItemToCloud(store, item, 'save');
                 }
             }
+            notifyDataChange(store, items, 'save');
             res();
         }));
     }
@@ -170,6 +183,7 @@ const ARDB = (function () {
             if (!skipPush && typeof API !== 'undefined' && API.pushItemToCloud) {
                 API.pushItemToCloud(store, { id }, 'delete');
             }
+            notifyDataChange(store, { id }, 'delete');
             res();
         }));
     }
@@ -183,6 +197,7 @@ const ARDB = (function () {
                 if (typeof id === 'number') os.delete(String(id));
                 else if (typeof id === 'string' && !isNaN(Number(id))) os.delete(Number(id));
             }
+            notifyDataChange(store, ids, 'delete');
             res();
         }));
     }
