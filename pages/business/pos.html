@@ -47,7 +47,7 @@
                 background: #fff !important;
                 color: #000 !important;
                 font-family: 'Courier New', Tahoma, Arial, sans-serif !important;
-                font-size: 11px !important;
+                font-size: 13px !important;
                 direction: rtl !important;
                 text-align: right !important;
             }
@@ -675,18 +675,18 @@
             }).join('');
 
             const receiptHtml = `
-                <div style="font-family:'Courier New', Tahoma, Arial, sans-serif;font-size:11px;color:#000;line-height:1.35;direction:rtl;text-align:right;width:100%;box-sizing:border-box;background:#fff;padding:2px;">
+                <div style="font-family:'Courier New', Tahoma, Arial, sans-serif;font-size:13px;color:#000;line-height:1.4;direction:rtl;text-align:right;width:100%;box-sizing:border-box;background:#fff;padding:2px;">
                     <!-- الترويسة الرئيسية للمحل/الشركة -->
                     <div style="text-align:center;padding-bottom:6px;margin-bottom:6px;border-bottom:1px dashed #000;">
-                        <div style="font-size:16px;font-weight:bold;margin-bottom:3px;">${_companySettings.name || 'AR-Program'}</div>
-                        ${_companySettings.address ? `<div style="font-size:10px;margin-bottom:2px;">📍 ${_companySettings.address}</div>` : ''}
-                        ${_companySettings.phone ? `<div style="font-size:10px;margin-bottom:2px;">📞 ${_companySettings.phone}</div>` : ''}
-                        ${_companySettings.taxNo ? `<div style="font-size:10px;margin-bottom:2px;">الرقم الضريبي: ${_companySettings.taxNo}</div>` : ''}
-                        <div style="font-size:12px;font-weight:bold;margin-top:6px;background:#eee;padding:3px 0;border-radius:3px;">إيصال مبيعات كاشير (POS)</div>
+                        <div style="font-size:18px;font-weight:bold;margin-bottom:3px;">${_companySettings.name || 'AR-Program'}</div>
+                        ${_companySettings.address ? `<div style="font-size:11.5px;margin-bottom:2px;">📍 ${_companySettings.address}</div>` : ''}
+                        ${_companySettings.phone ? `<div style="font-size:11.5px;margin-bottom:2px;">📞 ${_companySettings.phone}</div>` : ''}
+                        ${_companySettings.taxNo ? `<div style="font-size:11.5px;margin-bottom:2px;">الرقم الضريبي: ${_companySettings.taxNo}</div>` : ''}
+                        <div style="font-size:13.5px;font-weight:bold;margin-top:6px;background:#eee;padding:4px 0;border-radius:3px;">إيصال مبيعات كاشير (POS)</div>
                     </div>
 
                     <!-- تفاصيل الفاتورة -->
-                    <table style="width:100%;font-size:10px;margin-bottom:6px;">
+                    <table style="width:100%;font-size:11.5px;margin-bottom:6px;">
                         <tr>
                             <td><b>رقم الفاتورة:</b> ${invNumber}</td>
                             <td style="text-align:left;"><b>التاريخ:</b> ${invDateStr}</td>
@@ -704,7 +704,7 @@
                     <div style="border-top:1px dashed #000;margin:6px 0;"></div>
 
                     <!-- جدول الأصناف -->
-                    <table style="width:100%;font-size:10.5px;border-collapse:collapse;margin-bottom:6px;">
+                    <table style="width:100%;font-size:12.5px;border-collapse:collapse;margin-bottom:6px;">
                         <thead>
                             <tr style="border-bottom:1px solid #000;">
                                 <th style="text-align:right;padding:4px 0;width:45%;">الصنف</th>
@@ -716,11 +716,11 @@
                             ${invItems.map(c => `
                                 <tr style="border-bottom:1px dashed #eee;">
                                     <td style="padding:4px 0;vertical-align:top;">
-                                        <div style="font-weight:bold;">${c.name}</div>
-                                        ${(c.serials && c.serials.length) ? `<div style="font-size:9px;color:#333;margin-top:1px;">S/N: ${c.serials.join(', ')}</div>` : ''}
+                                        <div style="font-weight:bold;font-size:13px;">${c.name}</div>
+                                        ${(c.serials && c.serials.length) ? `<div style="font-size:10.5px;color:#222;margin-top:1px;">S/N: ${c.serials.join(', ')}</div>` : ''}
                                     </td>
-                                    <td style="text-align:center;padding:4px 0;vertical-align:top;">${c.quantity} × ${c.price.toFixed(2)}</td>
-                                    <td style="text-align:left;font-weight:bold;padding:4px 0;vertical-align:top;">${c.total.toFixed(2)}</td>
+                                    <td style="text-align:center;padding:4px 0;vertical-align:top;font-size:12.5px;">${c.quantity} × ${c.price.toFixed(2)}</td>
+                                    <td style="text-align:left;font-weight:bold;padding:4px 0;vertical-align:top;font-size:13px;">${c.total.toFixed(2)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -729,7 +729,7 @@
                     <div style="border-top:1px dashed #000;margin:6px 0;"></div>
 
                     <!-- الملخص المالي والخصم -->
-                    <table style="width:100%;font-size:11px;margin-bottom:6px;">
+                    <table style="width:100%;font-size:12.5px;margin-bottom:6px;">
                         <tr>
                             <td style="padding:2px 0;">المجموع الفرعي:</td>
                             <td style="text-align:left;font-weight:bold;padding:2px 0;">${subTotal.toFixed(2)} ج.م</td>
@@ -740,14 +740,14 @@
                             <td style="text-align:left;font-weight:bold;padding:2px 0;">-${discountAmount.toFixed(2)} ج.م</td>
                         </tr>
                         ` : ''}
-                        <tr style="font-size:14px;font-weight:bold;border-top:1px solid #000;border-bottom:2px double #000;">
-                            <td style="padding:5px 0;">الإجمالي النهائي:</td>
-                            <td style="text-align:left;padding:5px 0;">${grandTotal.toFixed(2)} ج.م</td>
+                        <tr style="font-size:17px;font-weight:bold;border-top:1.5px solid #000;border-bottom:2px double #000;">
+                            <td style="padding:6px 0;">الإجمالي النهائي:</td>
+                            <td style="text-align:left;padding:6px 0;">${grandTotal.toFixed(2)} ج.م</td>
                         </tr>
                     </table>
 
                     <!-- تفاصيل وطريقة السداد -->
-                    <div style="margin-top:6px;font-size:10.5px;background:#fafafa;padding:6px;border-radius:4px;border:1px solid #eee;">
+                    <div style="margin-top:6px;font-size:11.5px;background:#fafafa;padding:6px;border-radius:4px;border:1px solid #eee;">
                         <div style="font-weight:bold;margin-bottom:4px;border-bottom:1px solid #ddd;padding-bottom:2px;">تفاصيل الدفع:</div>
                         <table style="width:100%;">
                             ${payDetailsRows}
@@ -761,11 +761,11 @@
                     </div>
 
                     <!-- تذييل الفاتورة والسياسات والباركوود -->
-                    <div style="text-align:center;font-size:10px;margin-top:10px;padding-top:6px;border-top:1px dashed #000;">
-                        <div style="margin-bottom:4px;font-weight:bold;">${_companySettings.note || 'شكراً لزيارتكم وسعداء بملء ثقتكم!'}</div>
-                        <div style="font-size:9px;color:#555;">الاسترجاع والاستبدال خلال 14 يوماً بموجب الفاتورة الأصلية</div>
-                        <div style="font-family:monospace;font-size:13px;letter-spacing:2px;margin-top:6px;font-weight:bold;">||||| | ||||| |||||| |||</div>
-                        <div style="font-family:monospace;font-size:11px;font-weight:bold;margin-top:1px;">* ${invNumber} *</div>
+                    <div style="text-align:center;font-size:11.5px;margin-top:10px;padding-top:6px;border-top:1px dashed #000;">
+                        <div style="margin-bottom:4px;font-weight:bold;font-size:12.5px;">${_companySettings.note || 'شكراً لزيارتكم وسعداء بملء ثقتكم!'}</div>
+                        <div style="font-size:10.5px;color:#444;">الاسترجاع والاستبدال خلال 14 يوماً بموجب الفاتورة الأصلية</div>
+                        <div style="font-family:monospace;font-size:15px;letter-spacing:2px;margin-top:6px;font-weight:bold;">||||| | ||||| |||||| |||</div>
+                        <div style="font-family:monospace;font-size:12px;font-weight:bold;margin-top:1px;">* ${invNumber} *</div>
                     </div>
                 </div>
             `;
