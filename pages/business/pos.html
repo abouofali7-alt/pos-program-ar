@@ -790,11 +790,67 @@
                 area.innerHTML = targetHtml;
             }
 
-            try {
-                window.print();
-            } catch(e) {
-                console.warn('window.print error:', e);
+            setTimeout(() => {
+                try {
+                    window.print();
+                } catch(e) {
+                    console.warn('window.print error, trying popup fallback...', e);
+                    printThermalReceiptPopup(targetHtml);
+                }
+            }, 150);
+        }
+
+        function printThermalReceiptPopup(htmlContent) {
+            if (htmlContent) _lastReceiptHtml = htmlContent;
+            const targetHtml = htmlContent || _lastReceiptHtml;
+            if (!targetHtml) {
+                UI.toast('لا يوجد إيصال سابق للطباعة', 'warn');
+                return;
             }
+
+            const win = window.open('', '_blank', 'width=380,height=650,left=100,top=100');
+            if (!win) {
+                UI.toast('يرجى السماح بالنوافذ المنبثقة للطباعة', 'warn');
+                return;
+            }
+
+            win.document.write(`
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="utf-8">
+                    <title>طباعة إيصال حراري</title>
+                    <style>
+                        @page { size: 80mm auto; margin: 0mm; }
+                        body {
+                            margin: 0;
+                            padding: 3mm;
+                            font-family: 'Courier New', Tahoma, Arial, sans-serif;
+                            font-size: 13px;
+                            background: #fff;
+                            color: #000;
+                            direction: rtl;
+                            text-align: right;
+                        }
+                        @media print {
+                            body { padding: 1mm; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${targetHtml}
+                    <script>
+                        window.onload = function() {
+                            setTimeout(function() {
+                                window.focus();
+                                window.print();
+                            }, 250);
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            win.document.close();
         }
 
         function showReceiptPreviewModal(invNumber, receiptHtml) {
@@ -807,7 +863,7 @@
             }
 
             modal.innerHTML = `
-                <div style="background:var(--card-dark);border:1px solid var(--border-color);border-radius:14px;width:min(460px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:var(--shadow-card);overflow:hidden;animation:fadeIn 0.2s;">
+                <div style="background:var(--card-dark);border:1px solid var(--border-color);border-radius:14px;width:min(480px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:var(--shadow-card);overflow:hidden;animation:fadeIn 0.2s;">
                     <div style="padding:14px 18px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.02);">
                         <b style="font-size:1.05rem;color:var(--success);"><i class="fa-solid fa-circle-check"></i> تم إتمام الفاتورة (${invNumber})</b>
                         <button onclick="document.getElementById('posReceiptModal').style.display='none'" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
@@ -817,9 +873,12 @@
                             ${receiptHtml}
                         </div>
                     </div>
-                    <div style="padding:14px 18px;border-top:1px solid var(--border-color);display:flex;gap:10px;justify-content:space-between;background:var(--card-dark);">
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('posReceiptModal').style.display='none'" style="font-size:0.88rem;padding:8px 14px;">إغلاق</button>
-                        <button type="button" class="btn btn-primary-soft" onclick="printThermalReceipt()" style="font-size:0.95rem;padding:8px 20px;font-weight:700;"><i class="fa-solid fa-print"></i> طباعة الإيصال الحراري الآن</button>
+                    <div style="padding:14px 18px;border-top:1px solid var(--border-color);display:flex;gap:8px;justify-content:space-between;background:var(--card-dark);flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('posReceiptModal').style.display='none'" style="font-size:0.88rem;padding:8px 12px;">إغلاق</button>
+                        <div style="display:flex;gap:6px;">
+                            <button type="button" class="btn btn-secondary" onclick="printThermalReceiptPopup()" style="font-size:0.88rem;padding:8px 12px;" title="طباعة من خلال نافذة مستقلة"><i class="fa-solid fa-window-restore"></i> نافذة طباعة</button>
+                            <button type="button" class="btn btn-primary-soft" onclick="printThermalReceipt()" style="font-size:0.92rem;padding:8px 16px;font-weight:700;"><i class="fa-solid fa-print"></i> طباعة حرارية مباشرة</button>
+                        </div>
                     </div>
                 </div>
             `;

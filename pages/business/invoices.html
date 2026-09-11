@@ -604,11 +604,18 @@
             }
             area.innerHTML = receiptHtml;
 
-            try {
-                window.print();
-            } catch(e) {
-                console.warn('window.print thermal error:', e);
-            }
+            setTimeout(() => {
+                try {
+                    window.print();
+                } catch(e) {
+                    console.warn('window.print thermal error:', e);
+                    const win = window.open('', '_blank', 'width=380,height=650');
+                    if (win) {
+                        win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>طباعة إيصال حراري</title><style>@page{size:80mm auto;margin:0mm;}body{margin:0;padding:3mm;font-family:"Courier New",sans-serif;font-size:13px;direction:rtl;text-align:right;}</style></head><body>' + receiptHtml + '<script>window.onload=function(){setTimeout(function(){window.print();},200);};<\/script></body></html>');
+                        win.document.close();
+                    }
+                }
+            }, 150);
         }
 
         async function delInvoice(id) {
