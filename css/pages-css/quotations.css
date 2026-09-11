@@ -158,7 +158,14 @@ body.light-mode .glass-table td {
 
 @media print {
     body * { visibility: hidden; }
-    #printableQuotation, #printableQuotation * { visibility: visible; }
-    #printableQuotation { position: absolute; left: 0; top: 0; width: 100%; color: #000 !important; background: #fff !important; }
+    #printableQuotation, #printableQuotation * {
+        visibility: visible;
+        color: #000000 !important;
+        background: #ffffff !important;
+        font-weight: 800 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    #printableQuotation { position: absolute; left: 0; top: 0; width: 100%; color: #000000 !important; background: #ffffff !important; }
     .no-print { display: none !important; }
 }

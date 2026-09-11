@@ -38,13 +38,14 @@ const ARExport = (function () {
                 <meta charset="utf-8">
                 <title>${title || 'طباعة تقرير'}</title>
                 <style>
-                    body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; color: #1e293b; }
-                    h2 { text-align: center; margin-bottom: 20px; color: #0f172a; }
+                    body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; color: #000000 !important; font-weight: 800 !important; }
+                    h2 { text-align: center; margin-bottom: 20px; color: #000000 !important; font-weight: 900 !important; }
                     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: right; font-size: 14px; }
-                    th { background: #f1f5f9; font-weight: bold; }
-                    tr:nth-child(even) { background: #f8fafc; }
+                    th, td { border: 1.5px solid #000000 !important; padding: 10px; text-align: right; font-size: 14px; color: #000000 !important; font-weight: 800 !important; }
+                    th { background: #ffffff !important; font-weight: 900 !important; color: #000000 !important; }
+                    tr:nth-child(even) { background: #ffffff !important; }
                     @media print {
+                        body, body * { color: #000000 !important; background: #ffffff !important; font-weight: 800 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                         body { padding: 0; }
                     }
                 </style>
