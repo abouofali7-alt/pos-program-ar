@@ -54,7 +54,8 @@
             try {
                 const cur = JSON.parse(localStorage.getItem('ar_session') || 'null');
                 if (cur && cur.id) {
-                    window.location.href = '../index.html';
+                    const isMgr = cur.roleId === 1 || cur.roleName === 'مدير' || (cur.username && cur.username.toLowerCase() === 'admin');
+                    window.location.href = isMgr ? '../index.html' : 'business/pos.html';
                     return;
                 }
             } catch (e) {}
@@ -115,7 +116,8 @@
                 if (typeof ARDB !== 'undefined') ARDB.setSession(sess);
 
                 UI.toast('تم الدخول بنجاح! مرحباً ' + (found.name || found.username), 'ok');
-                setTimeout(() => { window.location.href = '../index.html'; }, 300);
+                const targetPage = isManager ? '../index.html' : 'business/pos.html';
+                setTimeout(() => { window.location.href = targetPage; }, 300);
             });
         })();
     </script>

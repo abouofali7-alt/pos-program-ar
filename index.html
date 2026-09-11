@@ -6,8 +6,15 @@
             var l = localStorage.getItem('ar_lang') || 'ar';
             document.documentElement.lang = l;
             document.documentElement.dir = (l === 'en') ? 'ltr' : 'rtl';
-            if (!localStorage.getItem('ar_session')) {
+            var s = localStorage.getItem('ar_session');
+            if (!s) {
                 window.location.href = 'pages/login.html';
+            } else {
+                var u = JSON.parse(s);
+                var isMgr = u && (u.roleId === 1 || u.roleName === 'مدير' || (u.username && u.username.toLowerCase() === 'admin'));
+                if (!isMgr) {
+                    window.location.href = 'pages/business/pos.html';
+                }
             }
         } catch(e) {}
     </script>
@@ -153,6 +160,13 @@
 
         async function initDashboard() {
             try {
+                if (typeof window.ARUI !== 'undefined' && window.ARUI.isManagerUser) {
+                    const u = JSON.parse(localStorage.getItem('ar_session') || 'null');
+                    if (!window.ARUI.isManagerUser(u)) {
+                        window.location.href = 'pages/business/pos.html';
+                        return;
+                    }
+                }
                 const [products, categories, customers, invoices, expenses, movements, tasks] = await Promise.all([
                     ARDB.getAll('products'), ARDB.getAll('categories'), ARDB.getAll('customers'),
                     ARDB.getAll('invoices'), ARDB.getAll('expenses'), ARDB.getAll('stockMovements'),

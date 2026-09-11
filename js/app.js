@@ -252,16 +252,23 @@
         let user = getStoredUser();
         const p = window.location.pathname;
         const isLoginPage = p.endsWith('login.html');
+        const isIndexPage = p.endsWith('index.html') || p === '/' || p.endsWith('/') || !p.includes('/pages/');
 
         if (!user && !isLoginPage) {
             window.location.href = relPrefix() + 'pages/login.html';
             return { dbReady: true, user: null };
         } else if (user && isLoginPage) {
-            window.location.href = relPrefix() + 'index.html';
+            const landing = isManagerUser(user) ? 'index.html' : 'pages/business/pos.html';
+            window.location.href = relPrefix() + landing;
             return { dbReady: true, user };
         }
 
         if (user && !isLoginPage) {
+            if (isIndexPage && !isManagerUser(user)) {
+                window.location.href = relPrefix() + 'pages/business/pos.html';
+                return { dbReady: true, user, forbidden: true };
+            }
+
             // مزامنة مصفوفة الصلاحيات للجلسات القديمة التي لم تتضمن permissions
             if ((!user.permissions || !Array.isArray(user.permissions)) && !isManagerUser(user)) {
                 try {
@@ -294,7 +301,8 @@
                 };
                 const nameAr = moduleNames[currentModule] || currentModule;
                 alert('عذراً، ليس لديك صلاحية الوصول لوحدة ' + nameAr);
-                window.location.href = relPrefix() + 'index.html';
+                const landing = isManagerUser(user) ? 'index.html' : 'pages/business/pos.html';
+                window.location.href = relPrefix() + landing;
                 return { dbReady: true, user, forbidden: true };
             }
         }
@@ -384,12 +392,14 @@
         const searchTitle = isEn ? 'Quick Search (Ctrl + K)' : 'بحث سريع (Ctrl + K)';
         const notifTitle = isEn ? 'Notifications' : 'الإشعارات';
 
+        const homeHref = isManagerUser(user) ? (prefix + 'index.html') : (prefix + 'pages/business/pos.html');
+
         host.innerHTML =
             '<header class="topbar">' +
                 '<div class="topbar-right">' +
                     '<button id="appNavBtn" class="icon-btn"><i class="fa-solid fa-bars"></i></button>' +
-                    '<a class="brand" href="' + prefix + 'index.html"><i class="fa-solid fa-cubes"></i> AR-Program</a>' +
-                    '<a href="' + prefix + 'index.html" class="btn btn-secondary topbar-home-btn" style="margin-inline-start:6px;padding:4px 10px;font-size:0.82rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;" title="' + homeTxt + '"><i class="fa-solid fa-house"></i> <span>' + homeTxt + '</span></a>' +
+                    '<a class="brand" href="' + homeHref + '"><i class="fa-solid fa-cubes"></i> AR-Program</a>' +
+                    '<a href="' + homeHref + '" class="btn btn-secondary topbar-home-btn" style="margin-inline-start:6px;padding:4px 10px;font-size:0.82rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;" title="' + homeTxt + '"><i class="fa-solid fa-house"></i> <span>' + homeTxt + '</span></a>' +
                     '<span id="apiStatusBadge" style="font-size:0.75rem;padding:4px 10px;border-radius:20px;margin-inline-start:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><i class="fa-solid fa-spinner fa-spin"></i> ...</span>' +
                 '</div>' +
                 '<div class="topbar-left">' +
@@ -547,7 +557,9 @@
                         window.location.reload();
                     } else {
                         const prefix = typeof relPrefix === 'function' ? relPrefix() : '../../';
-                        window.location.href = prefix + 'index.html';
+                        const u = getStoredUser();
+                        const target = isManagerUser(u) ? (prefix + 'index.html') : (prefix + 'pages/business/pos.html');
+                        window.location.href = target;
                     }
                 }, 1000);
             } catch(e) {
