@@ -166,16 +166,17 @@ const ARDB = (function () {
 
     function localUpdate(store, id, patch, skipPush = false) {
         return localGetById(store, id).then((rec) => {
+            const now = Date.now();
             if (!rec) {
                 return localGetAll(store).then(all => {
                     const matched = (all || []).find(x => x && (String(x.id) === String(id) || String(x.key) === String(id)));
                     if (!matched) throw new Error('record not found: ' + id);
-                    const merged = Object.assign({}, matched, patch, { id: matched.id });
+                    const merged = Object.assign({}, matched, patch, { id: matched.id, updatedAt: now });
                     return localPut(store, merged, skipPush);
                 });
             }
             const targetId = rec.id !== undefined ? rec.id : id;
-            const merged = Object.assign({}, rec, patch, { id: targetId });
+            const merged = Object.assign({}, rec, patch, { id: targetId, updatedAt: now });
             return localPut(store, merged, skipPush);
         });
     }
@@ -249,18 +250,19 @@ const ARDB = (function () {
     function update(store, id, patch) {
         if (typeof API !== 'undefined' && API.isApiModeEnabled()) {
             return API.getById(store, id).then((rec) => {
+                const now = Date.now();
                 if (!rec) {
                     return localGetAll(store).then(all => {
                         const matched = (all || []).find(x => x && (String(x.id) === String(id) || String(x.key) === String(id)));
                         if (matched) {
-                            const merged = Object.assign({}, matched, patch, { id: matched.id });
+                            const merged = Object.assign({}, matched, patch, { id: matched.id, updatedAt: now });
                             return API.update(store, merged);
                         }
                         throw new Error('record not found: ' + id);
                     });
                 }
                 const targetId = rec.id !== undefined ? rec.id : id;
-                const merged = Object.assign({}, rec, patch, { id: targetId });
+                const merged = Object.assign({}, rec, patch, { id: targetId, updatedAt: now });
                 return API.update(store, merged);
             });
         }

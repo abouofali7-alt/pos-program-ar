@@ -338,20 +338,20 @@
                 if (item.serialIds && item.serialIds.length) {
                     for (let k = 0; k < Math.min(item.quantity, item.serialIds.length); k++) {
                         const sid = item.serialIds[k];
-                        await ARDB.update('serials', sid, { status: 'available', invoiceId: null });
+                        await ARDB.update('serials', sid, { status: 'available', invoiceId: null, updatedAt: Date.now() });
                     }
                 } else if (item.serials && item.serials.length) {
                     for (let k = 0; k < Math.min(item.quantity, item.serials.length); k++) {
                         const sn = item.serials[k];
                         const match = pSerials.find(s => s.serialNumber && String(s.serialNumber).trim().toLowerCase() === String(sn).trim().toLowerCase());
                         if (match) {
-                            await ARDB.update('serials', match.id, { status: 'available', invoiceId: null });
+                            await ARDB.update('serials', match.id, { status: 'available', invoiceId: null, updatedAt: Date.now() });
                         }
                     }
                 } else {
                     const soldRecs = pSerials.filter(s => s.status === 'sold' && (String(s.invoiceId) === String(pickedInvoice.id) || !s.invoiceId));
                     for (let k = 0; k < Math.min(item.quantity, soldRecs.length); k++) {
-                        await ARDB.update('serials', soldRecs[k].id, { status: 'available', invoiceId: null });
+                        await ARDB.update('serials', soldRecs[k].id, { status: 'available', invoiceId: null, updatedAt: Date.now() });
                     }
                 }
             }

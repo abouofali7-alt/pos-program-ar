@@ -228,13 +228,44 @@ const API = (function () {
 
                     let updatedAny = false;
 
-                    // 1. تحديث أو إضافة العناصر الواردة من السحابة إلى IndexedDB المحلي دفعة واحدة (Bulk) بدون إعادة الرفع للسحابة
+                    // 1. تحديث أو إضافة العناصر الواردة من السحابة إلى IndexedDB المحلي دفعة واحدة (Bulk) بدون إعادة الرفع للسحابة مع حماية التحديثات المحلية
                     for (const s of Object.keys(cloudData)) {
                         const items = (cloudData[s] || []).filter(Boolean);
                         if (items.length) {
                             try {
-                                await ARDB.bulkPut(s, items, true);
-                                updatedAny = true;
+                                const pendingPushIds = new Set(
+                                    (_pushQueue || []).filter(q => q.store === s && q.item).map(q => String(q.item.id !== undefined ? q.item.id : q.item.key))
+                                );
+                                const localItems = await ARDB.localGetAll(s);
+                                const localById = {};
+                                (localItems || []).forEach(it => {
+                                    if (it) {
+                                        const id = it.id !== undefined ? String(it.id) : (it.key !== undefined ? String(it.key) : null);
+                                        if (id !== null) localById[id] = it;
+                                    }
+                                });
+
+                                const finalItemsToPut = [];
+                                for (const cloudItem of items) {
+                                    const cId = cloudItem.id !== undefined ? String(cloudItem.id) : (cloudItem.key !== undefined ? String(cloudItem.key) : null);
+                                    if (cId !== null && pendingPushIds.has(cId)) {
+                                        continue;
+                                    }
+                                    if (cId !== null && localById[cId]) {
+                                        const localItem = localById[cId];
+                                        const localTs = Number(localItem.updatedAt || localItem.createdAt || 0);
+                                        const cloudTs = Number(cloudItem.updatedAt || cloudItem.createdAt || 0);
+                                        if (localTs > cloudTs && localTs > 0) {
+                                            continue;
+                                        }
+                                    }
+                                    finalItemsToPut.push(cloudItem);
+                                }
+
+                                if (finalItemsToPut.length) {
+                                    await ARDB.bulkPut(s, finalItemsToPut, true);
+                                    updatedAny = true;
+                                }
                             } catch(e){}
                         }
                     }

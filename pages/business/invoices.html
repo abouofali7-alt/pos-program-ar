@@ -418,17 +418,27 @@
             });
 
             // تحديث حالة السريالات المباعة
+            const allSerialsList = await ARDB.getAll('serials');
             for (const it of items) {
                 if (it.serialIds && it.serialIds.length) {
                     for (const sid of it.serialIds) {
-                        await ARDB.update('serials', sid, { status: 'sold', invoiceId: invId, invoiceDate: date });
+                        await ARDB.update('serials', sid, { status: 'sold', invoiceId: invId, invoiceDate: date, updatedAt: Date.now() });
                     }
                 } else if (it.serials && it.serials.length) {
-                    const allSerials = await ARDB.getAll('serials');
                     for (const sn of it.serials) {
-                        const rec = (allSerials || []).find(s => String(s.productId) === String(it.productId) && s.serialNumber && s.serialNumber.trim().toLowerCase() === String(sn).trim().toLowerCase());
+                        const rec = (allSerialsList || []).find(s => String(s.productId) === String(it.productId) && s.serialNumber && s.serialNumber.trim().toLowerCase() === String(sn).trim().toLowerCase());
                         if (rec) {
-                            await ARDB.update('serials', rec.id, { status: 'sold', invoiceId: invId, invoiceDate: date });
+                            await ARDB.update('serials', rec.id, { status: 'sold', invoiceId: invId, invoiceDate: date, updatedAt: Date.now() });
+                        } else {
+                            await ARDB.add('serials', {
+                                productId: it.productId,
+                                serialNumber: sn,
+                                status: 'sold',
+                                invoiceId: invId,
+                                invoiceDate: date,
+                                createdAt: Date.now(),
+                                updatedAt: Date.now()
+                            });
                         }
                     }
                 }

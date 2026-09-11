@@ -98,20 +98,16 @@ async function saveToRemote(cloudObj) {
     }
 }
 
-async function saveCloudData(cloudObj, awaitRemote = false) {
+async function saveCloudData(cloudObj, awaitRemote = true) {
     global._ar_cloud_data = cloudObj;
     _isLoadedFromRemote = true;
     try {
         fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
     } catch(e) {}
 
-    if (awaitRemote || (cloudObj && cloudObj.resetTimestamp)) {
-        try {
-            await saveToRemote(cloudObj);
-        } catch(e) {}
-    } else {
-        saveToRemote(cloudObj).catch(() => {});
-    }
+    try {
+        await saveToRemote(cloudObj);
+    } catch(e) {}
 }
 
 function getItemId(x) {
