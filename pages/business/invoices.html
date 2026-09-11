@@ -8,6 +8,43 @@
     <link rel="stylesheet" href="../../css/app.css">
     <link rel="stylesheet" href="../../css/responsive.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        @media print {
+            html, body {
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #fff !important;
+                color: #000 !important;
+            }
+            body > *:not(#thermalPrintArea) {
+                display: none !important;
+            }
+            #thermalPrintArea {
+                display: block !important;
+                position: relative !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 2mm 3mm !important;
+                box-sizing: border-box !important;
+                background: #fff !important;
+                color: #000 !important;
+                font-family: 'Courier New', Tahoma, Arial, sans-serif !important;
+                font-size: 13px !important;
+                direction: rtl !important;
+                text-align: right !important;
+            }
+            @page {
+                size: auto;
+                margin: 0mm;
+            }
+        }
+        #thermalPrintArea {
+            display: none;
+        }
+    </style>
 </head>
 <body class="dark-mode">
     <div id="appHeaderHost"></div>
@@ -100,7 +137,8 @@
                 '<td><span class="badge ' + (isCredit ? 'badge-amber' : 'badge-green') + '">' + (isCredit ? 'آجل' : 'نقداً') + '</span></td>' +
                 '<td class="num" style="font-weight:700;color:var(--success);">' + UI.money(inv.total) + '</td>' +
                 '<td style="text-align:left;white-space:nowrap;">' +
-                '<button class="btn btn-sm" onclick="printInvoice(' + inv.id + ')"><i class="fa-solid fa-print"></i></button> ' +
+                '<button class="btn btn-sm btn-secondary" onclick="printThermalInvoice(' + inv.id + ')" title="طباعة إيصال حراري (80mm)"><i class="fa-solid fa-receipt"></i> حراري</button> ' +
+                '<button class="btn btn-sm" onclick="printInvoice(' + inv.id + ')" title="طباعة فاتورة A4"><i class="fa-solid fa-print"></i> A4</button> ' +
                 '<button class="btn btn-sm btn-danger" onclick="delInvoice(' + inv.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>';
             }).join('') || '<tr><td colspan="8" class="empty-state">لا توجد فواتير</td></tr>';
         }
@@ -434,6 +472,145 @@
             setTimeout(() => { win.print(); }, 350);
         }
 
+        async function printThermalInvoice(id) {
+            const inv = await ARDB.getById('invoices', id);
+            if (!inv) return;
+            const [settings, products, customers] = await Promise.all([ARDB.getAll('settings'), ARDB.getAll('products'), ARDB.getAll('customers')]);
+            const s = {}; settings.forEach(r => { if (r && r.key) s[r.key] = r.value; });
+            const pById = {}; products.forEach(p => pById[p.id] = p);
+            const cust = inv.customerId ? customers.find(c => String(c.id) === String(inv.customerId)) : null;
+
+            const companyName = s.companyName || 'AR-Program';
+            const companyAddress = s.companyAddress || '';
+            const companyPhone = s.companyPhone || '';
+            const taxNo = s.taxNo || '';
+            const invNumber = inv.number || ('INV-' + inv.id);
+            const invDateObj = new Date(inv.date || Date.now());
+            const invDateStr = invDateObj.toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            const invTimeStr = invDateObj.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+            const customerName = cust ? cust.name : 'عميل عام (نقدي)';
+            const customerPhone = cust && cust.phone ? cust.phone : '';
+            const customerAddress = cust && cust.address ? cust.address : '';
+            const cashierName = inv.cashierName || 'المستخدم';
+
+            const subTotal = inv.subtotal || inv.total || 0;
+            const discountAmount = inv.discount || inv.discountAmount || 0;
+            const discountType = inv.discountType || 'fixed';
+            const discountValue = inv.discountValue || 0;
+            const grandTotal = inv.total || 0;
+
+            const invItems = (inv.items || []).map(it => {
+                const pid = it.productId || it.id;
+                const pName = it.name || (pById[pid] ? pById[pid].name : 'صنف ' + pid);
+                const qty = it.quantity || it.qty || 1;
+                const price = Number(it.price || 0);
+                const tot = Number(it.total || (price * qty));
+                const serials = it.serials || [];
+                return { name: pName, quantity: qty, price: price, total: tot, serials: serials };
+            });
+
+            const payMethodSummary = inv.paymentMethod || (inv.paymentType === 'credit' ? 'آجل' : 'نقداً (كاش)');
+
+            const receiptHtml = `
+                <div style="font-family:'Courier New', Tahoma, Arial, sans-serif;font-size:13px;color:#000;line-height:1.4;direction:rtl;text-align:right;width:100%;box-sizing:border-box;background:#fff;padding:2px;">
+                    <!-- الترويسة الرئيسية للمحل/الشركة -->
+                    <div style="text-align:center;padding-bottom:6px;margin-bottom:6px;border-bottom:1px dashed #000;">
+                        <div style="font-size:18px;font-weight:bold;margin-bottom:3px;">${companyName}</div>
+                        ${companyAddress ? `<div style="font-size:11.5px;margin-bottom:2px;">📍 ${companyAddress}</div>` : ''}
+                        ${companyPhone ? `<div style="font-size:11.5px;margin-bottom:2px;">📞 ${companyPhone}</div>` : ''}
+                        ${taxNo ? `<div style="font-size:11.5px;margin-bottom:2px;">الرقم الضريبي: ${taxNo}</div>` : ''}
+                        <div style="font-size:13.5px;font-weight:bold;margin-top:6px;background:#eee;padding:4px 0;border-radius:3px;">إيصال مبيعات (حراري)</div>
+                    </div>
+
+                    <!-- تفاصيل الفاتورة -->
+                    <table style="width:100%;font-size:11.5px;margin-bottom:6px;">
+                        <tr>
+                            <td><b>رقم الفاتورة:</b> ${invNumber}</td>
+                            <td style="text-align:left;"><b>التاريخ:</b> ${invDateStr}</td>
+                        </tr>
+                        <tr>
+                            <td><b>المستخدم:</b> ${cashierName}</td>
+                            <td style="text-align:left;"><b>الوقت:</b> ${invTimeStr}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><b>العميل:</b> ${customerName} ${customerPhone ? '(' + customerPhone + ')' : ''}</td>
+                        </tr>
+                        ${customerAddress ? `<tr><td colspan="2"><b>العنوان:</b> ${customerAddress}</td></tr>` : ''}
+                        <tr>
+                            <td colspan="2"><b>طريقة الدفع:</b> ${payMethodSummary}</td>
+                        </tr>
+                    </table>
+
+                    <div style="border-top:1px dashed #000;margin:6px 0;"></div>
+
+                    <!-- جدول الأصناف -->
+                    <table style="width:100%;font-size:12.5px;border-collapse:collapse;margin-bottom:6px;">
+                        <thead>
+                            <tr style="border-bottom:1px solid #000;">
+                                <th style="text-align:right;padding:4px 0;width:45%;">الصنف</th>
+                                <th style="text-align:center;padding:4px 0;width:30%;">ك × سعر</th>
+                                <th style="text-align:left;padding:4px 0;width:25%;">الإجمالي</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${invItems.map(c => `
+                                <tr style="border-bottom:1px dashed #eee;">
+                                    <td style="padding:4px 0;vertical-align:top;">
+                                        <div style="font-weight:bold;font-size:13px;">${c.name}</div>
+                                        ${(c.serials && c.serials.length) ? `<div style="font-size:10.5px;color:#222;margin-top:1px;">S/N: ${c.serials.join(', ')}</div>` : ''}
+                                    </td>
+                                    <td style="text-align:center;padding:4px 0;vertical-align:top;font-size:12.5px;">${c.quantity} × ${c.price.toFixed(2)}</td>
+                                    <td style="text-align:left;font-weight:bold;padding:4px 0;vertical-align:top;font-size:13px;">${c.total.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <div style="border-top:1px dashed #000;margin:6px 0;"></div>
+
+                    <!-- الملخص المالي والخصم -->
+                    <table style="width:100%;font-size:12.5px;margin-bottom:6px;">
+                        <tr>
+                            <td style="padding:2px 0;">المجموع الفرعي:</td>
+                            <td style="text-align:left;font-weight:bold;padding:2px 0;">${subTotal.toFixed(2)} ج.م</td>
+                        </tr>
+                        ${discountAmount > 0 ? `
+                        <tr style="color:#d97706;">
+                            <td style="padding:2px 0;">الخصم المطبق ${discountType === 'percent' ? '(' + discountValue + '%)' : ''}:</td>
+                            <td style="text-align:left;font-weight:bold;padding:2px 0;">-${discountAmount.toFixed(2)} ج.م</td>
+                        </tr>
+                        ` : ''}
+                        <tr style="font-size:17px;font-weight:bold;border-top:1.5px solid #000;border-bottom:2px double #000;">
+                            <td style="padding:6px 0;">الإجمالي النهائي:</td>
+                            <td style="text-align:left;padding:6px 0;">${grandTotal.toFixed(2)} ج.م</td>
+                        </tr>
+                    </table>
+
+                    <!-- تذييل الفاتورة والسياسات والباركوود -->
+                    <div style="text-align:center;font-size:11.5px;margin-top:10px;padding-top:6px;border-top:1px dashed #000;">
+                        <div style="margin-bottom:4px;font-weight:bold;font-size:12.5px;">${s.invoiceNote || 'شكراً لزيارتكم وسعداء بملء ثقتكم!'}</div>
+                        <div style="font-size:10.5px;color:#444;">الاسترجاع والاستبدال خلال 14 يوماً بموجب الفاتورة الأصلية</div>
+                        <div style="font-family:monospace;font-size:15px;letter-spacing:2px;margin-top:6px;font-weight:bold;">||||| | ||||| |||||| |||</div>
+                        <div style="font-family:monospace;font-size:12px;font-weight:bold;margin-top:1px;">* ${invNumber} *</div>
+                    </div>
+                </div>
+            `;
+
+            let area = document.getElementById('thermalPrintArea');
+            if (!area) {
+                area = document.createElement('div');
+                area.id = 'thermalPrintArea';
+                document.body.appendChild(area);
+            }
+            area.innerHTML = receiptHtml;
+
+            try {
+                window.print();
+            } catch(e) {
+                console.warn('window.print thermal error:', e);
+            }
+        }
+
         async function delInvoice(id) {
             const ok = await UI.confirmBox('حذف الفاتورة؟ لن تُلغى حركات المخزون المرتبطة تلقائيًا.');
             if (!ok) return;
@@ -444,5 +621,6 @@
 
         load();
     </script>
+    <div id="thermalPrintArea"></div>
 </body>
 </html>
