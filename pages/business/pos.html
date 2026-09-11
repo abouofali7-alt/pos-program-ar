@@ -72,15 +72,35 @@
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:8px;font-size:0.95rem;">
-                    <div style="display:flex;justify-content:space-between;">
-                        <span>المجموع:</span>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>المجموع الفرعي:</span>
                         <b id="subTotal">0.00 ج.م</b>
                     </div>
-                    <div style="display:flex;justify-content:space-between;color:var(--success);font-size:1.2rem;font-weight:700;margin-top:6px;border-top:1px solid var(--border-color);padding-top:8px;">
+
+                    <!-- قسم الخصم -->
+                    <div style="background:rgba(255,255,255,0.03);border:1px dashed var(--border-color);border-radius:10px;padding:8px 12px;margin:2px 0;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                            <span style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);"><i class="fa-solid fa-tags" style="color:var(--warning);"></i> تطبيق الخصم:</span>
+                            <div style="display:flex;gap:4px;">
+                                <button type="button" id="btnDiscFixed" class="btn btn-sm btn-primary-soft" onclick="setDiscountType('fixed')" style="padding:2px 8px;font-size:0.75rem;">مبلغ</button>
+                                <button type="button" id="btnDiscPercent" class="btn btn-sm btn-secondary" onclick="setDiscountType('percent')" style="padding:2px 8px;font-size:0.75rem;">% نسبة</button>
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <input id="discountInput" type="number" min="0" step="any" placeholder="0" oninput="renderCart()" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border-color);background:var(--card-dark);color:var(--text-primary);font-size:0.9rem;font-weight:700;outline:none;">
+                            <span id="discountTypeUnit" style="font-size:0.8rem;color:var(--text-secondary);min-width:30px;text-align:center;">ج.م</span>
+                        </div>
+                        <div id="discountAmountRow" style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--warning);margin-top:6px;display:none;">
+                            <span>قيمة الخصم:</span>
+                            <b id="discountAmountText">-0.00 ج.م</b>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;color:var(--success);font-size:1.2rem;font-weight:700;margin-top:4px;border-top:1px solid var(--border-color);padding-top:8px;">
                         <span>الإجمالي المستحق:</span>
                         <span id="grandTotal">0.00 ج.م</span>
                     </div>
-                    <button class="btn btn-primary-soft" onclick="checkout()" style="width:100%;padding:12px;font-size:1.05rem;margin-top:10px;"><i class="fa-solid fa-print"></i> إتمام الدفع وطباعة الفاتورة</button>
+                    <button class="btn btn-primary-soft" onclick="checkout()" style="width:100%;padding:12px;font-size:1.05rem;margin-top:6px;"><i class="fa-solid fa-print"></i> إتمام الدفع وطباعة الفاتورة</button>
                 </div>
             </div>
         </div>
@@ -99,6 +119,58 @@
         let _selectedCat = null;
         let _posLocation = null;
         let _saleType = 'retail';
+        let _discountType = 'fixed';
+
+        function setDiscountType(type) {
+            _discountType = type;
+            const btnFixed = document.getElementById('btnDiscFixed');
+            const btnPercent = document.getElementById('btnDiscPercent');
+            const unit = document.getElementById('discountTypeUnit');
+            if (type === 'percent') {
+                if (btnFixed) btnFixed.className = 'btn btn-sm btn-secondary';
+                if (btnPercent) btnPercent.className = 'btn btn-sm btn-primary-soft';
+                if (unit) unit.textContent = '%';
+            } else {
+                if (btnFixed) btnFixed.className = 'btn btn-sm btn-primary-soft';
+                if (btnPercent) btnPercent.className = 'btn btn-sm btn-secondary';
+                if (unit) unit.textContent = 'ج.م';
+            }
+            renderCart();
+        }
+
+        function editItemPrice(prodId) {
+            const item = _cart.find(c => String(c.productId) === String(prodId));
+            if (!item) return;
+            const newPriceStr = prompt(`تعديل سعر الوحدة للمنتج (${item.productName}):`, item.price);
+            if (newPriceStr === null) return;
+            const newPrice = parseFloat(newPriceStr);
+            if (!isNaN(newPrice) && newPrice >= 0) {
+                item.price = newPrice;
+                renderCart();
+                UI.toast('تم تحديث سعر المنتج بالسلة', 'ok');
+            }
+        }
+
+        function getCartTotals() {
+            const subTotal = _cart.reduce((s, item) => s + (item.price * item.quantity), 0);
+            const discInput = document.getElementById('discountInput');
+            let rawVal = parseFloat(discInput ? discInput.value : 0) || 0;
+            if (rawVal < 0) rawVal = 0;
+
+            let discountAmount = 0;
+            if (_discountType === 'percent') {
+                discountAmount = (subTotal * rawVal) / 100;
+            } else {
+                discountAmount = rawVal;
+            }
+
+            if (discountAmount > subTotal) {
+                discountAmount = subTotal;
+            }
+
+            const grandTotal = Math.max(0, subTotal - discountAmount);
+            return { subTotal, discountType: _discountType, discountValue: rawVal, discountAmount, grandTotal };
+        }
 
         function getProdPrice(prod) {
             if (!prod) return 0;
@@ -347,6 +419,8 @@
 
         function clearCart() {
             _cart = [];
+            const discInput = document.getElementById('discountInput');
+            if (discInput) discInput.value = '';
             renderCart();
         }
 
@@ -356,13 +430,15 @@
                 container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-secondary);font-size:0.9rem;">السلة فارغة، انقر على المنتجات لإضافتها</div>';
                 document.getElementById('subTotal').innerHTML = '0.00 ج.م';
                 document.getElementById('grandTotal').innerHTML = '0.00 ج.م';
+                const discRow = document.getElementById('discountAmountRow');
+                if (discRow) discRow.style.display = 'none';
                 return;
             }
 
-            let total = 0;
+            const { subTotal, discountAmount, grandTotal } = getCartTotals();
+
             container.innerHTML = _cart.map((item) => {
                 const itemTotal = item.price * item.quantity;
-                total += itemTotal;
                 const serialsTag = (item.serials && item.serials.length)
                     ? `<div style="font-size:0.75rem;color:var(--accent-purple);margin-top:2px;"><i class="fa-solid fa-barcode"></i> S/N: ${item.serials.join(', ')}</div>`
                     : '';
@@ -371,7 +447,10 @@
                         <div style="flex:1;">
                             <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary);">${item.productName}</div>
                             ${serialsTag}
-                            <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px;">${UI.money(item.price)} × ${item.quantity}</div>
+                            <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px;">
+                                ${UI.money(item.price)} × ${item.quantity}
+                                <button onclick="editItemPrice('${item.productId}')" class="btn btn-sm btn-secondary" style="padding:1px 5px;font-size:0.68rem;margin-inline-start:4px;" title="تعديل السعر/خصم خاص للصنف"><i class="fa-solid fa-pen"></i></button>
+                            </div>
                         </div>
                         <div style="display:flex;align-items:center;gap:6px;">
                             <button onclick="updateQty('${item.productId}', -1)" class="icon-btn" style="width:24px;height:24px;">-</button>
@@ -383,36 +462,46 @@
                 `;
             }).join('');
 
-            document.getElementById('subTotal').innerHTML = UI.money(total) + ' ج.م';
-            document.getElementById('grandTotal').innerHTML = UI.money(total) + ' ج.م';
+            document.getElementById('subTotal').innerHTML = UI.money(subTotal) + ' ج.م';
+            
+            const discRow = document.getElementById('discountAmountRow');
+            const discText = document.getElementById('discountAmountText');
+            if (discountAmount > 0) {
+                if (discRow) discRow.style.display = 'flex';
+                if (discText) discText.textContent = '-' + UI.money(discountAmount) + ' ج.م';
+            } else {
+                if (discRow) discRow.style.display = 'none';
+            }
+
+            document.getElementById('grandTotal').innerHTML = UI.money(grandTotal) + ' ج.م';
         }
 
         async function checkout() {
             if (!_cart.length) return UI.toast('السلة فارغة!', 'warn');
-            const total = _cart.reduce((s, c) => s + (c.price * c.quantity), 0);
+            const { subTotal, discountType, discountValue, discountAmount, grandTotal } = getCartTotals();
 
             if (typeof ARPayments !== 'undefined') {
-                ARPayments.openCheckoutModal(total, async (payRes) => {
+                ARPayments.openCheckoutModal(grandTotal, async (payRes) => {
                     if (payRes && payRes.status === 'success') {
-                        await finalizeInvoice(total, payRes);
+                        await finalizeInvoice(subTotal, discountType, discountValue, discountAmount, grandTotal, payRes);
                     }
                 });
             } else {
-                await finalizeInvoice(total, {
+                await finalizeInvoice(subTotal, discountType, discountValue, discountAmount, grandTotal, {
                     method: 'cash',
-                    payments: [{ method: 'cash', amount: total, label: 'نقداً (كاش)' }]
+                    payments: [{ method: 'cash', amount: grandTotal, label: 'نقداً (كاش)' }]
                 });
             }
         }
 
-        async function finalizeInvoice(total, payRes) {
+        async function finalizeInvoice(subTotal, discountType, discountValue, discountAmount, grandTotal, payRes) {
             const invNumber = await ARDB.nextSeq('invoice_seq', 'POS-', 5);
             const customerIdVal = document.getElementById('posCustomer') ? document.getElementById('posCustomer').value : '';
             const customerId = customerIdVal ? customerIdVal : null;
             
             const payments = (payRes && payRes.payments && payRes.payments.length)
                 ? payRes.payments
-                : [{ method: (typeof payRes === 'string' ? payRes : (payRes && payRes.method ? payRes.method : 'cash')), amount: total, label: 'كاش' }];
+                : [{ method: (typeof payRes === 'string' ? payRes : (payRes && payRes.method ? payRes.method : 'cash')), amount: grandTotal, label: 'كاش' }];
 
             const payMethodSummary = payments.map(p => {
                 const mObj = typeof ARPayments !== 'undefined' ? ARPayments.METHODS.find(m => m.id === p.method) : null;
@@ -440,7 +529,11 @@
                 number: invNumber,
                 date: Date.now(),
                 customerId: customerId,
-                total: total,
+                subtotal: subTotal,
+                discountType: discountType,
+                discountValue: discountValue,
+                discount: discountAmount,
+                total: grandTotal,
                 items: invItems,
                 payments: payments,
                 paymentMethod: payMethodSummary,
@@ -470,7 +563,7 @@
                 });
             }
 
-            if (total > 0) {
+            if (grandTotal > 0) {
                 const journalLines = [];
                 payments.forEach(p => {
                     if (p.amount > 0) {
@@ -478,7 +571,7 @@
                         journalLines.push({ accountId: accId, debit: p.amount, credit: 0 });
                     }
                 });
-                journalLines.push({ accountId: 11, debit: 0, credit: total });
+                journalLines.push({ accountId: 11, debit: 0, credit: grandTotal });
 
                 await ARDB.add('journalEntries', {
                     number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
@@ -504,7 +597,7 @@
             }
 
             if (typeof ARAudit !== 'undefined') {
-                ARAudit.logAction('إصدار فاتورة POS', 'المبيعات', `فاتورة رقم ${invNumber} بقيمة ${total} عبر ${payMethodSummary}`);
+                ARAudit.logAction('إصدار فاتورة POS', 'المبيعات', `فاتورة رقم ${invNumber} بقيمة ${grandTotal} (خصم: ${discountAmount}) عبر ${payMethodSummary}`);
             }
 
             UI.toast('تم حفظ وإتمام الفاتورة رقم: ' + invNumber, 'ok');
@@ -516,6 +609,14 @@
                     const lbl = mObj ? mObj.label : (p.label || p.method);
                     return `<tr><td><b>${lbl}:</b></td><td style="text-align:left;">${UI.money(p.amount)} ج.م</td></tr>`;
                 }).join('');
+
+                const discountBlock = discountAmount > 0 ? `
+                    <table style="width:100%;text-align:right;font-size:11px;margin-bottom:6px;">
+                        <tr><td>المجموع الفرعي:</td><td style="text-align:left;">${UI.money(subTotal)} ج.م</td></tr>
+                        <tr style="color:#d97706;"><td>الخصم:</td><td style="text-align:left;">-${UI.money(discountAmount)} ج.م</td></tr>
+                    </table>
+                    <hr>
+                ` : '';
 
                 win.document.write(`
                     <html lang="ar" dir="rtl">
@@ -529,12 +630,13 @@
                             ${invItems.map(c => `<tr><td>${c.name} ${(c.serials && c.serials.length) ? '(S/N: ' + c.serials.join(',') + ')' : ''} (x${c.quantity})</td><td style="text-align:left;">${UI.money(c.total)}</td></tr>`).join('')}
                         </table>
                         <hr>
+                        ${discountBlock}
                         <div style="font-weight:700;margin-bottom:6px;">تفاصيل السداد:</div>
                         <table style="width:100%;text-align:right;font-size:11px;margin-bottom:8px;">
                             ${payDetailsRows}
                         </table>
                         <hr>
-                        <h3 style="margin-top:10px;">الإجمالي: ${UI.money(total)} ج.م</h3>
+                        <h3 style="margin-top:10px;">الإجمالي النهائي: ${UI.money(grandTotal)} ج.م</h3>
                         <p>شكراً لزيارتكم!</p>
                         <script>window.onload = function() { window.print(); window.close(); }<\/script>
                     </body>
