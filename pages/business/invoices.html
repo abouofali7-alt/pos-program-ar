@@ -273,9 +273,9 @@
             const opt = sel.options[sel.selectedIndex];
             if (opt && opt.dataset.serials === '1') {
                 wrap.style.display = 'block';
-                const pid = Number(sel.value);
+                const pid = sel.value;
                 const allSerials = await ARDB.getAll('serials');
-                const avail = (allSerials || []).filter(s => s.productId === pid && s.status === 'available');
+                const avail = (allSerials || []).filter(s => String(s.productId) === String(pid) && s.status === 'available');
                 serialsSel.innerHTML = avail.map(s => '<option value="' + s.id + '" data-sn="' + s.serialNumber + '">' + s.serialNumber + '</option>').join('');
                 if (!avail.length) {
                     serialsSel.innerHTML = '<option value="" disabled>لا توجد سريالات متاحة في المخزن</option>';

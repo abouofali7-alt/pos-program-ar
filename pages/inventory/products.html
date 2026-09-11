@@ -338,17 +338,28 @@
             if (!raw) return UI.toast('أدخل الرقم التسلسلي', 'warn');
             const list = raw.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
             
+            const allSerials = await ARDB.getAll('serials');
             let count = 0;
             for (const sn of list) {
                 try {
-                    await ARDB.add('serials', {
-                        productId: activeViewerPid,
-                        serialNumber: sn,
-                        status: 'available',
-                        purchaseDate: Date.now(),
-                        createdAt: Date.now()
-                    });
-                    count++;
+                    const match = (allSerials || []).find(s => s.serialNumber && s.serialNumber.trim().toLowerCase() === sn.toLowerCase());
+                    if (match) {
+                        await ARDB.update('serials', match.id, {
+                            productId: activeViewerPid,
+                            status: 'available',
+                            purchaseDate: Date.now()
+                        });
+                        count++;
+                    } else {
+                        await ARDB.add('serials', {
+                            productId: activeViewerPid,
+                            serialNumber: sn,
+                            status: 'available',
+                            purchaseDate: Date.now(),
+                            createdAt: Date.now()
+                        });
+                        count++;
+                    }
                 } catch(e) {
                     UI.toast('السريال ' + sn + ' مكرر مسبقاً', 'warn');
                 }

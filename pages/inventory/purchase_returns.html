@@ -153,7 +153,7 @@
             // تحديث حالة السريالات المرتجعة للمورد
             const allSerials = await ARDB.getAll('serials');
             for (const it of items) {
-                const recs = (allSerials || []).filter(s => s.productId === it.productId && s.purchaseId === pickedPurchase.id && s.status === 'available');
+                const recs = (allSerials || []).filter(s => String(s.productId) === String(it.productId) && String(s.purchaseId) === String(pickedPurchase.id) && s.status === 'available');
                 for (let k = 0; k < Math.min(it.quantity, recs.length); k++) {
                     await ARDB.update('serials', recs[k].id, { status: 'purchase_returned' });
                 }

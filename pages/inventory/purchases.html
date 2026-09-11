@@ -252,18 +252,29 @@
             const purId = await ARDB.add('purchases', { number, date, supplierId, paymentType, items, total, note, location });
 
             // حفظ السريالات في قاعدة البيانات
+            const allSerials = await ARDB.getAll('serials');
             for (const it of items) {
                 if (it.serials && it.serials.length) {
                     for (const sn of it.serials) {
                         try {
-                            await ARDB.add('serials', {
-                                productId: it.productId,
-                                serialNumber: sn,
-                                status: 'available',
-                                purchaseId: purId,
-                                purchaseDate: date,
-                                createdAt: Date.now()
-                            });
+                            const match = (allSerials || []).find(s => s.serialNumber && s.serialNumber.trim().toLowerCase() === sn.trim().toLowerCase());
+                            if (match) {
+                                await ARDB.update('serials', match.id, {
+                                    productId: it.productId,
+                                    status: 'available',
+                                    purchaseId: purId,
+                                    purchaseDate: date
+                                });
+                            } else {
+                                await ARDB.add('serials', {
+                                    productId: it.productId,
+                                    serialNumber: sn,
+                                    status: 'available',
+                                    purchaseId: purId,
+                                    purchaseDate: date,
+                                    createdAt: Date.now()
+                                });
+                            }
                         } catch(e) {
                             console.warn('تخطي سريال مكرر أو خطأ:', sn, e);
                         }

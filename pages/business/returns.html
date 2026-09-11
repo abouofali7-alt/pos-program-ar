@@ -322,14 +322,13 @@
             for (const it of items) {
                 if (it.serials && it.serials.length) {
                     for (const sn of it.serials) {
-                        const rec = (allSerials || []).find(s => s.productId === it.productId && s.serialNumber === sn);
+                        const rec = (allSerials || []).find(s => String(s.productId) === String(it.productId) && s.serialNumber && s.serialNumber.toLowerCase() === sn.toLowerCase());
                         if (rec) {
                             await ARDB.update('serials', rec.id, { status: 'available', invoiceId: null });
                         }
                     }
                 } else {
-                    // إذا كان هناك سريالات مرتبطة بنفس الفاتورة لهذا المنتج
-                    const recs = (allSerials || []).filter(s => s.productId === it.productId && s.invoiceId === pickedInvoice.id && s.status === 'sold');
+                    const recs = (allSerials || []).filter(s => String(s.productId) === String(it.productId) && String(s.invoiceId) === String(pickedInvoice.id) && s.status === 'sold');
                     for (let k = 0; k < Math.min(it.quantity, recs.length); k++) {
                         await ARDB.update('serials', recs[k].id, { status: 'available', invoiceId: null });
                     }
