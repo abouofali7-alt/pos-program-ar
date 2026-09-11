@@ -37,7 +37,18 @@
             <h3>مرتجع مبيعات</h3>
             <div class="form-grid">
                 <div class="form-item"><label>التاريخ</label><input type="date" id="retDate"></div>
-                <div class="form-item"><label>فاتورة البيع</label><select id="retInvoice" onchange="onPickInvoice()"></select></div>
+                <div class="form-item" style="position:relative;">
+                    <label><i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> بحث بالباركود أو الفاتورة</label>
+                    <div style="display:flex;gap:6px;">
+                        <div style="position:relative;flex:1;">
+                            <i class="fa-solid fa-search" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:0.85rem;"></i>
+                            <input type="text" id="retInvSearch" oninput="searchReturnInvoice()" onkeydown="onRetSearchKey(event)" placeholder="مسح الباركود أسفل الفاتورة أو كتابة رقمها..." autocomplete="off" style="width:100%;padding:8px 30px 8px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);">
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick="resetRetInvSearch()" title="إعادة ضبط"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div id="retInvResults" style="display:none;position:absolute;top:100%;right:0;left:0;max-height:220px;overflow-y:auto;background:var(--card-dark);border:1px solid var(--border-color);border-radius:8px;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,0.6);margin-top:4px;padding:4px;"></div>
+                    <div id="retInvBadge" style="margin-top:4px;font-size:0.85rem;display:none;"></div>
+                </div>
                 <div class="form-item" style="grid-column:1/-1;"><label>ملاحظة</label><input id="retNote"></div>
             </div>
             <div class="table-scroll" style="margin-bottom:12px;">
@@ -61,24 +72,24 @@
     <script src="../../js/app.js"></script>
     <script>
         let pickedInvoice = null;
+        let _allInvoices = [];
+        let _custById = {};
         const salesAcc = 11, cashAcc = 3;
 
         async function load() {
             const [ret, invoices, customers] = await Promise.all([ARDB.getAll('invoiceReturns'), ARDB.getAll('invoices'), ARDB.getAll('customers')]);
-            const custById = {}; customers.forEach(c => custById[c.id] = c);
+            _allInvoices = invoices || [];
+            _custById = {}; customers.forEach(c => _custById[c.id] = c);
+
             const sorted = ret.sort((a, b) => (b.date || 0) - (a.date || 0));
             document.getElementById('retBody').innerHTML = sorted.map(r =>
                 '<tr><td class="num" style="font-weight:700;">' + r.number + '</td>' +
                 '<td>' + UI.date(r.date) + '</td>' +
                 '<td>' + (r.invoiceNumber || '—') + '</td>' +
-                '<td class="num">' + r.items.length + '</td>' +
+                '<td class="num">' + (r.items ? r.items.length : 0) + '</td>' +
                 '<td class="num" style="font-weight:700;color:var(--danger);">' + UI.money(r.total) + '</td>' +
                 '<td style="text-align:left;"><button class="btn btn-sm btn-danger" onclick="delReturn(' + r.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>'
             ).join('') || '<tr><td colspan="6" class="empty-state">لا توجد مرتجعات</td></tr>';
-
-            const sel = document.getElementById('retInvoice');
-            sel.innerHTML = '<option value="">— اختر فاتورة —</option>' + invoices.map(inv =>
-                '<option value="' + inv.id + '">' + inv.number + ' — ' + (inv.customerId && custById[inv.customerId] ? custById[inv.customerId].name : 'بدون عميل') + '</option>').join('');
         }
 
         async function openRetModal() {
@@ -86,19 +97,126 @@
             document.getElementById('retModal').style.opacity = '1';
             document.getElementById('retDate').value = UI.todayInput();
             document.getElementById('retNote').value = '';
-            document.getElementById('retLinesBody').innerHTML = '<tr><td colspan="5" class="empty-state">اختر فاتورة أولًا</td></tr>';
+            document.getElementById('retLinesBody').innerHTML = '<tr><td colspan="5" class="empty-state">قم بمسح الباركود أو اختيار فاتورة بالأسفل</td></tr>';
             document.getElementById('retTotal').textContent = '0.00';
-            pickedInvoice = null;
+            resetRetInvSearch();
             await load();
-        window.addEventListener('ar_cloud_data_updated', load);
+            setTimeout(() => {
+                const inp = document.getElementById('retInvSearch');
+                if (inp) inp.focus();
+            }, 150);
+            window.addEventListener('ar_cloud_data_updated', load);
         }
+
         function closeRetModal() {
             document.getElementById('retModal').style.visibility = 'hidden';
             document.getElementById('retModal').style.opacity = '0';
         }
-        function onPickInvoice() {
-            const id = Number(document.getElementById('retInvoice').value);
-            loadInvLines(id);
+
+        function searchReturnInvoice() {
+            const rawVal = document.getElementById('retInvSearch').value || '';
+            const query = rawVal.trim().replace(/^\*+|\*+$/g, '').toLowerCase();
+            const resDiv = document.getElementById('retInvResults');
+
+            if (!query) {
+                resDiv.style.display = 'none';
+                resDiv.innerHTML = '';
+                return;
+            }
+
+            const matches = _allInvoices.filter(inv => {
+                const num = String(inv.number || '').toLowerCase();
+                const id = String(inv.id || '').toLowerCase();
+                const custName = (inv.customerId && _custById[inv.customerId] ? _custById[inv.customerId].name : '').toLowerCase();
+                const cleanNum = num.replace(/[^a-z0-9]/g, '');
+                const cleanQuery = query.replace(/[^a-z0-9]/g, '');
+
+                return num === query || id === query || (cleanQuery && cleanNum === cleanQuery) || num.includes(query) || custName.includes(query);
+            });
+
+            const exactMatch = _allInvoices.find(inv => {
+                const num = String(inv.number || '').toLowerCase();
+                const id = String(inv.id || '').toLowerCase();
+                const cleanNum = num.replace(/[^a-z0-9]/g, '');
+                const cleanQuery = query.replace(/[^a-z0-9]/g, '');
+                return num === query || id === query || (cleanQuery && cleanNum === cleanQuery);
+            });
+
+            if (exactMatch && query.length >= 4) {
+                selectReturnInvoice(exactMatch.id);
+                resDiv.style.display = 'none';
+                return;
+            }
+
+            if (!matches.length) {
+                resDiv.innerHTML = '<div style="padding:10px;color:var(--text-muted);text-align:center;">لا توجد فاتورة مطابقة للباركود المدخل</div>';
+                resDiv.style.display = 'block';
+                return;
+            }
+
+            resDiv.innerHTML = matches.slice(0, 10).map(inv => {
+                const custName = inv.customerId && _custById[inv.customerId] ? _custById[inv.customerId].name : 'بدون عميل';
+                return `<div onclick="selectReturnInvoice(${inv.id})" style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background 0.15s;" onmouseover="this.style.background='var(--accent-primary-soft)'" onmouseout="this.style.background='transparent'">
+                    <div>
+                        <b style="color:var(--accent-cyan);"><i class="fa-solid fa-barcode"></i> ${inv.number || ('INV-' + inv.id)}</b>
+                        <span style="font-size:0.85rem;color:var(--text-secondary);margin-inline-start:8px;">${custName}</span>
+                    </div>
+                    <div style="font-weight:700;color:var(--success);font-size:0.9rem;">${UI.money(inv.total)}</div>
+                </div>`;
+            }).join('');
+
+            resDiv.style.display = 'block';
+        }
+
+        function selectReturnInvoice(id) {
+            const inv = _allInvoices.find(i => i.id === id);
+            if (!inv) return;
+            pickedInvoice = inv;
+            const custName = inv.customerId && _custById[inv.customerId] ? _custById[inv.customerId].name : 'بدون عميل';
+            
+            document.getElementById('retInvSearch').value = inv.number || ('INV-' + inv.id);
+            document.getElementById('retInvResults').style.display = 'none';
+            
+            const badge = document.getElementById('retInvBadge');
+            badge.style.display = 'block';
+            badge.innerHTML = `<span class="badge badge-green"><i class="fa-solid fa-check"></i> تم تحديد الفاتورة: ${inv.number} (${custName}) — الإجمالي: ${UI.money(inv.total)}</span>`;
+
+            loadInvLines(inv.id);
+        }
+
+        function resetRetInvSearch() {
+            pickedInvoice = null;
+            document.getElementById('retInvSearch').value = '';
+            document.getElementById('retInvResults').style.display = 'none';
+            document.getElementById('retInvResults').innerHTML = '';
+            const badge = document.getElementById('retInvBadge');
+            badge.style.display = 'none';
+            badge.innerHTML = '';
+            document.getElementById('retLinesBody').innerHTML = '<tr><td colspan="5" class="empty-state">اختر أو امسح باركود الفاتورة أولاً</td></tr>';
+            document.getElementById('retTotal').textContent = '0.00';
+        }
+
+        function onRetSearchKey(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const rawVal = document.getElementById('retInvSearch').value || '';
+                const query = rawVal.trim().replace(/^\*+|\*+$/g, '').toLowerCase();
+                if (!query) return;
+
+                const match = _allInvoices.find(inv => {
+                    const num = String(inv.number || '').toLowerCase();
+                    const id = String(inv.id || '').toLowerCase();
+                    const cleanNum = num.replace(/[^a-z0-9]/g, '');
+                    const cleanQuery = query.replace(/[^a-z0-9]/g, '');
+                    return num === query || id === query || (cleanQuery && cleanNum === cleanQuery) || num.includes(query);
+                });
+
+                if (match) {
+                    selectReturnInvoice(match.id);
+                } else {
+                    UI.toast('لم يتم العثور على فاتورة بهذا الباركود', 'warn');
+                }
+            }
         }
         async function loadInvLines(id) {
             if (!id) { document.getElementById('retLinesBody').innerHTML = '<tr><td colspan="5" class="empty-state">اختر فاتورة أولًا</td></tr>'; recalcRet(); return; }
