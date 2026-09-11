@@ -98,15 +98,20 @@ async function saveToRemote(cloudObj) {
     }
 }
 
-function saveCloudData(cloudObj) {
+async function saveCloudData(cloudObj, awaitRemote = false) {
     global._ar_cloud_data = cloudObj;
     _isLoadedFromRemote = true;
     try {
         fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
     } catch(e) {}
 
-    // Async background persistence to external remote storage without delaying HTTP response
-    saveToRemote(cloudObj).catch(() => {});
+    if (awaitRemote || (cloudObj && cloudObj.resetTimestamp)) {
+        try {
+            await saveToRemote(cloudObj);
+        } catch(e) {}
+    } else {
+        saveToRemote(cloudObj).catch(() => {});
+    }
 }
 
 function getItemId(x) {
@@ -205,7 +210,7 @@ router.post('/push', async (req, res) => {
 
         cloud.lastUpdated = Date.now();
         cloud.reset = false;
-        await saveCloudData(cloud);
+        await saveCloudData(cloud, false);
         res.json({ success: true, lastUpdated: cloud.lastUpdated, deleted: cloud.deleted });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
@@ -234,7 +239,7 @@ router.post('/reset', async (req, res) => {
     try {
         const now = Date.now();
         const resetObj = { lastUpdated: now, resetTimestamp: now, data: {}, deleted: {}, reset: false };
-        await saveCloudData(resetObj);
+        await saveCloudData(resetObj, true);
         res.json({ success: true, message: 'Cloud database reset successfully', lastUpdated: now, resetTimestamp: now });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });

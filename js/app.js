@@ -526,6 +526,36 @@
         });
     }
 
+    window.confirmResetAllSystemData = async function() {
+        const ok = await UI.confirmBox(
+            'هل أنت متأكد تماماً من تفريغ وتصفير كافّة بيانات المنتجات والفواتير والمخزون والحسابات والسريالات والمستخدمين من الجهاز ومن السيرفر بشكل نهائي؟ لن يمكنك التراجع عن هذا الإجراء.',
+            'تصفير شامل ونهائي لكافة بيانات النظام'
+        );
+        if (ok) {
+            try {
+                UI.toast('جاري تفريغ وتصفير كافة بيانات النظام أونلاين ومحلياً...', 'info');
+                if (typeof API !== 'undefined' && API.resetAllData) {
+                    await API.resetAllData();
+                } else if (typeof ARDB !== 'undefined') {
+                    await ARDB.clearAllData();
+                    await ARDB.seed();
+                }
+                UI.toast('تم مسح وتصفير كافة بيانات البرنامج والسيرفر بشكل نهائي!', 'ok');
+                setTimeout(() => {
+                    const isIndex = window.location.pathname.includes('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('/');
+                    if (isIndex) {
+                        window.location.reload();
+                    } else {
+                        const prefix = typeof relPrefix === 'function' ? relPrefix() : '../../';
+                        window.location.href = prefix + 'index.html';
+                    }
+                }, 1000);
+            } catch(e) {
+                UI.toast('حدث خطأ أثناء التصفير: ' + e.message, 'error');
+            }
+        }
+    };
+
     window.ARUI = { MAP, assetUrl, initApp, renderHeader, updateApiBadge, resetIdleTimer, initIdleMonitor, userHasModulePermission, isManagerUser, getUserPermissions };
 })();
 
