@@ -372,46 +372,61 @@
             const [settings, products, customers] = await Promise.all([ARDB.getAll('settings'), ARDB.getAll('products'), ARDB.getAll('customers')]);
             const s = {}; settings.forEach(r => { if (r && r.key) s[r.key] = r.value; });
             const pById = {}; products.forEach(p => pById[p.id] = p);
-            const cust = inv.customerId ? customers.find(c => c.id === inv.customerId) : null;
+            const cust = inv.customerId ? customers.find(c => String(c.id) === String(inv.customerId)) : null;
 
-            const rows = inv.items.map(it => {
+            const rows = (inv.items || []).map(it => {
                 const pid = it.productId || it.id;
                 const pName = it.name || (pById[pid] ? pById[pid].name : 'صنف ' + pid);
                 const qty = it.quantity || it.qty || 1;
-                const serialsTag = (it.serials && it.serials.length) ? '<div style="font-size:11px;color:#666;">S/N: ' + it.serials.join(', ') + '</div>' : '';
-                return '<tr><td style="text-align:right;">' + pName + serialsTag + '</td>' +
+                const serialsTag = (it.serials && it.serials.length) ? '<div style="font-size:11px;color:#555;margin-top:2px;">S/N: ' + it.serials.join(', ') + '</div>' : '';
+                return '<tr><td style="text-align:right;font-weight:600;">' + pName + serialsTag + '</td>' +
                 '<td>' + qty + '</td>' +
                 '<td>' + UI.money(it.price) + '</td>' +
-                '<td>' + UI.money(it.total || (it.price * qty)) + '</td></tr>';
+                '<td style="font-weight:700;">' + UI.money(it.total || (it.price * qty)) + '</td></tr>';
             }).join('');
 
-            const win = window.open('', '_blank', 'width=800,height=640');
+            const subTotalVal = inv.subtotal || inv.total;
+            const discountVal = inv.discount || inv.discountAmount || 0;
+            const curr = s.currency || 'ج.م';
+
+            const win = window.open('', '_blank', 'width=840,height=680');
             if (!win) { UI.toast('اسمح بالنوافذ المنبثقة للطباعة', 'warn'); return; }
             win.document.write(
                 '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>' + (inv.number) + '</title>' +
                 '<style>' +
-                'body{font-family:"Segoe UI",Tahoma,Arial;direction:rtl;color:#111;margin:24px;}' +
-                '.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #444;padding-bottom:12px;margin-bottom:18px;}' +
-                '.head h1{margin:0;font-size:20px;}' +
-                '.meta{width:100%;border-collapse:collapse;margin-bottom:16px;} .meta td{padding:3px 0;font-size:13px;}' +
-                'table.items{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;}' +
-                'table.items th{background:#f0f0f0;padding:7px;border:1px solid #bbb;text-align:center;}' +
-                'table.items td{padding:6px;border:1px solid #ddd;text-align:center;}' +
-                '.total{text-align:left;font-size:16px;font-weight:700;margin-top:8px;}' +
-                '.foot{margin-top:30px;font-size:12px;color:#555;border-top:1px solid #ccc;padding-top:10px;}' +
+                'body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;direction:rtl;color:#111;margin:24px;line-height:1.5;}' +
+                '.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #334155;padding-bottom:14px;margin-bottom:18px;}' +
+                '.head h1{margin:0;font-size:22px;color:#0f172a;}' +
+                '.meta{width:100%;border-collapse:collapse;margin-bottom:16px;background:#f8fafc;padding:10px;border-radius:6px;border:1px solid #e2e8f0;}' +
+                '.meta td{padding:4px 8px;font-size:13.5px;vertical-align:top;}' +
+                'table.items{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13.5px;}' +
+                'table.items th{background:#f1f5f9;padding:8px;border:1px solid #cbd5e1;text-align:center;color:#1e293b;font-weight:700;}' +
+                'table.items td{padding:8px;border:1px solid #e2e8f0;text-align:center;}' +
+                '.totals-box{margin-top:12px;margin-inline-start:auto;width:320px;border-top:1.5px solid #0f172a;padding-top:8px;font-size:14px;}' +
+                '.totals-row{display:flex;justify-content:space-between;padding:3px 0;}' +
+                '.totals-grand{font-size:18px;font-weight:800;color:#0f172a;border-top:1px solid #cbd5e1;padding-top:6px;margin-top:4px;}' +
+                '.foot{margin-top:30px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:10px;text-align:center;}' +
                 '@media print{body{margin:8mm;}}' +
                 '</style></head><body>' +
                 '<div class="head"><div><h1>' + (s.companyName || 'AR-Program') + '</h1>' +
-                '<div style="font-size:12px;color:#555;">' + (s.companyAddress || '') + (s.companyPhone ? ' — هاتف: ' + s.companyPhone : '') + '</div>' +
-                (s.taxNo ? '<div style="font-size:12px;color:#555;">الرقم الضريبي: ' + s.taxNo + '</div>' : '') +
-                '</div><div style="text-align:left;"><b style="font-size:18px;">فاتورة بيع</b><br><span style="font-size:13px;">' + inv.number + '</span></div></div>' +
-                '<table class="meta"><tr><td><b>التاريخ:</b> ' + UI.datetime(inv.date) + '</td>' +
-                (cust ? '<td><b>العميل:</b> ' + cust.name + '</td>' : '<td></td>') +
-                '</tr></table>' +
-                '<table class="items"><thead><tr><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-                '<div class="total">الإجمالي: ' + UI.money(inv.total) + ' ' + (s.currency || '') + '</div>' +
-                (inv.note ? '<div style="font-size:12px;color:#333;margin-top:8px;">ملاحظات: ' + inv.note + '</div>' : '') +
-                (s.invoiceNote ? '<div class="foot">' + s.invoiceNote + '</div>' : '') +
+                '<div style="font-size:12.5px;color:#475569;margin-top:4px;">' + (s.companyAddress ? '📍 ' + s.companyAddress + ' ' : '') + (s.companyPhone ? ' — 📞 ' + s.companyPhone : '') + '</div>' +
+                (s.taxNo ? '<div style="font-size:12.5px;color:#475569;">الرقم الضريبي: ' + s.taxNo + '</div>' : '') +
+                '</div><div style="text-align:left;"><b style="font-size:20px;color:#0f172a;">فاتورة مبيعات</b><br><span style="font-size:14px;font-weight:700;color:#475569;">' + inv.number + '</span></div></div>' +
+                '<table class="meta"><tr>' +
+                '<td><b>التاريخ:</b> ' + UI.datetime(inv.date) + '</td>' +
+                '<td><b>العميل:</b> ' + (cust ? cust.name : 'عميل نقدي') + (cust && cust.phone ? ' (' + cust.phone + ')' : '') + '</td>' +
+                (inv.paymentMethod ? '<td><b>طريقة الدفع:</b> ' + inv.paymentMethod + '</td>' : '') +
+                '</tr>' +
+                (cust && cust.address ? '<tr><td colspan="3"><b>العنوان:</b> ' + cust.address + '</td></tr>' : '') +
+                '</table>' +
+                '<table class="items"><thead><tr><th style="width:45%;">الصنف</th><th style="width:15%;">الكمية</th><th style="width:20%;">سعر الوحدة</th><th style="width:20%;">الإجمالي</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+                '<div class="totals-box">' +
+                (discountVal > 0 ? '<div class="totals-row"><span>المجموع الفرعي:</span><b>' + UI.money(subTotalVal) + ' ' + curr + '</b></div>' : '') +
+                (discountVal > 0 ? '<div class="totals-row" style="color:#d97706;"><span>الخصم المطبق:</span><b>-' + UI.money(discountVal) + ' ' + curr + '</b></div>' : '') +
+                '<div class="totals-row totals-grand"><span>الإجمالي النهائي:</span><span>' + UI.money(inv.total) + ' ' + curr + '</span></div>' +
+                '</div>' +
+                (inv.note ? '<div style="font-size:12.5px;color:#334155;margin-top:14px;padding:8px;background:#f8fafc;border-radius:4px;"><b>ملاحظات:</b> ' + inv.note + '</div>' : '') +
+                '<div class="foot">' + (s.invoiceNote || 'شكراً لزيارتكم وسعداء بملء ثقتكم!') + '</div>' +
                 '</body></html>'
             );
             win.document.close();
