@@ -610,6 +610,14 @@
                     for (const sid of item.serialIds) {
                         await ARDB.update('serials', sid, { status: 'sold', invoiceId: invId, invoiceDate: Date.now() });
                     }
+                } else if (item.serials && item.serials.length) {
+                    const allSerials = await ARDB.getAll('serials');
+                    for (const sn of item.serials) {
+                        const rec = (allSerials || []).find(s => String(s.productId) === String(item.productId) && s.serialNumber && s.serialNumber.trim().toLowerCase() === String(sn).trim().toLowerCase());
+                        if (rec) {
+                            await ARDB.update('serials', rec.id, { status: 'sold', invoiceId: invId, invoiceDate: Date.now() });
+                        }
+                    }
                 }
             }
 

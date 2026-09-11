@@ -309,7 +309,20 @@
                 const pid = it.productId || it.id;
                 const origQty = it.quantity || it.qty || 1;
                 if (q < 0 || q > origQty) { UI.toast('كمية مرتجعة أكبر من المباعة', 'error'); anyQty = false; total = -1; return; }
-                if (q > 0) { items.push({ productId: pid, quantity: q, price: returnPrice, originalPrice: it.price, discountApportioned: Number((it.price - returnPrice).toFixed(2)), total: q * returnPrice }); total += q * returnPrice; anyQty = true; }
+                if (q > 0) {
+                    items.push({
+                        productId: pid,
+                        quantity: q,
+                        price: returnPrice,
+                        originalPrice: it.price,
+                        discountApportioned: Number((it.price - returnPrice).toFixed(2)),
+                        total: q * returnPrice,
+                        serials: it.serials || [],
+                        serialIds: it.serialIds || []
+                    });
+                    total += q * returnPrice;
+                    anyQty = true;
+                }
             });
             if (total < 0) return;
             if (!anyQty) { UI.toast('حدد كمية مرتجعة واحدة على الأقل', 'warn'); return; }
@@ -319,18 +332,26 @@
 
             // إعادة حالة السريالات للمخزون (متاح)
             const allSerials = await ARDB.getAll('serials');
-            for (const it of items) {
-                if (it.serials && it.serials.length) {
-                    for (const sn of it.serials) {
-                        const rec = (allSerials || []).find(s => String(s.productId) === String(it.productId) && s.serialNumber && s.serialNumber.toLowerCase() === sn.toLowerCase());
-                        if (rec) {
-                            await ARDB.update('serials', rec.id, { status: 'available', invoiceId: null });
+            for (const item of items) {
+                const pSerials = (allSerials || []).filter(s => String(s.productId) === String(item.productId));
+                
+                if (item.serialIds && item.serialIds.length) {
+                    for (let k = 0; k < Math.min(item.quantity, item.serialIds.length); k++) {
+                        const sid = item.serialIds[k];
+                        await ARDB.update('serials', sid, { status: 'available', invoiceId: null });
+                    }
+                } else if (item.serials && item.serials.length) {
+                    for (let k = 0; k < Math.min(item.quantity, item.serials.length); k++) {
+                        const sn = item.serials[k];
+                        const match = pSerials.find(s => s.serialNumber && String(s.serialNumber).trim().toLowerCase() === String(sn).trim().toLowerCase());
+                        if (match) {
+                            await ARDB.update('serials', match.id, { status: 'available', invoiceId: null });
                         }
                     }
                 } else {
-                    const recs = (allSerials || []).filter(s => String(s.productId) === String(it.productId) && String(s.invoiceId) === String(pickedInvoice.id) && s.status === 'sold');
-                    for (let k = 0; k < Math.min(it.quantity, recs.length); k++) {
-                        await ARDB.update('serials', recs[k].id, { status: 'available', invoiceId: null });
+                    const soldRecs = pSerials.filter(s => s.status === 'sold' && (String(s.invoiceId) === String(pickedInvoice.id) || !s.invoiceId));
+                    for (let k = 0; k < Math.min(item.quantity, soldRecs.length); k++) {
+                        await ARDB.update('serials', soldRecs[k].id, { status: 'available', invoiceId: null });
                     }
                 }
             }

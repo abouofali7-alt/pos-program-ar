@@ -27,17 +27,34 @@
             <div class="table-head">الأرصدة</div>
             <div class="table-scroll">
                 <table class="data-table">
-                    <thead><tr><th>المنتج</th><th>التصنيف</th><th>الكمية المتاحة</th><th>الحد الأدنى</th><th>قيمة الرصيد</th><th>الحالة</th></tr></thead>
+                    <thead><tr><th>المنتج</th><th>التصنيف</th><th>الكمية المتاحة</th><th>الحد الأدنى</th><th>قيمة الرصيد</th><th>الحالة</th><th>السريالات</th></tr></thead>
                     <tbody id="stockBody"></tbody>
                 </table>
             </div>
         </div>
     </main>
 
+    <div id="serialsModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closeSerialsModal()">
+        <div class="modal-box" style="width:min(680px,94vw);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <h3 id="serialsModalTitle" style="margin:0;"><i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> السريالات</h3>
+                <button class="btn btn-sm btn-secondary" onclick="closeSerialsModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="table-scroll" style="max-height:360px;">
+                <table class="data-table">
+                    <thead><tr><th>الرقم التسلسلي (S/N)</th><th>الحالة</th><th>تاريخ الشراء</th><th>تاريخ البيع</th></tr></thead>
+                    <tbody id="serialsBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script src="../../js/ui.js"></script>
     <script src="../../js/db.js"></script>
     <script src="../../js/app.js"></script>
     <script>
+        let activePid = null;
+
         async function load() {
             const [categories, products, movements, warehouses] = await Promise.all([
                 ARDB.getAll('categories'), ARDB.getAll('products'), ARDB.getAll('stockMovements'), ARDB.getAll('warehouses')
@@ -45,7 +62,14 @@
             const catById = {}; categories.forEach(c => catById[c.id] = c);
             const qty = {};
             products.forEach(p => qty[p.id] = 0);
-            movements.forEach(m => { if (qty[m.productId] !== undefined) qty[m.productId] += (m.quantity || 0) * (m.direction === 'in' ? 1 : -1); });
+            movements.forEach(m => {
+                if (m && m.productId != null) {
+                    const matchedKey = Object.keys(qty).find(k => String(k) === String(m.productId));
+                    if (matchedKey !== undefined) {
+                        qty[matchedKey] += (m.quantity || 0) * (m.direction === 'in' ? 1 : -1);
+                    }
+                }
+            });
 
             let lowCount = 0, valueSum = 0;
             const rows = products.map(p => {
@@ -54,22 +78,72 @@
                 const value = q * (p.cost || 0);
                 if (low) lowCount++;
                 valueSum += value;
+                const snBtn = p.hasSerials
+                    ? `<button class="btn btn-sm btn-secondary" style="padding:3px 8px;font-size:0.78rem;" onclick="viewInvSerials('${p.id}')"><i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> السريالات</button>`
+                    : '—';
+
                 return '<tr>' +
-                    '<td>' + p.name + '</td>' +
-                    '<td>' + (p.categoryId && catById[p.categoryId] ? catById[p.categoryId].name : '—') + '</td>' +
+                    '<td>' + p.name + (p.hasSerials ? ' <span class="badge badge-purple" style="font-size:0.68rem;">S/N</span>' : '') + '</td>' +
+                    '<td>' + (p.categoryId && catById[String(p.categoryId)] ? catById[String(p.categoryId)].name : '—') + '</td>' +
                     '<td class="num" style="font-weight:700;">' + q + '</td>' +
                     '<td class="num">' + (p.minStock || 0) + '</td>' +
                     '<td class="num">' + UI.money(value) + '</td>' +
                     '<td>' + (low
                         ? '<span class="badge badge-red">منخفض</span>'
-                        : (q === 0 ? '<span class="badge badge-amber">نفد</span>' : '<span class="badge badge-green">متوفر</span>')) + '</td></tr>';
+                        : (q === 0 ? '<span class="badge badge-amber">نفد</span>' : '<span class="badge badge-green">متوفر</span>')) + '</td>' +
+                    '<td>' + snBtn + '</td>' +
+                    '</tr>';
             });
 
             document.getElementById('stTotal').textContent = products.length;
             document.getElementById('stLow').textContent = lowCount;
             document.getElementById('stValue').innerHTML = UI.money(valueSum);
-            document.getElementById('stockBody').innerHTML = rows.join('') || '<tr><td colspan="6" class="empty-state">لا توجد منتجات</td></tr>';
+            document.getElementById('stockBody').innerHTML = rows.join('') || '<tr><td colspan="7" class="empty-state">لا توجد منتجات</td></tr>';
+
+            if (activePid) renderSerialsTable();
         }
+
+        async function viewInvSerials(pid) {
+            activePid = pid;
+            const p = await ARDB.getById('products', pid);
+            if (!p) return;
+            document.getElementById('serialsModalTitle').innerHTML = '<i class="fa-solid fa-barcode" style="color:var(--accent-cyan);"></i> السريالات: ' + p.name;
+            await renderSerialsTable();
+            document.getElementById('serialsModal').style.visibility = 'visible';
+            document.getElementById('serialsModal').style.opacity = '1';
+        }
+
+        function closeSerialsModal() {
+            activePid = null;
+            document.getElementById('serialsModal').style.visibility = 'hidden';
+            document.getElementById('serialsModal').style.opacity = '0';
+        }
+
+        async function renderSerialsTable() {
+            if (!activePid) return;
+            const allSerials = await ARDB.getAll('serials');
+            const prodSerials = (allSerials || []).filter(s => String(s.productId) === String(activePid));
+            const tbody = document.getElementById('serialsBody');
+
+            if (!prodSerials.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">لا توجد أرقام تسلسلية مسجلة لهذا المنتج</td></tr>';
+            } else {
+                tbody.innerHTML = prodSerials.map(s => {
+                    let stBadge = '<span class="badge badge-green">متاح بالمخزن</span>';
+                    if (s.status === 'sold') stBadge = '<span class="badge badge-amber">مباع</span>';
+                    else if (s.status === 'purchase_returned') stBadge = '<span class="badge badge-red">مرتجع للمورد</span>';
+                    else if (s.status === 'returned') stBadge = '<span class="badge badge-blue">مرتجع للمخزن</span>';
+
+                    return '<tr>' +
+                        '<td class="num" style="font-weight:700;letter-spacing:0.5px;">' + s.serialNumber + '</td>' +
+                        '<td>' + stBadge + '</td>' +
+                        '<td>' + (s.purchaseDate ? UI.date(s.purchaseDate) : '—') + '</td>' +
+                        '<td>' + (s.invoiceDate ? UI.date(s.invoiceDate) : '—') + '</td>' +
+                        '</tr>';
+                }).join('');
+            }
+        }
+
         load();
         window.addEventListener('ar_cloud_data_updated', load);
     </script>
