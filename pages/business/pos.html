@@ -468,7 +468,7 @@
             const discText = document.getElementById('discountAmountText');
             if (discountAmount > 0) {
                 if (discRow) discRow.style.display = 'flex';
-                if (discText) discText.textContent = '-' + UI.money(discountAmount) + ' ج.م';
+                if (discText) discText.innerHTML = '-' + UI.money(discountAmount) + ' ج.م';
             } else {
                 if (discRow) discRow.style.display = 'none';
             }
