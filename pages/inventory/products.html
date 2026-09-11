@@ -118,7 +118,10 @@
 
         if (typeof window !== 'undefined') {
             window.addEventListener('ar_cloud_data_updated', () => {
-                try { load(); } catch(e){}
+                try {
+                    load();
+                    if (activeViewerPid) renderSerialsTable();
+                } catch(e){}
             });
         }
 
@@ -252,16 +255,27 @@
             // حفظ السريالات المضافة مباشرة في نموذج المنتج
             if (hasSerials && parsedSerials.length > 0 && targetPid) {
                 let savedCount = 0;
+                const allSerials = await ARDB.getAll('serials');
                 for (const sn of parsedSerials) {
                     try {
-                        await ARDB.add('serials', {
-                            productId: targetPid,
-                            serialNumber: sn,
-                            status: 'available',
-                            purchaseDate: Date.now(),
-                            createdAt: Date.now()
-                        });
-                        savedCount++;
+                        const match = (allSerials || []).find(s => s.serialNumber && s.serialNumber.trim().toLowerCase() === sn.toLowerCase());
+                        if (match) {
+                            await ARDB.update('serials', match.id, {
+                                productId: targetPid,
+                                status: 'available',
+                                purchaseDate: Date.now()
+                            });
+                            savedCount++;
+                        } else {
+                            await ARDB.add('serials', {
+                                productId: targetPid,
+                                serialNumber: sn,
+                                status: 'available',
+                                purchaseDate: Date.now(),
+                                createdAt: Date.now()
+                            });
+                            savedCount++;
+                        }
                     } catch(e) {
                         console.warn('سريال مكرر:', sn);
                     }
