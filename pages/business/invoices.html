@@ -538,6 +538,49 @@
             setTimeout(() => { win.print(); }, 350);
         }
 
+        function generateCode39SVG(text, height = 38) {
+            const code39Map = {
+                '0': 'NNNWWNWNN', '1': 'WNNWNNNNW', '2': 'NNWWNNNNW', '3': 'WNWWNNNNN',
+                '4': 'NNNWWNNNW', '5': 'WNNWWNNNN', '6': 'NNWWWNNNN', '7': 'NNNWNNWNW',
+                '8': 'WNNWNNWNN', '9': 'NNWWNNWNN', 'A': 'WNNNNWNNW', 'B': 'NNWNNWNNW',
+                'C': 'WNWNNWNNN', 'D': 'NNNNWWNNW', 'E': 'WNNNWWNNN', 'F': 'NNWNWWNNN',
+                'G': 'NNNNNWWNW', 'H': 'WNNNNWWNN', 'I': 'NNWNNWWNN', 'J': 'NNNNWWWNN',
+                'K': 'WNNNNNNWW', 'L': 'NNWNNNNWW', 'M': 'WNWNNNNWN', 'N': 'NNNNWNNWW',
+                'O': 'WNNNWNNWN', 'P': 'NNWNWNNWN', 'Q': 'NNNNNNWWW', 'R': 'WNNNNNWWN',
+                'S': 'NNWNNNWWN', 'T': 'NNNNWNWWN', 'U': 'WWNNNNNNW', 'V': 'NWWNNNNNW',
+                'W': 'WWWNNNNNN', 'X': 'NWNNWNNNW', 'Y': 'WWNNWNNNN', 'Z': 'NWWNWNNNN',
+                '-': 'NWNNNNWNW', '.': 'WWNNNNWNN', ' ': 'NWWNNNWWN', '*': 'NWNNWNWNN'
+            };
+
+            const str = String(text || '').toUpperCase().replace(/[^0-9A-Z\-\.\s]/g, '') || '0000';
+            const cleanText = '*' + str + '*';
+            const narrowWidth = 1.6;
+            const wideWidth = 3.6;
+
+            let bars = [];
+            let x = 6;
+
+            for (let i = 0; i < cleanText.length; i++) {
+                const char = cleanText[i];
+                const pattern = code39Map[char] || code39Map['*'];
+
+                for (let p = 0; p < pattern.length; p++) {
+                    const isBar = (p % 2 === 0);
+                    const isWide = (pattern[p] === 'W');
+                    const width = isWide ? wideWidth : narrowWidth;
+
+                    if (isBar) {
+                        bars.push('<rect x="' + x.toFixed(1) + '" y="0" width="' + width.toFixed(1) + '" height="' + height + '" fill="#000000" />');
+                    }
+                    x += width;
+                }
+                x += narrowWidth;
+            }
+
+            const totalWidth = Math.ceil(x + 6);
+            return '<svg xmlns="http://www.w3.org/2000/svg" width="' + totalWidth + '" height="' + height + '" viewBox="0 0 ' + totalWidth + ' ' + height + '" style="display:block;margin:4px auto;max-width:100%;background:#ffffff;">' + bars.join('') + '</svg>';
+        }
+
         async function printThermalInvoice(id) {
             const inv = await ARDB.getById('invoices', id);
             if (!inv) return;
@@ -669,8 +712,8 @@
                     <div style="text-align:center;font-size:9.5px;font-weight:800;color:#000000 !important;margin-top:6px;padding-top:4px;border-top:1.5px dashed #000000;">
                         <div style="margin-bottom:2px;font-weight:900;font-size:10.5px;color:#000000 !important;">${s.invoiceNote || 'شكراً لزيارتكم وسعداء بملء ثقتكم!'}</div>
                         <div style="font-size:8.5px;font-weight:800;color:#000000 !important;">الاسترجاع والاستبدال خلال 14 يوماً بموجب الفاتورة الأصلية</div>
-                        <div style="font-family:monospace;font-size:13px;letter-spacing:2px;margin-top:4px;font-weight:900;color:#000000 !important;">||||| | ||||| |||||| |||</div>
-                        <div style="font-family:monospace;font-size:10px;font-weight:900;margin-top:1px;color:#000000 !important;">* ${invNumber} *</div>
+                        <div style="margin-top:6px;background:#ffffff;padding:2px 0;">${generateCode39SVG(invNumber)}</div>
+                        <div style="font-family:monospace;font-size:10px;font-weight:900;margin-top:2px;color:#000000 !important;">* ${invNumber} *</div>
                     </div>
 
                     <!-- مسافة التلقيم الخاصة بقطع القص التلقائي للمقص (25mm Paper Feed for Cutter Blade) -->
