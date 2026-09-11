@@ -38,6 +38,8 @@
                 <h2><i class="fa-solid fa-cash-register" style="color:var(--success);"></i> نقطة البيع (POS)</h2>
                 <div class="sub">نظام الكاشير والمبيعات السريعة</div>
             </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-secondary" onclick="printThermalReceipt()" title="طباعة آخر إيصال حراري تم إصداره"><i class="fa-solid fa-print"></i> طباعة آخر إيصال</button>
                 <button class="btn btn-secondary" onclick="syncPosData()" title="تحديث وسحب المنتجات والبيانات من السحابة"><i class="fa-solid fa-arrows-rotate"></i> تحديث المزامنة</button>
                 <input id="barcodeSearch" placeholder="🔍 ابحث بالاسم أو الباركوود (أو امسح الباركوود مباشرة)..." style="padding:8px 14px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-dark);color:var(--text-primary);width:320px;" autofocus>
             </div>
@@ -621,167 +623,242 @@
 
             UI.toast('تم حفظ وإتمام الفاتورة رقم: ' + invNumber, 'ok');
 
-            const win = window.open('', '', 'width=420,height=700');
-            if (win) {
-                const curUser = (typeof getStoredUser === 'function') ? getStoredUser() : null;
-                const cashierName = curUser ? (curUser.name || curUser.username || 'الكاشير') : 'الكاشير';
-                const custObj = customerId ? _customers.find(c => String(c.id) === String(customerId)) : null;
-                const customerName = custObj ? custObj.name : 'عميل عام';
-                const invDateStr = new Date().toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
+            const curUser = (typeof getStoredUser === 'function') ? getStoredUser() : null;
+            const cashierName = curUser ? (curUser.name || curUser.username || 'الكاشير') : 'الكاشير';
+            const custObj = customerId ? _customers.find(c => String(c.id) === String(customerId)) : null;
+            const customerName = custObj ? custObj.name : 'عميل عام';
+            const invDateStr = new Date().toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
 
-                const payDetailsRows = payments.map(p => {
-                    const mObj = typeof ARPayments !== 'undefined' ? ARPayments.METHODS.find(m => m.id === p.method) : null;
-                    const lbl = mObj ? mObj.label : (p.label || p.method);
-                    return `<tr><td>${lbl}:</td><td style="text-align:left;font-weight:bold;">${Number(p.amount || 0).toFixed(2)} ج.م</td></tr>`;
-                }).join('');
+            const payDetailsRows = payments.map(p => {
+                const mObj = typeof ARPayments !== 'undefined' ? ARPayments.METHODS.find(m => m.id === p.method) : null;
+                const lbl = mObj ? mObj.label : (p.label || p.method);
+                return `<tr><td>${lbl}:</td><td style="text-align:left;font-weight:bold;">${Number(p.amount || 0).toFixed(2)} ج.م</td></tr>`;
+            }).join('');
 
-                win.document.write(`
-                    <!doctype html>
-                    <html lang="ar" dir="rtl">
-                    <head>
-                        <meta charset="utf-8">
-                        <title>إيصال حراري ${invNumber}</title>
-                        <style>
-                            @page {
-                                size: 80mm auto;
-                                margin: 0;
-                            }
-                            * {
-                                box-sizing: border-box;
-                                margin: 0;
-                                padding: 0;
-                            }
-                            body {
-                                font-family: 'Courier New', Tahoma, Arial, sans-serif;
-                                width: 76mm;
-                                margin: 0 auto;
-                                padding: 6px 4px;
-                                color: #000;
-                                background: #fff;
-                                font-size: 11px;
-                                line-height: 1.3;
-                                direction: rtl;
-                                text-align: right;
-                            }
-                            .text-center { text-align: center; }
-                            .bold { font-weight: bold; }
-                            
-                            .header { text-align: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #000; }
-                            .store-name { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
-                            .store-info { font-size: 10px; margin-bottom: 2px; }
-                            .receipt-title { font-size: 12px; font-weight: bold; margin: 4px 0 2px 0; background: #eee; padding: 2px 0; }
-                            
-                            .meta-table { width: 100%; font-size: 10px; margin-bottom: 6px; }
-                            .meta-table td { padding: 1px 0; }
-                            
-                            .divider { border-top: 1px dashed #000; margin: 5px 0; }
-                            
-                            .items-table { width: 100%; font-size: 10.5px; border-collapse: collapse; margin-bottom: 6px; }
-                            .items-table th { border-bottom: 1px solid #000; padding: 3px 0; text-align: right; font-weight: bold; }
-                            .items-table th.num { text-align: left; }
-                            .items-table td { padding: 3px 0; vertical-align: top; }
-                            .items-table td.num { text-align: left; font-weight: bold; }
-                            .item-sn { font-size: 9px; color: #222; }
-                            
-                            .summary-table { width: 100%; font-size: 11px; margin-bottom: 6px; }
-                            .summary-table td { padding: 2px 0; }
-                            .summary-table td.val { text-align: left; font-weight: bold; }
-                            .net-row td { font-size: 13.5px; font-weight: bold; border-top: 1px solid #000; border-bottom: 2px double #000; padding: 4px 0; }
-                            
-                            .payments-box { font-size: 10px; margin-bottom: 6px; }
-                            .payments-table { width: 100%; }
-                            .payments-table td { padding: 1px 0; }
-                            
-                            .footer { text-align: center; font-size: 10px; margin-top: 8px; padding-top: 4px; border-top: 1px dashed #000; }
-                            .barcode-stub { font-family: monospace; font-size: 13px; letter-spacing: 2px; margin-top: 4px; font-weight: bold; text-align: center; }
-                            
-                            @media print {
-                                body { width: 76mm; }
-                                .no-print { display: none; }
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="header">
-                            <div class="store-name">${_companySettings.name || 'AR-Program'}</div>
-                            ${_companySettings.address ? `<div class="store-info">${_companySettings.address}</div>` : ''}
-                            ${_companySettings.phone ? `<div class="store-info">ت: ${_companySettings.phone}</div>` : ''}
-                            ${_companySettings.taxNo ? `<div class="store-info">رقم ضريبي: ${_companySettings.taxNo}</div>` : ''}
-                            <div class="receipt-title">إيصال مبيعات كاشير (POS)</div>
-                        </div>
+            const receiptHtml = `
+                <!doctype html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="utf-8">
+                    <title>إيصال حراري ${invNumber}</title>
+                    <style>
+                        @page {
+                            size: 80mm auto;
+                            margin: 0;
+                        }
+                        * {
+                            box-sizing: border-box;
+                            margin: 0;
+                            padding: 0;
+                        }
+                        body {
+                            font-family: 'Courier New', Tahoma, Arial, sans-serif;
+                            width: 76mm;
+                            margin: 0 auto;
+                            padding: 6px 4px;
+                            color: #000;
+                            background: #fff;
+                            font-size: 11px;
+                            line-height: 1.3;
+                            direction: rtl;
+                            text-align: right;
+                        }
+                        .text-center { text-align: center; }
+                        .bold { font-weight: bold; }
+                        
+                        .header { text-align: center; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #000; }
+                        .store-name { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
+                        .store-info { font-size: 10px; margin-bottom: 2px; }
+                        .receipt-title { font-size: 12px; font-weight: bold; margin: 4px 0 2px 0; background: #eee; padding: 2px 0; }
+                        
+                        .meta-table { width: 100%; font-size: 10px; margin-bottom: 6px; }
+                        .meta-table td { padding: 1px 0; }
+                        
+                        .divider { border-top: 1px dashed #000; margin: 5px 0; }
+                        
+                        .items-table { width: 100%; font-size: 10.5px; border-collapse: collapse; margin-bottom: 6px; }
+                        .items-table th { border-bottom: 1px solid #000; padding: 3px 0; text-align: right; font-weight: bold; }
+                        .items-table th.num { text-align: left; }
+                        .items-table td { padding: 3px 0; vertical-align: top; }
+                        .items-table td.num { text-align: left; font-weight: bold; }
+                        .item-sn { font-size: 9px; color: #222; }
+                        
+                        .summary-table { width: 100%; font-size: 11px; margin-bottom: 6px; }
+                        .summary-table td { padding: 2px 0; }
+                        .summary-table td.val { text-align: left; font-weight: bold; }
+                        .net-row td { font-size: 13.5px; font-weight: bold; border-top: 1px solid #000; border-bottom: 2px double #000; padding: 4px 0; }
+                        
+                        .payments-box { font-size: 10px; margin-bottom: 6px; }
+                        .payments-table { width: 100%; }
+                        .payments-table td { padding: 1px 0; }
+                        
+                        .footer { text-align: center; font-size: 10px; margin-top: 8px; padding-top: 4px; border-top: 1px dashed #000; }
+                        .barcode-stub { font-family: monospace; font-size: 13px; letter-spacing: 2px; margin-top: 4px; font-weight: bold; text-align: center; }
+                        
+                        @media print {
+                            body { width: 76mm; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="store-name">${_companySettings.name || 'AR-Program'}</div>
+                        ${_companySettings.address ? `<div class="store-info">${_companySettings.address}</div>` : ''}
+                        ${_companySettings.phone ? `<div class="store-info">ت: ${_companySettings.phone}</div>` : ''}
+                        ${_companySettings.taxNo ? `<div class="store-info">رقم ضريبي: ${_companySettings.taxNo}</div>` : ''}
+                        <div class="receipt-title">إيصال مبيعات كاشير (POS)</div>
+                    </div>
 
-                        <table class="meta-table">
-                            <tr><td><b>رقم الفاتورة:</b> ${invNumber}</td><td style="text-align:left;"><b>التاريخ:</b> ${invDateStr}</td></tr>
-                            <tr><td><b>الكاشير:</b> ${cashierName}</td><td style="text-align:left;"><b>العميل:</b> ${customerName}</td></tr>
-                        </table>
+                    <table class="meta-table">
+                        <tr><td><b>رقم الفاتورة:</b> ${invNumber}</td><td style="text-align:left;"><b>التاريخ:</b> ${invDateStr}</td></tr>
+                        <tr><td><b>الكاشير:</b> ${cashierName}</td><td style="text-align:left;"><b>العميل:</b> ${customerName}</td></tr>
+                    </table>
 
-                        <div class="divider"></div>
+                    <div class="divider"></div>
 
-                        <table class="items-table">
-                            <thead>
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th style="width:50%;">الصنف</th>
+                                <th style="width:25%;">الكمية×السعر</th>
+                                <th class="num" style="width:25%;">الإجمالي</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${invItems.map(c => `
                                 <tr>
-                                    <th style="width:50%;">الصنف</th>
-                                    <th style="width:25%;">الكمية×السعر</th>
-                                    <th class="num" style="width:25%;">الإجمالي</th>
+                                    <td>
+                                        <div class="bold">${c.name}</div>
+                                        ${(c.serials && c.serials.length) ? `<div class="item-sn">S/N: ${c.serials.join(', ')}</div>` : ''}
+                                    </td>
+                                    <td>${c.quantity} × ${c.price.toFixed(2)}</td>
+                                    <td class="num">${c.total.toFixed(2)}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                ${invItems.map(c => `
-                                    <tr>
-                                        <td>
-                                            <div class="bold">${c.name}</div>
-                                            ${(c.serials && c.serials.length) ? `<div class="item-sn">S/N: ${c.serials.join(', ')}</div>` : ''}
-                                        </td>
-                                        <td>${c.quantity} × ${c.price.toFixed(2)}</td>
-                                        <td class="num">${c.total.toFixed(2)}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <div class="divider"></div>
+
+                    <table class="summary-table">
+                        <tr>
+                            <td>المجموع الفرعي:</td>
+                            <td class="val">${subTotal.toFixed(2)} ج.م</td>
+                        </tr>
+                        ${discountAmount > 0 ? `
+                        <tr>
+                            <td>الخصم ${discountType === 'percent' ? '(' + discountValue + '%)' : ''}:</td>
+                            <td class="val">-${discountAmount.toFixed(2)} ج.م</td>
+                        </tr>
+                        ` : ''}
+                        <tr class="net-row">
+                            <td>الصافي النهائي:</td>
+                            <td class="val">${grandTotal.toFixed(2)} ج.م</td>
+                        </tr>
+                    </table>
+
+                    <div class="payments-box">
+                        <div class="bold" style="margin-bottom:2px;">طريقة السداد:</div>
+                        <table class="payments-table">
+                            ${payDetailsRows}
                         </table>
+                    </div>
 
-                        <div class="divider"></div>
+                    <div class="footer">
+                        <div>${_companySettings.note || 'شكراً لزيارتكم وسعداء بملء ثقتكم!'}</div>
+                        <div class="barcode-stub">*${invNumber}*</div>
+                        <div style="font-size:8px;margin-top:4px;color:#555;">AR-Program POS</div>
+                    </div>
+                </body>
+                </html>
+            `;
 
-                        <table class="summary-table">
-                            <tr>
-                                <td>المجموع الفرعي:</td>
-                                <td class="val">${subTotal.toFixed(2)} ج.م</td>
-                            </tr>
-                            ${discountAmount > 0 ? `
-                            <tr>
-                                <td>الخصم ${discountType === 'percent' ? '(' + discountValue + '%)' : ''}:</td>
-                                <td class="val">-${discountAmount.toFixed(2)} ج.م</td>
-                            </tr>
-                            ` : ''}
-                            <tr class="net-row">
-                                <td>الصافي النهائي:</td>
-                                <td class="val">${grandTotal.toFixed(2)} ج.م</td>
-                            </tr>
-                        </table>
+            printThermalReceipt(receiptHtml);
+            showReceiptPreviewModal(invNumber, receiptHtml);
 
-                        <div class="payments-box">
-                            <div class="bold" style="margin-bottom:2px;">طريقة السداد:</div>
-                            <table class="payments-table">
-                                ${payDetailsRows}
-                            </table>
-                        </div>
+            clearCart();
+        }
 
-                        <div class="footer">
-                            <div>${_companySettings.note || 'شكراً لزيارتكم وسعداء بملء ثقتكم!'}</div>
-                            <div class="barcode-stub">*${invNumber}*</div>
-                            <div style="font-size:8px;margin-top:4px;color:#555;">AR-Program POS</div>
-                        </div>
+        let _lastReceiptHtml = '';
 
-                        <script>
-                            window.onload = function() {
-                                window.print();
-                                setTimeout(function() { window.close(); }, 500);
-                            };
-                        <\/script>
-                    </body>
-                    </html>
-                `);
-                win.document.close();
+        function printThermalReceipt(htmlContent) {
+            if (htmlContent) _lastReceiptHtml = htmlContent;
+            const targetHtml = htmlContent || _lastReceiptHtml;
+            if (!targetHtml) {
+                UI.toast('لا يوجد إيصال سابق للطباعة', 'warn');
+                return;
             }
+
+            try {
+                let iframe = document.getElementById('posPrintIframe');
+                if (!iframe) {
+                    iframe = document.createElement('iframe');
+                    iframe.id = 'posPrintIframe';
+                    iframe.style.position = 'fixed';
+                    iframe.style.right = '-9999px';
+                    iframe.style.bottom = '-9999px';
+                    iframe.style.width = '0';
+                    iframe.style.height = '0';
+                    iframe.style.border = 'none';
+                    document.body.appendChild(iframe);
+                }
+
+                const doc = iframe.contentWindow.document;
+                doc.open();
+                doc.write(targetHtml);
+                doc.close();
+
+                setTimeout(() => {
+                    try {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                    } catch(e) {
+                        const win = window.open('', '_blank', 'width=420,height=700');
+                        if (win) {
+                            win.document.write(targetHtml);
+                            win.document.close();
+                        }
+                    }
+                }, 300);
+            } catch(err) {
+                console.error('Print error:', err);
+                const win = window.open('', '_blank', 'width=420,height=700');
+                if (win) {
+                    win.document.write(targetHtml);
+                    win.document.close();
+                }
+            }
+        }
+
+        function showReceiptPreviewModal(invNumber, receiptHtml) {
+            let modal = document.getElementById('posReceiptModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'posReceiptModal';
+                modal.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,23,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:15px;';
+                document.body.appendChild(modal);
+            }
+
+            modal.innerHTML = `
+                <div style="background:var(--card-dark);border:1px solid var(--border-color);border-radius:14px;width:min(460px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:var(--shadow-card);overflow:hidden;animation:fadeIn 0.2s;">
+                    <div style="padding:14px 18px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.02);">
+                        <b style="font-size:1.05rem;color:var(--success);"><i class="fa-solid fa-circle-check"></i> تم إتمام الفاتورة (${invNumber})</b>
+                        <button onclick="document.getElementById('posReceiptModal').style.display='none'" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div style="flex:1;overflow-y:auto;padding:12px;background:#f8fafc;display:flex;justify-content:center;">
+                        <div style="width:100%;max-width:380px;background:#fff;border:1px solid #cbd5e1;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);padding:10px;border-radius:6px;color:#000;">
+                            ${receiptHtml.replace(/<script[\s\S]*?<\/script>/gi, '')}
+                        </div>
+                    </div>
+                    <div style="padding:14px 18px;border-top:1px solid var(--border-color);display:flex;gap:10px;justify-content:space-between;background:var(--card-dark);">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('posReceiptModal').style.display='none'" style="font-size:0.88rem;padding:8px 14px;">إغلاق</button>
+                        <button type="button" class="btn btn-primary-soft" onclick="printThermalReceipt()" style="font-size:0.95rem;padding:8px 20px;font-weight:700;"><i class="fa-solid fa-print"></i> طباعة الإيصال الحراري الآن</button>
+                    </div>
+                </div>
+            `;
+            modal.style.display = 'flex';
+        }
 
             clearCart();
         }
