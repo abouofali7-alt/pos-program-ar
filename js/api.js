@@ -73,6 +73,24 @@ const API = (function () {
     let _pushTimer = null;
     let _isPushing = false;
     let _broadcastChannel = null;
+    const PENDING_KEY = 'ar_push_pending';
+
+    function persistQueue() {
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify(_pushQueue)); } catch(e) {}
+    }
+
+    function restoreQueue() {
+        try {
+            const raw = localStorage.getItem(PENDING_KEY);
+            if (raw && raw !== '[]') {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr) && arr.length) _pushQueue.push(...arr);
+            }
+            localStorage.removeItem(PENDING_KEY);
+        } catch(e) {
+            try { localStorage.removeItem(PENDING_KEY); } catch(_) {}
+        }
+    }
 
     try {
         if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -82,6 +100,7 @@ const API = (function () {
                     pullCloudSync(true);
                 } else if (event.data === 'reset_now') {
                     _pushQueue = [];
+                    persistQueue();
                     pullCloudSync(true);
                 }
             };
@@ -99,6 +118,7 @@ const API = (function () {
         _isPushing = true;
         const clientResetTs = Number(localStorage.getItem('ar_last_reset_ts') || 0);
         const batch = _pushQueue.splice(0, _pushQueue.length);
+        persistQueue();
         try {
             const res = await fetch(`${getBaseUrl()}/sync/push`, {
                 method: 'POST',
@@ -109,6 +129,7 @@ const API = (function () {
                 const json = await res.json();
                 if (json && json.reset) {
                     _pushQueue = [];
+                    persistQueue();
                     if (json.resetTimestamp) {
                         localStorage.setItem('ar_last_reset_ts', String(json.resetTimestamp));
                     }
@@ -121,17 +142,21 @@ const API = (function () {
                 notifyLocalTabs();
             } else {
                 _pushQueue.unshift(...batch);
+                persistQueue();
             }
         } catch(e) {
             _pushQueue.unshift(...batch);
+            persistQueue();
             setTimeout(processPushQueue, 1500);
         } finally {
             _isPushing = false;
+            if (_pushQueue.length === 0) persistQueue();
         }
     }
 
     function pushItemToCloud(store, item, action = 'save') {
         _pushQueue.push({ store, item, action });
+        persistQueue();
         if (_pushTimer) clearTimeout(_pushTimer);
         _pushTimer = setTimeout(processPushQueue, 0);
         notifyLocalTabs('sync_now');
@@ -199,6 +224,7 @@ const API = (function () {
 
                 if (cloudResetTs > 0 && cloudResetTs > localResetTs) {
                     _pushQueue = []; // تفريغ ركام الرفع لمنع إرسال داتا قديمة للسيرفر
+                    persistQueue();
                     if (_pushTimer) clearTimeout(_pushTimer);
                     localStorage.setItem('ar_last_reset_ts', String(cloudResetTs));
                     _lastSyncTimestamp = json.lastUpdated || cloudResetTs;
@@ -295,6 +321,10 @@ const API = (function () {
 
     function startAutoSync() {
         if (_syncTimer) return;
+        restoreQueue();
+        if (typeof _pushQueue !== 'undefined' && _pushQueue.length) {
+            processPushQueue();
+        }
         pullCloudSync(true);
 
         _syncTimer = setInterval(async () => {
@@ -337,6 +367,7 @@ const API = (function () {
             if (!item.id) {
                 item.id = Date.now() + Math.floor(Math.random() * 10000);
             }
+            if (!item.updatedAt) item.updatedAt = Date.now();
         }
         await ARDB.localPut(store, item, true);
         const finalId = (item && item.id) ? item.id : Date.now();
@@ -345,8 +376,11 @@ const API = (function () {
     }
 
     async function update(store, item) {
-        if (typeof item === 'object' && item !== null && !item.id) {
-            item.id = Date.now() + Math.floor(Math.random() * 10000);
+        if (typeof item === 'object' && item !== null) {
+            if (!item.id) {
+                item.id = Date.now() + Math.floor(Math.random() * 10000);
+            }
+            if (!item.updatedAt) item.updatedAt = Date.now();
         }
         await ARDB.localPut(store, item, true);
         pushItemToCloud(store, item, 'save');
@@ -361,6 +395,7 @@ const API = (function () {
 
     async function resetAllData() {
         _pushQueue = []; // تفريغ كلي لصف الرفع لمنع إرسال أي داتا سابقة
+        persistQueue();
         if (_pushTimer) clearTimeout(_pushTimer);
         let now = Date.now();
         try {
