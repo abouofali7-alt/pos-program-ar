@@ -158,9 +158,16 @@ const ARSplash = (function () {
     function setupVideoPlayer() {
         const video = document.getElementById('splashVideoPlayer');
         if (video) {
-            video.play().catch(e => {
-                console.warn('[Splash] Video autoplay fallback to frames:', e);
-            });
+            video.muted = true;
+            video.currentTime = 0;
+            const p = video.play();
+            if (p !== undefined) {
+                p.then(() => {
+                    console.log('[Splash] Playing real MP4 video intro_movie.mp4');
+                }).catch(e => {
+                    console.warn('[Splash] Video autoplay fallback to frames:', e);
+                });
+            }
         }
     }
 
