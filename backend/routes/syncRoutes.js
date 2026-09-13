@@ -3,116 +3,101 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 
-const SYNC_FILE = process.env.VERCEL ? '/tmp/ar_cloud_sync.json' : path.join(__dirname, '..', 'ar_cloud_sync.json');
-let _remoteObjectId = 'ff808181a067127101a0818dc3d24b44';
+const LOCAL_SYNC_FILE = path.join(__dirname, '..', 'ar_cloud_sync.json');
+const DB_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+const USE_DB = !!DB_URL;
+const ON_VERCEL = !!process.env.VERCEL;
 
-let _isHydrated = false;
-let _hydrationPromise = null;
+let _pg = null;
+let _tableReady = false;
+let _tableReadyPromise = null;
 
-async function ensureHydrated() {
-    if (_isHydrated && global._ar_cloud_data && global._ar_cloud_data.lastUpdated) {
-        return global._ar_cloud_data;
-    }
-    if (_hydrationPromise) {
-        await _hydrationPromise;
-        return global._ar_cloud_data || { lastUpdated: Date.now(), resetTimestamp: 0, data: {}, deleted: {} };
-    }
-
-    _hydrationPromise = (async () => {
-        if (!global._ar_cloud_data) {
-            global._ar_cloud_data = { lastUpdated: Date.now(), resetTimestamp: 0, data: {}, deleted: {} };
-        }
-        try {
-            if (fs.existsSync(SYNC_FILE)) {
-                const raw = fs.readFileSync(SYNC_FILE, 'utf8');
-                const parsed = JSON.parse(raw);
-                if (parsed && typeof parsed === 'object' && parsed.lastUpdated) {
-                    global._ar_cloud_data = parsed;
-                }
-            }
-        } catch(e) {}
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3500);
-            const res = await fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (res.ok) {
-                const json = await res.json();
-                if (json && json.data && json.data.lastUpdated) {
-                    const remoteData = json.data;
-                    const localTs = global._ar_cloud_data ? (global._ar_cloud_data.lastUpdated || 0) : 0;
-                    if (remoteData.lastUpdated >= localTs) {
-                        global._ar_cloud_data = remoteData;
-                        try { fs.writeFileSync(SYNC_FILE, JSON.stringify(remoteData), 'utf8'); } catch(e){}
-                    }
-                }
-            }
-        } catch(e) {}
-
-        _isHydrated = true;
-        return global._ar_cloud_data;
-    })();
-
-    await _hydrationPromise;
-    _hydrationPromise = null;
-    return global._ar_cloud_data;
+function EMPTY_BLOB() {
+    return { lastUpdated: Date.now(), resetTimestamp: 0, data: {}, deleted: {}, reset: false };
 }
 
-async function createRemoteObject(cloudObj) {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch('https://api.restful-api.dev/objects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'pos_sync_cloud', data: cloudObj || global._ar_cloud_data }),
-            signal: controller.signal
+const UNAVAILABLE_MSG = 'Cloud sync storage is not configured. On Vercel, set the DATABASE_URL environment variable (Postgres/Neon) to enable cross-device sync.';
+
+async function getDb() {
+    if (!USE_DB) return null;
+    if (!_pg) {
+        const { Pool } = require('pg');
+        const ssl = DB_URL.includes('localhost') || DB_URL.includes('127.0.0.1')
+            ? false
+            : { rejectUnauthorized: false };
+        _pg = new Pool({
+            connectionString: DB_URL,
+            ssl,
+            max: 5,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 5000
         });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-            const json = await res.json();
-            if (json && json.id) {
-                _remoteObjectId = json.id;
-                return true;
-            }
-        }
-    } catch(e) {}
-    return false;
-}
-
-async function saveToRemote(cloudObj) {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
-        const res = await fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'pos_sync_cloud', data: cloudObj }),
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (!res.ok) {
-            await createRemoteObject(cloudObj);
-        }
-    } catch(e) {
-        await createRemoteObject(cloudObj);
     }
+    if (!_tableReady) {
+        if (!_tableReadyPromise) {
+            _tableReadyPromise = (async () => {
+                await _pg.query(`CREATE TABLE IF NOT EXISTS ar_cloud_sync (
+                    id INTEGER PRIMARY KEY,
+                    payload JSONB NOT NULL,
+                    updated_at BIGINT NOT NULL
+                )`);
+                await _pg.query(
+                    'INSERT INTO ar_cloud_sync (id, payload, updated_at) VALUES (1, $1::jsonb, $2) ON CONFLICT (id) DO NOTHING',
+                    [JSON.stringify(EMPTY_BLOB()), Date.now()]
+                );
+            })();
+        }
+        await _tableReadyPromise;
+        _tableReady = true;
+    }
+    return _pg;
 }
 
-async function saveCloudData(cloudObj, awaitRemote = false) {
-    global._ar_cloud_data = cloudObj;
-    _isHydrated = true;
+async function loadBlob() {
+    if (USE_DB) {
+        const db = await getDb();
+        const { rows } = await db.query('SELECT payload FROM ar_cloud_sync WHERE id = 1');
+        if (rows.length && rows[0].payload) {
+            return Object.assign(EMPTY_BLOB(), rows[0].payload);
+        }
+        return EMPTY_BLOB();
+    }
     try {
-        fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
-    } catch(e) {}
+        const parsed = JSON.parse(fs.readFileSync(LOCAL_SYNC_FILE, 'utf8'));
+        if (parsed && typeof parsed === 'object' && parsed.lastUpdated) {
+            return parsed;
+        }
+    } catch (e) {}
+    return EMPTY_BLOB();
+}
 
-    if (awaitRemote || (cloudObj && cloudObj.resetTimestamp)) {
-        try {
-            await saveToRemote(cloudObj);
-        } catch(e) {}
-    } else {
-        saveToRemote(cloudObj).catch(() => {});
+async function saveBlobFile(blob) {
+    try {
+        fs.writeFileSync(LOCAL_SYNC_FILE, JSON.stringify(blob), 'utf8');
+    } catch (e) {}
+}
+
+async function withLockedBlob(fn) {
+    const db = await getDb();
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+        const { rows } = await client.query('SELECT payload FROM ar_cloud_sync WHERE id = 1 FOR UPDATE');
+        const blob = rows.length && rows[0].payload
+            ? Object.assign(EMPTY_BLOB(), rows[0].payload)
+            : EMPTY_BLOB();
+        const result = await fn(blob);
+        await client.query(
+            'UPDATE ar_cloud_sync SET payload = $1::jsonb, updated_at = $2 WHERE id = 1',
+            [JSON.stringify(result), Date.now()]
+        );
+        await client.query('COMMIT');
+        return result;
+    } catch (e) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        throw e;
+    } finally {
+        client.release();
     }
 }
 
@@ -130,94 +115,131 @@ function isMatch(x, y) {
     return idX !== null && idY !== null && idX === idY;
 }
 
-// 1. POST /api/sync/push — أي جهاز يرفع معاملة أو صنف جديد
-router.post('/push', async (req, res) => {
-    try {
-        const cloud = await ensureHydrated();
-        const { store, item, action, fullData, batch, clientResetTs } = req.body || {};
+function applyPush(cloud, body) {
+    const { store, item, action, fullData, batch } = body || {};
 
-        const cloudResetTs = Number(cloud.resetTimestamp || 0);
-        const reqClientResetTs = Number(clientResetTs || 0);
+    if (!cloud.data) cloud.data = {};
+    if (!cloud.deleted) cloud.deleted = {};
 
-        if (cloudResetTs > 0 && reqClientResetTs < cloudResetTs) {
-            return res.json({
-                success: false,
-                reset: true,
-                resetTimestamp: cloudResetTs,
-                message: 'Stale push rejected due to prior cloud reset'
-            });
-        }
+    const itemsToProcess = [];
+    if (batch && Array.isArray(batch)) {
+        itemsToProcess.push(...batch);
+    } else if (store && item) {
+        itemsToProcess.push({ store, item, action });
+    }
 
-        if (!cloud.data) cloud.data = {};
-        if (!cloud.deleted) cloud.deleted = {};
-
-        const itemsToProcess = [];
-        if (batch && Array.isArray(batch)) {
-            itemsToProcess.push(...batch);
-        } else if (store && item) {
-            itemsToProcess.push({ store, item, action });
-        }
-
-        if (fullData && typeof fullData === 'object') {
-            for (const s of Object.keys(fullData)) {
-                const incoming = fullData[s] || [];
-                if (!cloud.data[s]) cloud.data[s] = [];
-                if (!cloud.deleted[s]) cloud.deleted[s] = [];
-
-                for (const it of incoming) {
-                    if (!it) continue;
-                    const itId = getItemId(it);
-                    if (itId && cloud.deleted[s] && cloud.deleted[s].some(id => String(id) === String(itId))) {
-                        continue;
-                    }
-                    const idx = cloud.data[s].findIndex(x => isMatch(x, it));
-                    if (idx >= 0) {
-                        const existing = cloud.data[s][idx];
-                        const existingTs = Number(existing.updatedAt || existing.createdAt || 0);
-                        const incomingTs = Number(it.updatedAt || it.createdAt || 0);
-                        if (incomingTs >= existingTs) {
-                            cloud.data[s][idx] = it;
-                        }
-                    } else {
-                        cloud.data[s].push(it);
-                    }
-                }
-            }
-        }
-
-        for (const entry of itemsToProcess) {
-            const s = entry.store;
-            const it = entry.item;
-            const act = entry.action || 'save';
-            if (!s || !it) continue;
-
+    if (fullData && typeof fullData === 'object') {
+        for (const s of Object.keys(fullData)) {
+            const incoming = fullData[s] || [];
             if (!cloud.data[s]) cloud.data[s] = [];
             if (!cloud.deleted[s]) cloud.deleted[s] = [];
-            const itemId = getItemId(it);
 
-            if (act === 'delete') {
-                cloud.data[s] = cloud.data[s].filter(x => !isMatch(x, it));
-                if (itemId && !cloud.deleted[s].includes(itemId)) {
-                    cloud.deleted[s].push(itemId);
+            for (const it of incoming) {
+                if (!it) continue;
+                const itId = getItemId(it);
+                if (itId && cloud.deleted[s] && cloud.deleted[s].some(id => String(id) === String(itId))) {
+                    continue;
                 }
-            } else {
                 const idx = cloud.data[s].findIndex(x => isMatch(x, it));
                 if (idx >= 0) {
-                    cloud.data[s][idx] = it;
+                    const existing = cloud.data[s][idx];
+                    const existingTs = Number(existing.updatedAt || existing.createdAt || 0);
+                    const incomingTs = Number(it.updatedAt || it.createdAt || 0);
+                    if (incomingTs >= existingTs) {
+                        cloud.data[s][idx] = it;
+                    }
                 } else {
                     cloud.data[s].push(it);
                 }
-                if (itemId) {
-                    cloud.deleted[s] = cloud.deleted[s].filter(id => String(id) !== String(itemId));
-                }
             }
         }
+    }
 
-        cloud.lastUpdated = Date.now();
-        cloud.reset = false;
-        await saveCloudData(cloud, false);
-        res.json({ success: true, lastUpdated: cloud.lastUpdated, deleted: cloud.deleted });
-    } catch(e) {
+    for (const entry of itemsToProcess) {
+        const s = entry.store;
+        const it = entry.item;
+        const act = entry.action || 'save';
+        if (!s || !it) continue;
+
+        if (!cloud.data[s]) cloud.data[s] = [];
+        if (!cloud.deleted[s]) cloud.deleted[s] = [];
+        const itemId = getItemId(it);
+
+        if (act === 'delete') {
+            cloud.data[s] = cloud.data[s].filter(x => !isMatch(x, it));
+            if (itemId && !cloud.deleted[s].includes(itemId)) {
+                cloud.deleted[s].push(itemId);
+            }
+        } else {
+            const idx = cloud.data[s].findIndex(x => isMatch(x, it));
+            if (idx >= 0) {
+                cloud.data[s][idx] = it;
+            } else {
+                cloud.data[s].push(it);
+            }
+            if (itemId) {
+                cloud.deleted[s] = cloud.deleted[s].filter(id => String(id) !== String(itemId));
+            }
+        }
+    }
+
+    cloud.lastUpdated = Date.now();
+    cloud.reset = false;
+    return cloud;
+}
+
+function processPush(cloud, body) {
+    const cloudResetTs = Number(cloud.resetTimestamp || 0);
+    const reqClientResetTs = Number((body && body.clientResetTs) || 0);
+    if (cloudResetTs > 0 && reqClientResetTs < cloudResetTs) {
+        return {
+            stale: true,
+            resetTimestamp: cloudResetTs,
+            message: 'Stale push rejected due to prior cloud reset'
+        };
+    }
+    return { blob: applyPush(cloud, body) };
+}
+
+function unavailable(res) {
+    return res.status(503).json({ success: false, error: UNAVAILABLE_MSG });
+}
+
+// 1. POST /api/sync/push — أي جهاز يرفع معاملة أو صنف جديد
+router.post('/push', async (req, res) => {
+    try {
+        if (!USE_DB && ON_VERCEL) return unavailable(res);
+
+        if (USE_DB) {
+            const result = await withLockedBlob((cloud) => {
+                const out = processPush(cloud, req.body || {});
+                if (out.stale) return { __stale: out };
+                return out.blob;
+            });
+            if (result && result.__stale) {
+                return res.json({
+                    success: false,
+                    reset: true,
+                    resetTimestamp: result.__stale.resetTimestamp,
+                    message: result.__stale.message
+                });
+            }
+            return res.json({ success: true, lastUpdated: result.lastUpdated, deleted: result.deleted || {} });
+        }
+
+        const cloud = await loadBlob();
+        const out = processPush(cloud, req.body || {});
+        if (out.stale) {
+            return res.json({
+                success: false,
+                reset: true,
+                resetTimestamp: out.resetTimestamp,
+                message: out.message
+            });
+        }
+        await saveBlobFile(out.blob);
+        res.json({ success: true, lastUpdated: out.blob.lastUpdated, deleted: out.blob.deleted || {} });
+    } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
@@ -225,7 +247,9 @@ router.post('/push', async (req, res) => {
 // 2. GET /api/sync/pull — السحب السريع مع خاصية الدلتا والتأكد من عدم وجود تغييرات
 router.get('/pull', async (req, res) => {
     try {
-        const cloud = await ensureHydrated();
+        if (!USE_DB && ON_VERCEL) return unavailable(res);
+
+        const cloud = await loadBlob();
         const clientSince = Number(req.query.since || 0);
 
         if (clientSince > 0 && cloud.lastUpdated && cloud.lastUpdated <= clientSince && !cloud.reset) {
@@ -246,7 +270,7 @@ router.get('/pull', async (req, res) => {
             data: cloud.data || {},
             deleted: cloud.deleted || {}
         });
-    } catch(e) {
+    } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
@@ -254,12 +278,19 @@ router.get('/pull', async (req, res) => {
 // 3. POST /api/sync/reset — تفريغ ورسترة كافة بيانات السيرفر والداتا بيز السحابية
 router.post('/reset', async (req, res) => {
     try {
-        await ensureHydrated();
+        if (!USE_DB && ON_VERCEL) return unavailable(res);
+
         const now = Date.now();
-        const resetObj = { lastUpdated: now, resetTimestamp: now, data: {}, deleted: {}, reset: false };
-        await saveCloudData(resetObj, true);
+        const fresh = { lastUpdated: now, resetTimestamp: now, data: {}, deleted: {}, reset: false };
+
+        if (USE_DB) {
+            await withLockedBlob(() => fresh);
+        } else {
+            await saveBlobFile(fresh);
+        }
+
         res.json({ success: true, message: 'Cloud database reset successfully', lastUpdated: now, resetTimestamp: now });
-    } catch(e) {
+    } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });

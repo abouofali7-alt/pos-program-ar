@@ -5,5 +5,8 @@ backend/node_modules/
 *.log
 backend/*.log
 scratch/
+backend/ar_cloud_sync.json
+*.db-shm
+*.db-wal
 
 .vercel

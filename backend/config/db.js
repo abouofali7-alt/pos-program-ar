@@ -325,6 +325,46 @@ CREATE TABLE IF NOT EXISTS seqs (
 );
 `;
 
+const ACCOUNTS = [
+    [1000, 'رأس المال', 'equity'],
+    [1100, 'الأرباح المحتجزة', 'equity'],
+    [1200, 'صندوق النقدية', 'asset'],
+    [1300, 'البنك', 'asset'],
+    [1400, 'المخزون', 'asset'],
+    [1500, 'حسابات العملاء', 'asset'],
+    [1600, 'مصروفات مقدمة', 'asset'],
+    [2000, 'حسابات الموردين', 'liability'],
+    [2100, 'ضريبة القيمة المضافة', 'liability'],
+    [2200, 'سلف العملاء', 'liability'],
+    [3000, 'قروض', 'liability'],
+    [4000, 'المبيعات', 'revenue'],
+    [4100, 'إيرادات أخرى', 'revenue'],
+    [5000, 'المصروفات', 'expense'],
+    [5100, 'المشتريات', 'expense'],
+    [5200, 'تكلفة المبيعات', 'expense']
+];
+
+function seedIfEmpty() {
+    if (!db) return;
+    try {
+        const cnt = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+        if (cnt > 0) return;
+    } catch (e) { return; }
+
+    const insert = db.prepare('INSERT INTO users (username, password_hash, name, role_id, active, created) VALUES (?, ?, ?, ?, 1, ?)');
+    db.prepare('INSERT INTO roles (name, permissions, created) VALUES (?, ?, ?)').run('admin', '["*"]', nowISO());
+    db.prepare('INSERT INTO roles (name, permissions, created) VALUES (?, ?, ?)').run('manager', '["sales","inventory","hr","reports"]', nowISO());
+    db.prepare('INSERT INTO roles (name, permissions, created) VALUES (?, ?, ?)').run('accountant', '["accounting","reports"]', nowISO());
+    db.prepare('INSERT INTO roles (name, permissions, created) VALUES (?, ?, ?)').run('user', '["sales"]', nowISO());
+    const adminRole = db.prepare('SELECT id FROM roles WHERE name = ?').get('admin').id;
+    insert.run('admin', bcrypt.hashSync('admin123', 10), 'مدير النظام', adminRole, nowISO());
+
+    const insAcc = db.prepare('INSERT INTO accounts (code, name, type, created) VALUES (?, ?, ?, ?)');
+    ACCOUNTS.forEach(a => insAcc.run(String(a[0]), a[1], a[2], nowISO()));
+
+    db.prepare('INSERT INTO settings (id, org_name, currency) VALUES (1, ?, ?)').run('AR-Program', 'ج.م');
+}
+
 if (db) {
     try {
         db.exec(SCHEMA);
@@ -391,13 +431,13 @@ function parseJson(s, def) {
     try { return JSON.parse(s); } catch (e) { return def; }
 }
 
-const CASH_ACCOUNT_ID = 1;
-const CUSTOMER_ACCOUNT_ID = 6;
-const SUPPLIER_ACCOUNT_ID = 7;
-const SALES_ACCOUNT_ID = 4;
-const PURCHASES_ACCOUNT_ID = 5;
-const EXPENSE_ACCOUNT_ID = 8;
-const OTHER_INCOME_ACCOUNT_ID = 10;
+const CASH_ACCOUNT_ID = 3; // code 1200 صندوق النقدية
+const CUSTOMER_ACCOUNT_ID = 6; // code 1500
+const SUPPLIER_ACCOUNT_ID = 8; // code 2000
+const SALES_ACCOUNT_ID = 12; // code 4000
+const PURCHASES_ACCOUNT_ID = 15; // code 5100
+const EXPENSE_ACCOUNT_ID = 14; // code 5000
+const OTHER_INCOME_ACCOUNT_ID = 13; // code 4100
 
 const CASH = CASH_ACCOUNT_ID;
 const CUSTOMER = CUSTOMER_ACCOUNT_ID;

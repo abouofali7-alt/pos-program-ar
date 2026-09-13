@@ -102,6 +102,21 @@
 
 ---
 
+## 🔁 5. المزامنة السحابية بين الأجهزة (Cloud Auto-Sync)
+
+- المسارات: `POST /api/sync/push`، `GET /api/sync/pull?since=<ts>`، `POST /api/sync/reset`.
+- التخزين الدائم على Vercel يتم عبر **Postgres (Neon)** — عمود JSONB واحد في جدول `ar_cloud_sync` مع قفل صف (SELECT ... FOR UPDATE) لمنع فقدان الرفعات المتزامنة.
+- **مطلوب:** في إعدادات مشروع Vercel أضف متغير البيئة:
+  ```
+  DATABASE_URL=postgresql://...   (connection string من Neon)
+  ```
+  عند التحقق من ذلك تُنشأ الجداول تلقائيًا في أول طلب (CREATE TABLE IF NOT EXISTS + بذرة صف id=1).
+- على التخزين المحلي (`node backend/server.js` بدون DATABASE_URL): تُخزَّن بيانات المزامنة في `backend/ar_cloud_sync.json`.
+- على Vercel بدون `DATABASE_URL` تعيد `/api/sync/*` استجابة `503` واضحة بدل «الفشل الصامت» (لا فقدان بيانات).
+- ملاحظة: `/api/sync/*` غير محمية بمصادقة (تُركبت قبل `app.use('/api', auth)`) لإتاحة الرفع/السحب من أي جهاز واحد في نفس المنشأة.
+
+---
+
 ## 💡 نصائح للتطوير لـ OpenCode:
 1. يوصى بإنشاء السيرفر باستخدام **Python (FastAPI / Flask)** أو **Node.js (Express)** أو **C# (.NET)**.
 2. تفعيل خيار **CORS** إجباري ليعمل مع سيرفر الفرونت إند المحلي (`http://localhost:8080`).
