@@ -127,9 +127,9 @@
             const paidSum = list.filter(p => p.paid).reduce((sum, p) => sum + Number(p.net || 0), 0);
             const unpaidSum = totalSum - paidSum;
 
-            document.getElementById('stTotalPayroll').textContent = UI.money(totalSum) + ' ج.م';
-            document.getElementById('stPaidPayroll').textContent = UI.money(paidSum) + ' ج.م';
-            document.getElementById('stUnpaidPayroll').textContent = UI.money(unpaidSum) + ' ج.م';
+            document.getElementById('stTotalPayroll').innerHTML = UI.money(totalSum) + ' ج.م';
+            document.getElementById('stPaidPayroll').innerHTML = UI.money(paidSum) + ' ج.م';
+            document.getElementById('stUnpaidPayroll').innerHTML = UI.money(unpaidSum) + ' ج.م';
 
             const sorted = list.sort((a, b) => (b.period || '').localeCompare(a.period || ''));
             document.getElementById('payBody').innerHTML = sorted.map(p => {
@@ -157,7 +157,7 @@
 
         function formatSalaryBadge(e) {
             const type = e.salaryType || 'fixed';
-            const base = UI.money(e.salary || 0);
+            const baseVal = Number(e.salary || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const rate = Number(e.commissionRate || 0);
             const targetMap = {
                 'sales_user': 'مبيعاته',
@@ -168,11 +168,11 @@
             const targetLabel = targetMap[e.commissionTarget] || 'المبيعات';
 
             if (type === 'commission') {
-                return `<span class="badge badge-purple">${rate}% (${targetLabel})</span>`;
+                return `<span class="badge badge-purple" style="font-weight:700;"><i class="fa-solid fa-percent"></i> ${rate}% (${targetLabel})</span>`;
             } else if (type === 'hybrid') {
-                return `<span class="badge badge-cyan">${base} + ${rate}% (${targetLabel})</span>`;
+                return `<span class="badge badge-cyan" style="font-weight:700;" title="راتب متعدد">${baseVal} ج.م + ${rate}% (${targetLabel})</span>`;
             } else {
-                return `<span class="badge badge-blue">ثابت: ${base}</span>`;
+                return `<span class="badge badge-blue" style="font-weight:700;">ثابت: ${baseVal} ج.م</span>`;
             }
         }
 
@@ -362,7 +362,7 @@
             const add = Number(document.getElementById('payAdd').value) || 0;
             const ded = Number(document.getElementById('payDeduct').value) || 0;
             const net = base + add - ded;
-            document.getElementById('payNet').textContent = UI.money(net);
+            document.getElementById('payNet').innerHTML = UI.money(net);
         }
 
         async function editPay(id) {

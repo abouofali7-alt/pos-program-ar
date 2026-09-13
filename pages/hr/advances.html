@@ -153,9 +153,9 @@
             const totalPaid = _advances.reduce((sum, a) => sum + Number(a.paidAmount || 0), 0);
             const activeEmpIds = new Set(activeList.map(a => a.employeeId));
 
-            document.getElementById('stActiveBalance').textContent = UI.money(activeBalance) + ' ج.م';
-            document.getElementById('stTotalGranted').textContent = UI.money(totalGranted) + ' ج.م';
-            document.getElementById('stTotalPaid').textContent = UI.money(totalPaid) + ' ج.م';
+            document.getElementById('stActiveBalance').innerHTML = UI.money(activeBalance) + ' ج.م';
+            document.getElementById('stTotalGranted').innerHTML = UI.money(totalGranted) + ' ج.م';
+            document.getElementById('stTotalPaid').innerHTML = UI.money(totalPaid) + ' ج.م';
             document.getElementById('stActiveCount').textContent = activeEmpIds.size;
         }
 
