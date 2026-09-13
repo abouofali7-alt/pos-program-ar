@@ -6,6 +6,11 @@
             var l = localStorage.getItem('ar_lang') || 'ar';
             document.documentElement.lang = l;
             document.documentElement.dir = (l === 'en') ? 'ltr' : 'rtl';
+
+            var sess = localStorage.getItem('ar_session');
+            if (!sess) {
+                window.location.href = 'pages/login.html';
+            }
         } catch(e) {}
     </script>
     <meta charset="utf-8">
@@ -44,8 +49,8 @@
 </head>
 <body class="dark-mode">
 
-    <!-- الشاشة التفاعلية والسينمائية الحقيقية (Photorealistic Live-Action Film Experience) -->
-    <div id="splashOverlay">
+    <!-- الشاشة التفاعلية والسينمائية الحقيقية -->
+    <div id="splashOverlay" style="display: none;">
         <!-- شريطي السينما العلوية والسفلية -->
         <div class="splash-letterbox-top"></div>
         <div class="splash-letterbox-bottom"></div>

@@ -7,9 +7,10 @@
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/pages-css/splash.css">
     <style>
         .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .login-card { width: min(420px, 100%); background: var(--card-dark); border: 1px solid var(--border-color); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-card); }
+        .login-card { width: min(420px, 100%); background: var(--card-dark); border: 1px solid var(--border-color); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-card); z-index: 10; position: relative; }
         .login-logo { text-align: center; margin-bottom: 20px; }
         .login-logo i { font-size: 2.4rem; color: var(--accent-cyan); }
         .login-card h1 { font-size: 1.5rem; margin: 8px 0 2px; }
@@ -24,6 +25,47 @@
     </style>
 </head>
 <body class="dark-mode">
+
+    <!-- الشاشة التفاعلية والسينمائية الحقيقية قبل تسجيل الدخول -->
+    <div id="splashOverlay">
+        <div class="splash-letterbox-top"></div>
+        <div class="splash-letterbox-bottom"></div>
+        <canvas id="splashParticlesCanvas"></canvas>
+
+        <button id="skipSplashBtn" class="splash-skip-btn" onclick="ARSplash.finishAndRedirect()">
+            <span>تخطي الانيميشن</span> <i class="fa-solid fa-forward"></i>
+        </button>
+
+        <div class="splash-cinema-viewport">
+            <video id="splashVideoPlayer" class="splash-video-media" autoplay muted playsinline preload="auto">
+                <source src="../assets/cinema/intro_movie.mp4" type="video/mp4">
+            </video>
+        </div>
+
+        <div class="splash-logo-container">
+            <div class="splash-logo-title" id="splashLogoTitle">
+                <span class="splash-char" data-idx="0">A</span>
+                <span class="splash-char" data-idx="1">R</span>
+                <span class="splash-char special-accent" data-idx="2">-</span>
+                <span class="splash-char" data-idx="3">P</span>
+                <span class="splash-char" data-idx="4">R</span>
+                <span class="splash-char" data-idx="5">O</span>
+                <span class="splash-char" data-idx="6">G</span>
+                <span class="splash-char" data-idx="7">R</span>
+                <span class="splash-char" data-idx="8">A</span>
+                <span class="splash-char" data-idx="9">M</span>
+            </div>
+        </div>
+
+        <div class="splash-welcome-modal" id="welcomeModal">
+            <div class="splash-welcome-title"><i class="fa-solid fa-circle-check" style="color:var(--success, #22c55e);"></i> أهلاً بك في نظام AR-Program</div>
+            <div class="splash-welcome-sub" id="splashWelcomeSub">النظام الذكي لإدارة الحسابات، المبيعات، الرواتب، والمخزون</div>
+            <div class="splash-progress-bar">
+                <div class="splash-progress-fill" id="splashProgressFill"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="login-wrap">
         <div class="login-card">
             <div class="login-logo"><i class="fa-solid fa-cubes"></i></div>
@@ -44,13 +86,15 @@
                 الحساب الافتراضي: <b>admin</b> / <b>admin123</b><br>
                 يمكنك تغيير كلمة المرور من الإعدادات بعد الدخول
             </div>
-            <a href="../index.html" style="margin-top:16px;width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px;text-decoration:none;border-radius:10px;font-size:0.9rem;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;font-weight:700;box-shadow:0 0 15px rgba(56,189,248,0.2);">
+            <button type="button" onclick="if(window.ARSplash) ARSplash.replaySplash();" style="margin-top:16px;width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px;border-radius:10px;font-size:0.9rem;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;font-weight:700;box-shadow:0 0 15px rgba(56,189,248,0.2);cursor:pointer;">
                 <i class="fa-solid fa-film"></i> <span>مشاهدة الفيلم السينمائي التفاعلي</span>
-            </a>
+            </button>
         </div>
     </div>
     <script src="../js/ui.js"></script>
     <script src="../js/db.js"></script>
+    <script src="../js/splash.js"></script>
+
     <script>
         (async function () {
             // توجيه تلقائي إن كان المستخدم مسجلاً بالفعل

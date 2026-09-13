@@ -324,6 +324,14 @@ const ARSplash = (function () {
         const overlay = document.getElementById('splashOverlay');
         if (overlay) {
             overlay.classList.add('fade-out');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 700);
+        }
+
+        const isLoginPage = window.location.pathname.toLowerCase().includes('login.html');
+        if (isLoginPage) {
+            return;
         }
 
         setTimeout(() => {
@@ -347,9 +355,48 @@ const ARSplash = (function () {
         }, 600);
     }
 
-    return { initSplash, finishAndRedirect };
+    function replaySplash() {
+        _hasFinished = false;
+        const overlay = document.getElementById('splashOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            overlay.classList.remove('fade-out');
+            overlay.style.opacity = '1';
+            overlay.style.visibility = 'visible';
+        }
+        const chars = document.querySelectorAll('.splash-char');
+        chars.forEach(c => c.classList.remove('lit'));
+        const modal = document.getElementById('welcomeModal');
+        if (modal) modal.classList.remove('show');
+        const fillBar = document.getElementById('splashProgressFill');
+        if (fillBar) fillBar.style.width = '0%';
+        initSplash();
+    }
+
+    return { initSplash, finishAndRedirect, replaySplash };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
-    ARSplash.initSplash();
+    const overlay = document.getElementById('splashOverlay');
+    const isLogin = window.location.pathname.toLowerCase().includes('login.html');
+    const sessionStr = localStorage.getItem('ar_session');
+
+    if (sessionStr) {
+        // المستخدم مسجل للدخول بالفعل -> إلغاء وتشغيل الانترو فوراً وبدون أي شاشة سوداء أو انتظار
+        if (overlay) {
+            overlay.style.display = 'none';
+            overlay.classList.add('fade-out');
+        }
+        if (!isLogin && typeof initDashboard === 'function') {
+            initDashboard();
+        }
+        return;
+    }
+
+    // المستخدم غير مسجل -> تشغيل الانترو قبل تسجيل الدخول فقط
+    if (isLogin) {
+        if (overlay) ARSplash.initSplash();
+    } else {
+        window.location.href = 'pages/login.html';
+    }
 });
