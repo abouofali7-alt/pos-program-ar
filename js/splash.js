@@ -1,11 +1,10 @@
 /* ============================================================
-   AR-Program — Cinematic Machinery Splash Animation Controller
-   المسار الزمني الممتد والواقعي (18 ثانية على الأقل قبل التوجيه):
-   1. 0.0s - 3.5s : إنسان يمشي بخطوات واقعية باتجاه الآلة والتروس
-   2. 3.5s - 7.5s : الفني يمسح وينفض الأتربة الواقعية عن التروس
-   3. 7.5s - 11.5s: التماع التروس الماسي ودورانها المتشابك وتفعيل المحرك
-   4. 11.5s - 15.0s: تدفق الطاقة وإضاءة حروف AR-PROGRAM متتالية حرفاً بحرف
-   5. 15.0s - 18.5s: ظهور نافذة الترحيب الزجاجية والعد التنازلي واكتمال التحويل
+   AR-Program — Photorealistic Live-Action Movie Splash Controller
+   عرض سينمائي واقعي 100% من مشاهد فيلم سينمائي (18.5 ثانية على الأقل)
+   المشهد 1 (0s - 4.5s): الإنسان يتقدم في الورشة باتجاه آلة التروس
+   المشهد 2 (4.5s - 8.5s): لقطة مقربة ليد تمسح الأتربة والغبار عن التروس
+   المشهد 3 (8.5s - 12.5s): دوران التروس واشتعال المحرك وانطلاق الطاقة
+   المشهد 4 (12.5s - 18.5s): إضاءة الشعار AR-PROGRAM والترحيب والتوجيه
    ============================================================ */
 
 const ARSplash = (function () {
@@ -19,10 +18,10 @@ const ARSplash = (function () {
         if (!overlay) return;
 
         initParticleCanvas();
-        startAnimationSequence();
+        startFilmSequence();
     }
 
-    /* نظام جزيئات الهواء والغبار السابح ذو البُعد السينمائي */
+    /* نظام الجسيمات والغبار المعلق السابح في الهواء */
     function initParticleCanvas() {
         const canvas = document.getElementById('splashParticlesCanvas');
         if (!canvas) return;
@@ -36,15 +35,15 @@ const ARSplash = (function () {
         window.addEventListener('resize', resize);
 
         const particles = [];
-        const particleCount = 45;
+        const particleCount = 50;
 
         for (let i = 0; i < particleCount; i++) {
             particles.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
-                radius: Math.random() * 2 + 0.5,
-                color: Math.random() > 0.4 ? 'rgba(56, 189, 248, ' : 'rgba(245, 158, 11, ',
-                alpha: Math.random() * 0.5 + 0.2,
+                radius: Math.random() * 2.2 + 0.6,
+                color: Math.random() > 0.35 ? 'rgba(56, 189, 248, ' : 'rgba(245, 158, 11, ',
+                alpha: Math.random() * 0.5 + 0.25,
                 vx: (Math.random() - 0.5) * 0.4,
                 vy: -Math.random() * 0.5 - 0.2
             });
@@ -70,56 +69,52 @@ const ARSplash = (function () {
         drawParticles();
     }
 
-    function startAnimationSequence() {
-        const personRig = document.getElementById('personWalkingRig');
-        const dustLayer = document.getElementById('dustLayer');
-        const armGroup = document.getElementById('rightArmWipingGroup');
-        const gear1 = document.getElementById('gear1');
-        const gear2 = document.getElementById('gear2');
-        const gear3 = document.getElementById('gear3');
-        const piston1 = document.getElementById('piston1');
-        const piston2 = document.getElementById('piston2');
-        const pulseLeft = document.getElementById('energyPulseLeft');
-        const pulseRight = document.getElementById('energyPulseRight');
-
-        // المرحلة 1: الإنسان يمشي باتجاه الآلة (0.0s - 3.5s)
-        if (personRig) personRig.classList.add('person-walking-rig');
-
-        // المرحلة 2: يقرر مسح الأتربة وينفض الغبار عند الوصول (3.5s - 7.5s)
+    function setSceneCaption(text) {
+        const cap = document.getElementById('splashSceneCaption');
+        if (!cap) return;
+        cap.classList.remove('show');
         setTimeout(() => {
             if (_hasFinished) return;
-            if (armGroup) armGroup.classList.add('dusting-arm');
-            if (dustLayer) dustLayer.classList.add('dust-layer-anim');
-        }, 3500);
+            cap.innerText = text;
+            cap.classList.add('show');
+        }, 300);
+    }
 
-        // المرحلة 3: دوران التروس الحقيقية والتماعها وتفعيل المحرك (7.5s)
+    function startFilmSequence() {
+        const frame1 = document.getElementById('filmFrame1');
+        const frame2 = document.getElementById('filmFrame2');
+        const frame3 = document.getElementById('filmFrame3');
+        const frame4 = document.getElementById('filmFrame4');
+
+        // المشهد 1: إنسان يتقدم في الورشة باتجاه آلة التروس (0s - 4.5s)
+        if (frame1) frame1.classList.add('active');
+        setSceneCaption('المشهد الأول: التقدم نحو آلة الرواتب والمبيعات في الورشة الصناعية...');
+
+        // المشهد 2: نفض ومسح الأتربة عن التروس الماسية (4.5s - 8.5s)
         setTimeout(() => {
             if (_hasFinished) return;
-            if (gear1) gear1.classList.add('gear-spin-cw');
-            if (gear2) gear2.classList.add('gear-spin-ccw');
-            if (gear3) gear3.classList.add('gear-spin-cw');
+            if (frame1) frame1.classList.remove('active');
+            if (frame2) frame2.classList.add('active');
+            setSceneCaption('المشهد الثاني: نفض الأتربة وإعادة تجهيز التروس للعمل...');
+        }, 4500);
 
-            const sparkles = document.getElementById('sparkleGroup');
-            if (sparkles) sparkles.classList.add('sparkle-anim');
-        }, 7500);
-
-        // تشغيل قدرة المحرك والكباسات ونبض خطوط الطاقة (9.5s)
+        // المشهد 3: دوران التروس واشتعال المحرك وانطلاق الطاقة (8.5s - 12.5s)
         setTimeout(() => {
             if (_hasFinished) return;
-            const engineGroup = document.getElementById('engineGroup');
-            if (engineGroup) engineGroup.classList.add('engine-active');
-            if (piston1) piston1.classList.add('piston-1-anim');
-            if (piston2) piston2.classList.add('piston-2-anim');
+            if (frame2) frame2.classList.remove('active');
+            if (frame3) frame3.classList.add('active');
+            setSceneCaption('المشهد الثالث: انطلاق التروس واشتعال المحرك وتوليد الطاقة...');
+        }, 8500);
 
-            if (pulseLeft) pulseLeft.classList.add('energy-line-anim');
-            if (pulseRight) pulseRight.classList.add('energy-line-anim');
-        }, 9500);
-
-        // المرحلة 4: إضاءة حروف الاسم حرفاً بحرف عند (11.5s)
+        // المشهد 4: ظهور الشعار وتتابع إضاءة الحروف (12.5s)
         setTimeout(() => {
             if (_hasFinished) return;
+            if (frame3) frame3.classList.remove('active');
+            if (frame4) frame4.classList.add('active');
+            setSceneCaption('المشهد الرابع: جاهزية نظام AR-Program وإضاءة الشعار الرئيسي');
+
             illuminateTitleLetters();
-        }, 11500);
+        }, 12500);
     }
 
     function illuminateTitleLetters() {
@@ -137,10 +132,10 @@ const ARSplash = (function () {
                 index++;
             } else {
                 clearInterval(interval);
-                // المرحلة 5: إظهار الرسالة الترحيبية والتحويل عند (15.0s)
+                // المرحلة الأخيرة: إظهار الرسالة الترحيبية والعد التنازلي للتحويل
                 setTimeout(showWelcomeAndRedirect, 500);
             }
-        }, 350); // 10 حروف * 350ms = 3.5s
+        }, 280); // 10 حروف * 280ms = 2.8 ثانية
     }
 
     function showWelcomeAndRedirect() {

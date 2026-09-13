@@ -1,14 +1,13 @@
 /* ============================================================
-   AR-Program — Filmic & Realistic Machinery Splash Experience
-   شاشة بداية سينمائية واقعية: مشهد فيلم، انسان يمشي باتجاه الآلة،
-   ينفض الأتربة عن تروس واقعية 3D، تشغيل المحرك، وإضاءة الحروف
+   AR-Program — Photorealistic Live-Action Movie Film Experience
+   شاشة افتتاحية سينمائية حقيقية من مشاهد فيلم سينمائي واقعي (100% Photorealistic Film)
    ============================================================ */
 
 #splashOverlay {
     position: fixed;
     inset: 0;
     z-index: 999999;
-    background: radial-gradient(circle at 50% 35%, #0d1b2a 0%, #060913 85%, #020408 100%);
+    background: #020408;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -25,93 +24,130 @@
     pointer-events: none;
 }
 
-/* خلفية تسليط الضوء السينمائي (Spotlight Cone & Anamorphic Glow) */
-.splash-spotlight {
+/* شرائط السينما العلوية والسفلية (Anamorphic Film Letterbox) */
+.splash-letterbox-top, .splash-letterbox-bottom {
     position: absolute;
-    top: -10%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(850px, 90vw);
-    height: 100%;
-    background: conic-gradient(from 165deg at 50% 0%, transparent 0deg, rgba(56, 189, 248, 0.12) 15deg, rgba(245, 158, 11, 0.08) 30deg, transparent 45deg);
+    left: 0;
+    right: 0;
+    height: 4.5vh;
+    background: #000;
+    z-index: 25;
     pointer-events: none;
-    filter: blur(20px);
 }
 
-/* شريط السينما العاكس للتصوير (Cinematic Letterbox & Vignette) */
-#splashOverlay::before {
+.splash-letterbox-top { top: 0; }
+.splash-letterbox-bottom { bottom: 0; }
+
+/* حاوية مشاهد الفيلم الحقيقي (Film Frame Viewport) */
+.splash-cinema-viewport {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.splash-film-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transform: scale(1.08);
+    transition: opacity 1.2s ease-in-out, transform 5s ease-out;
+}
+
+.splash-film-frame.active {
+    opacity: 1;
+    transform: scale(1.0);
+}
+
+/* تباين الفيلم والجرين السينمائي */
+.splash-cinema-viewport::after {
     content: '';
     position: absolute;
     inset: 0;
-    box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.85);
+    background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.75) 100%);
     pointer-events: none;
-    z-index: 5;
+    z-index: 4;
 }
 
-/* كانفاس الجزيئات والأتربة المعلقة للهواء */
+/* كانفاس الجزيئات والغبار المعلق السابح */
 #splashParticlesCanvas {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 2;
+    z-index: 6;
 }
 
-/* زر التخطي العلوي الأنيق */
+/* زر التخطي العلوي السينمائي */
 .splash-skip-btn {
     position: absolute;
-    top: 24px;
+    top: calc(4.5vh + 16px);
     left: 24px;
-    z-index: 20;
-    background: rgba(15, 23, 42, 0.65);
-    border: 1px solid rgba(56, 189, 248, 0.3);
+    z-index: 30;
+    background: rgba(10, 15, 29, 0.75);
+    border: 1px solid rgba(56, 189, 248, 0.35);
     color: #94a3b8;
-    padding: 8px 20px;
+    padding: 8px 22px;
     border-radius: 20px;
     font-size: 0.85rem;
     cursor: pointer;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(14px);
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
     gap: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
 }
 
 .splash-skip-btn:hover {
-    background: rgba(56, 189, 248, 0.22);
+    background: rgba(56, 189, 248, 0.25);
     color: #38bdf8;
     border-color: #38bdf8;
     box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
 }
 
-/* مسرح المشهد السينمائي */
-.splash-stage {
-    position: relative;
-    z-index: 3;
-    width: min(960px, 98vw);
-    height: min(520px, 70vh);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+/* شريط وصف المشهد السينمائي الحقيقي (Filmic Scene Subtitle) */
+.splash-scene-caption {
+    position: absolute;
+    top: calc(4.5vh + 20px);
+    right: 24px;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.7);
+    border-right: 3.5px solid #38bdf8;
+    padding: 8px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.88rem;
+    color: #e2e8f0;
+    backdrop-filter: blur(10px);
+    letter-spacing: 0.5px;
+    opacity: 0;
+    transform: translateX(15px);
+    transition: all 0.5s ease;
 }
 
-.splash-svg {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
+.splash-scene-caption.show {
+    opacity: 1;
+    transform: translateX(0);
 }
 
-/* عنوان الحروف المتسلسلة (AR-PROGRAM) السينمائي */
-.splash-title-wrap {
-    margin-bottom: 12px;
+/* عنوان الحروف المتسلسلة فوق المشهد الرابع */
+.splash-logo-container {
+    position: absolute;
+    top: 22%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
     text-align: center;
-    z-index: 4;
 }
 
 .splash-logo-title {
-    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    font-size: clamp(2.4rem, 6.5vw, 4.4rem);
     font-weight: 900;
     letter-spacing: 8px;
     display: flex;
@@ -124,63 +160,63 @@
 
 .splash-char {
     display: inline-block;
-    color: #1e293b;
+    color: rgba(255, 255, 255, 0.15);
     text-shadow: none;
     transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     transform: scale(0.85);
-    opacity: 0.25;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+    opacity: 0.2;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.9));
 }
 
 .splash-char.lit {
     color: #38bdf8;
     opacity: 1;
-    transform: scale(1.2);
-    text-shadow: 0 0 20px #38bdf8, 0 0 40px #0284c7, 0 0 60px #38bdf8;
-    filter: drop-shadow(0 0 15px rgba(56, 189, 248, 0.8));
+    transform: scale(1.22);
+    text-shadow: 0 0 22px #38bdf8, 0 0 45px #0284c7, 0 0 70px #38bdf8;
+    filter: drop-shadow(0 0 20px rgba(56, 189, 248, 0.9));
 }
 
 .splash-char.special-accent.lit {
     color: #c084fc;
-    text-shadow: 0 0 20px #c084fc, 0 0 40px #9333ea, 0 0 60px #c084fc;
-    filter: drop-shadow(0 0 15px rgba(192, 132, 252, 0.8));
+    text-shadow: 0 0 22px #c084fc, 0 0 45px #9333ea, 0 0 70px #c084fc;
+    filter: drop-shadow(0 0 20px rgba(192, 132, 252, 0.9));
 }
 
-/* نافذة الترحيب الزجاجية والعد التنازلي السينمائي */
+/* نافذة الترحيب والشريط النهائي */
 .splash-welcome-modal {
     position: absolute;
-    bottom: 10px;
+    bottom: calc(4.5vh + 25px);
+    left: 50%;
+    transform: translate(-50%, 30px);
     background: rgba(10, 15, 29, 0.92);
-    border: 1px solid rgba(56, 189, 248, 0.4);
-    border-radius: 18px;
-    padding: 18px 32px;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    border-radius: 20px;
+    padding: 18px 36px;
     text-align: center;
-    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.25);
-    backdrop-filter: blur(16px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 35px rgba(56, 189, 248, 0.3);
+    backdrop-filter: blur(20px);
     opacity: 0;
-    transform: translateY(25px);
     transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: none;
-    max-width: min(560px, 92vw);
-    z-index: 10;
+    max-width: min(580px, 92vw);
+    z-index: 20;
 }
 
 .splash-welcome-modal.show {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     pointer-events: auto;
 }
 
 .splash-welcome-title {
-    font-size: 1.25rem;
+    font-size: 1.3rem;
     font-weight: 800;
     color: #38bdf8;
     margin-bottom: 4px;
-    letter-spacing: 0.5px;
 }
 
 .splash-welcome-sub {
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     color: #94a3b8;
     margin-bottom: 14px;
 }
@@ -188,7 +224,7 @@
 .splash-progress-bar {
     width: 100%;
     height: 7px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     overflow: hidden;
     position: relative;
@@ -199,146 +235,5 @@
     width: 0%;
     background: linear-gradient(90deg, #38bdf8, #f59e0b, #c084fc);
     border-radius: 10px;
-    box-shadow: 0 0 15px #38bdf8;
-}
-
-/* === Keyframe Animations (التحريك السينمائي) === */
-
-/* 1. حركة مشي الإنسان باتجاه الآلة (Human Walking Stride & Approach) */
-@keyframes humanWalkApproach {
-    0% { transform: translate(-230px, 0); }
-    100% { transform: translate(0, 0); }
-}
-
-@keyframes legWalkStrideLeft {
-    0%, 100% { transform: rotate(-22deg); }
-    50% { transform: rotate(22deg); }
-}
-
-@keyframes legWalkStrideRight {
-    0%, 100% { transform: rotate(22deg); }
-    50% { transform: rotate(-22deg); }
-}
-
-@keyframes bodyWalkBob {
-    0%, 50%, 100% { transform: translateY(0); }
-    25%, 75% { transform: translateY(-4px); }
-}
-
-.person-walking-rig {
-    animation: humanWalkApproach 3.5s cubic-bezier(0.25, 1, 0.5, 1) 1 forwards, bodyWalkBob 0.7s ease-in-out 5;
-}
-
-.leg-left-walk {
-    transform-origin: 42px 180px;
-    animation: legWalkStrideLeft 0.7s ease-in-out 5;
-}
-
-.leg-right-walk {
-    transform-origin: 73px 180px;
-    animation: legWalkStrideRight 0.7s ease-in-out 5;
-}
-
-/* 2. تحريك يد وقماش المسح ونفض الغبار الحقيقي (Dusting Motion) */
-@keyframes dustingHandMotion {
-    0% { transform: translate(0, 0) rotate(0deg); }
-    15% { transform: translate(-90px, 22px) rotate(-18deg); }
-    30% { transform: translate(35px, -18px) rotate(14deg); }
-    45% { transform: translate(-80px, 30px) rotate(-14deg); }
-    60% { transform: translate(25px, -10px) rotate(10deg); }
-    75% { transform: translate(-60px, 20px) rotate(-10deg); }
-    90% { transform: translate(15px, -5px) rotate(5deg); }
-    100% { transform: translate(0, 0) rotate(0deg); }
-}
-
-.dusting-arm {
-    transform-origin: 85px 90px;
-    animation: dustingHandMotion 4.0s ease-in-out 1 forwards;
-}
-
-/* 3. انقشاع وتلاشي طبقة الأتربة الواقعية (Real Dust Dissolve) */
-@keyframes dustPuffFadeOut {
-    0% { opacity: 0.88; filter: blur(2px); }
-    40% { opacity: 0.55; filter: blur(5px); }
-    75% { opacity: 0.2; filter: blur(10px); }
-    100% { opacity: 0; visibility: hidden; filter: blur(15px); }
-}
-
-.dust-layer-anim {
-    animation: dustPuffFadeOut 4.0s ease-in-out forwards;
-}
-
-/* 4. دوران التروس الواقعية 3D مع القصور الذاتي (Interlocking Gear Inertia) */
-@keyframes rotateClockwise {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-@keyframes rotateCounterClockwise {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(-360deg); }
-}
-
-.gear-spin-cw {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: rotateClockwise 4s linear infinite;
-}
-
-.gear-spin-ccw {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: rotateCounterClockwise 4s linear infinite;
-}
-
-/* 5. اهتزاز وقدرة المحرك والكباسات (Engine Firing Vibration) */
-@keyframes engineVibrate {
-    0%, 100% { transform: translate(620px, 300px); }
-    25% { transform: translate(621px, 299px); }
-    50% { transform: translate(619px, 301px); }
-    75% { transform: translate(621px, 301px); }
-}
-
-.engine-active {
-    animation: engineVibrate 0.12s linear infinite;
-}
-
-@keyframes pistonPulse1 {
-    0%, 100% { height: 48px; transform: translateY(0); }
-    50% { height: 26px; transform: translateY(22px); }
-}
-
-@keyframes pistonPulse2 {
-    0%, 100% { height: 26px; transform: translateY(22px); }
-    50% { height: 48px; transform: translateY(0); }
-}
-
-.piston-1-anim {
-    animation: pistonPulse1 0.32s ease-in-out infinite;
-}
-
-.piston-2-anim {
-    animation: pistonPulse2 0.32s ease-in-out infinite;
-}
-
-/* 6. نبض خطوط الطاقة الكهربائية إلى لوحة الاسم */
-@keyframes energyPulseFlow {
-    0% { stroke-dashoffset: 220; opacity: 0.1; }
-    50% { opacity: 1; }
-    100% { stroke-dashoffset: 0; opacity: 1; }
-}
-
-.energy-line-anim {
-    animation: energyPulseFlow 1.8s ease-out forwards;
-}
-
-/* 7. التماع بريق النظافة الماسي للتروس */
-@keyframes sparkleFlash {
-    0% { opacity: 0; transform: scale(0.3); }
-    50% { opacity: 1; transform: scale(1.6); }
-    100% { opacity: 0; transform: scale(0.3); }
-}
-
-.sparkle-anim {
-    animation: sparkleFlash 0.9s ease-out forwards;
+    box-shadow: 0 0 16px #38bdf8;
 }
