@@ -325,10 +325,11 @@ const ARDB = (function () {
 
         // الصلاحيات
         const roles = [
-            { id: 1, name: 'مدير', description: 'صلاحيات كاملة على كل الوحدات', permissions: ['accounting', 'inventory', 'hr', 'business', 'settings'] },
-            { id: 2, name: 'محاسب', description: 'المحاسبة والتقارير والمخزون', permissions: ['accounting', 'inventory', 'business'] },
+            { id: 1, name: 'مدير', description: 'صلاحيات كاملة على كل الوحدات', permissions: ['accounting', 'inventory', 'hr', 'business', 'maintenance', 'reports', 'settings'] },
+            { id: 2, name: 'محاسب', description: 'المحاسبة والتقارير والمخزون', permissions: ['accounting', 'inventory', 'business', 'reports'] },
             { id: 3, name: 'مشرف مخزن', description: 'المخزون والمشتريات والمنتجات', permissions: ['inventory'] },
-            { id: 4, name: 'موظف', description: 'الصلاحيات الأساسية', permissions: ['business'] }
+            { id: 4, name: 'موظف', description: 'الصلاحيات الأساسية', permissions: ['business'] },
+            { id: 5, name: 'فني صيانة', description: 'إدارة وتتبع تذاكر الصيانة والأجهزة والمعدات', permissions: ['maintenance', 'inventory', 'business'] }
         ];
         for (const r of roles) await localPut('roles', r);
 
@@ -342,7 +343,8 @@ const ARDB = (function () {
         const deps = [
             { id: 1, name: 'الإدارة العامة', description: '' },
             { id: 2, name: 'المبيعات', description: '' },
-            { id: 3, name: 'المخزون واللوجستيات', description: '' }
+            { id: 3, name: 'المخزون واللوجستيات', description: '' },
+            { id: 4, name: 'فني صيانة', description: 'قسم صيانة الأجهزة والمنتجات والدعم الفني' }
         ];
         for (const d of deps) await localPut('departments', d);
 
@@ -485,12 +487,33 @@ const ARDB = (function () {
         }
     }
 
+    async function ensureMaintenanceDefaults() {
+        try {
+            const deps = await localGetAll('departments');
+            const hasMaintDept = (deps || []).some(d => d && (d.name === 'فني صيانة' || d.name === 'الصيانة والدعم الفني' || d.name === 'قسم الصيانة'));
+            if (!hasMaintDept) {
+                await localPut('departments', { id: 4, name: 'فني صيانة', description: 'قسم صيانة الأجهزة والمنتجات والدعم الفني' });
+            }
+
+            const roles = await localGetAll('roles');
+            const hasMaintRole = (roles || []).some(r => r && (r.name === 'فني صيانة'));
+            if (!hasMaintRole) {
+                await localPut('roles', {
+                    id: 5,
+                    name: 'فني صيانة',
+                    description: 'إدارة وتتبع تذاكر الصيانة والأجهزة والمعدات',
+                    permissions: ['maintenance', 'inventory', 'business']
+                });
+            }
+        } catch(e) {}
+    }
+
     return {
         openDB, getAll, getById, getByIndex, add, put, update, remove,
         localGetAll, localGetById, localAdd, localPut, localUpdate, localRemove, bulkPut, bulkRemove, clearAllData,
-        nextSeq, seed, syncOpeningBalances, hashPassword, currentUser, setSession, clearSession, money
+        nextSeq, seed, syncOpeningBalances, ensureMaintenanceDefaults, hashPassword, currentUser, setSession, clearSession, money
     };
 })();
 
 /* جاهزية قاعدة البيانات للمتصفح كله */
-ARDB.openDB().then(() => ARDB.seed().then(() => ARDB.syncOpeningBalances())).catch((e) => console.error('DB init error:', e));
+ARDB.openDB().then(() => ARDB.seed().then(() => ARDB.syncOpeningBalances()).then(() => ARDB.ensureMaintenanceDefaults())).catch((e) => console.error('DB init error:', e));
