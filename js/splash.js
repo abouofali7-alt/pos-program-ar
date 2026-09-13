@@ -1,6 +1,6 @@
 /* ============================================================
-   AR-Program — Photorealistic Live-Action Movie Splash Controller
-   عرض سينمائي واقعي 100% من مشاهد فيلم سينمائي (18.5 ثانية على الأقل)
+   AR-Program — Photorealistic Live-Action Movie Video Splash Controller
+   عرض فيديو سينمائي حقيقي MP4 بنظام محاكاة الفيلم الواقعي (18.5 ثانية)
    المشهد 1 (0s - 4.5s): الإنسان يتقدم في الورشة باتجاه آلة التروس
    المشهد 2 (4.5s - 8.5s): لقطة مقربة ليد تمسح الأتربة والغبار عن التروس
    المشهد 3 (8.5s - 12.5s): دوران التروس واشتعال المحرك وانطلاق الطاقة
@@ -18,7 +18,17 @@ const ARSplash = (function () {
         if (!overlay) return;
 
         initParticleCanvas();
+        setupVideoPlayer();
         startFilmSequence();
+    }
+
+    function setupVideoPlayer() {
+        const video = document.getElementById('splashVideoPlayer');
+        if (video) {
+            video.play().catch(e => {
+                console.warn('[Splash] Video autoplay fallback to frames:', e);
+            });
+        }
     }
 
     /* نظام الجسيمات والغبار المعلق السابح في الهواء */
@@ -35,7 +45,7 @@ const ARSplash = (function () {
         window.addEventListener('resize', resize);
 
         const particles = [];
-        const particleCount = 50;
+        const particleCount = 55;
 
         for (let i = 0; i < particleCount; i++) {
             particles.push({
@@ -175,6 +185,11 @@ const ARSplash = (function () {
         if (_redirectTimer) clearTimeout(_redirectTimer);
         if (_countdownInterval) clearInterval(_countdownInterval);
         if (_particleAnimFrame) cancelAnimationFrame(_particleAnimFrame);
+
+        const video = document.getElementById('splashVideoPlayer');
+        if (video) {
+            video.pause();
+        }
 
         const overlay = document.getElementById('splashOverlay');
         if (overlay) {

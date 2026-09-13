@@ -1,6 +1,6 @@
 /* ============================================================
-   AR-Program — Photorealistic Live-Action Movie Film Experience
-   شاشة افتتاحية سينمائية حقيقية من مشاهد فيلم سينمائي واقعي (100% Photorealistic Film)
+   AR-Program — Photorealistic Live-Action Movie Video Experience
+   شاشة افتتاحية بفيديو سينمائي حقيقي MP4 (100% Real Motion Film)
    ============================================================ */
 
 #splashOverlay {
@@ -38,13 +38,23 @@
 .splash-letterbox-top { top: 0; }
 .splash-letterbox-bottom { bottom: 0; }
 
-/* حاوية مشاهد الفيلم الحقيقي (Film Frame Viewport) */
+/* منفذ الفيديو السينمائي الحقيقي (Real MP4 Cinema Viewport) */
 .splash-cinema-viewport {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
+}
+
+.splash-video-element {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    z-index: 2;
 }
 
 .splash-film-frame {
@@ -57,6 +67,7 @@
     opacity: 0;
     transform: scale(1.08);
     transition: opacity 1.2s ease-in-out, transform 5s ease-out;
+    z-index: 1;
 }
 
 .splash-film-frame.active {
@@ -112,13 +123,13 @@
     box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
 }
 
-/* شريط وصف المشهد السينمائي الحقيقي (Filmic Scene Subtitle) */
+/* شريط عنوان وصف المشهد السينمائي الحقيقي (Filmic Scene Subtitle) */
 .splash-scene-caption {
     position: absolute;
     top: calc(4.5vh + 20px);
     right: 24px;
     z-index: 20;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.75);
     border-right: 3.5px solid #38bdf8;
     padding: 8px 18px;
     border-radius: 0 8px 8px 0;
