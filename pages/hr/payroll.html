@@ -27,7 +27,7 @@
                 <div class="sub">إعداد وتصفية رواتب الموظفين (الراتب الثابت + العمولات والنسب - خصم السُلف والجزاءات = الصافي)</div>
             </div>
             <div class="page-actions" style="display:flex;gap:8px;">
-                <button class="btn btn-secondary" onclick="generateCurrentMonthPayroll()"><i class="fa-solid fa-rotate"></i> التحديث التلقائي للشهر الحالي</button>
+                <button class="btn btn-secondary" onclick="generateCurrentMonthPayroll()"><i class="fa-solid fa-rotate"></i> تحديث وإعادة احتساب الشهر الحالي</button>
                 <button class="btn btn-primary-soft" onclick="openPayModal()"><i class="fa-solid fa-plus"></i> راتب / مسير جديد</button>
             </div>
         </div>
@@ -41,9 +41,9 @@
 
         <div class="table-card">
             <div class="table-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 16px;">
-                <span>سجل الرواتب والعمولات</span>
+                <span>مسير رواتب الموظفين للشهر المحدد</span>
                 <div style="display:flex;gap:10px;align-items:center;">
-                    <label style="font-size:0.85rem;color:var(--text-secondary);">تصفية بالشهر:</label>
+                    <label style="font-size:0.85rem;color:var(--text-secondary);">عرض رواتب شهر:</label>
                     <input type="month" id="filterPeriod" onchange="load()" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);font-size:0.85rem;">
                 </div>
             </div>
@@ -108,19 +108,25 @@
         let editingPayId = null;
 
         async function load() {
+            let filterPeriod = document.getElementById('filterPeriod').value;
+            if (!filterPeriod) {
+                const pd = new Date();
+                filterPeriod = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0');
+                document.getElementById('filterPeriod').value = filterPeriod;
+            }
+
+            // التأكد التلقائي من توليد وقراءة كافة الموظفين للشهر المحدد
+            await autoEnsureAllEmployeesPayroll(filterPeriod);
+
             const [employees, payroll] = await Promise.all([ARDB.getAll('employees'), ARDB.getAll('payroll')]);
             _employees = employees || [];
             _empById = {};
-            _employees.forEach(e => _empById[e.id] = e);
+            _employees.forEach(e => _empById[String(e.id)] = e);
 
             const sel = document.getElementById('payEmp');
             sel.innerHTML = '<option value="">— اختر الموظف —</option>' + _employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
 
-            const filterPeriod = document.getElementById('filterPeriod').value;
-            let list = payroll || [];
-            if (filterPeriod) {
-                list = list.filter(p => p.period === filterPeriod);
-            }
+            let list = (payroll || []).filter(p => p.period === filterPeriod);
 
             // إحصائيات
             const totalSum = list.reduce((sum, p) => sum + Number(p.net || 0), 0);
@@ -133,8 +139,8 @@
 
             const sorted = list.sort((a, b) => (b.period || '').localeCompare(a.period || ''));
             document.getElementById('payBody').innerHTML = sorted.map(p => {
-                const emp = _empById[p.employeeId];
-                const empName = emp ? emp.name : '—';
+                const emp = _empById[String(p.employeeId)];
+                const empName = emp ? emp.name : '— (موظف محذوف)';
                 const salaryBadge = emp ? formatSalaryBadge(emp) : '—';
 
                 return `<tr>
@@ -152,7 +158,27 @@
                         <button class="btn btn-sm btn-danger" onclick="delPay(' + p.id + ')" title="حذف"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>`;
-            }).join('') || '<tr><td colspan="9" class="empty-state">لا توجد رواتب مسجلة للشهر المكتوب</td></tr>';
+            }).join('') || '<tr><td colspan="9" class="empty-state">لا يوجد موظفون مسجلون للشهر المحدد</td></tr>';
+        }
+
+        async function autoEnsureAllEmployeesPayroll(periodStr) {
+            const employees = await ARDB.getAll('employees');
+            if (!employees || !employees.length) return;
+            const payroll = await ARDB.getAll('payroll');
+
+            const existingMap = new Set();
+            (payroll || []).forEach(p => {
+                if (p && p.period === periodStr) {
+                    existingMap.add(String(p.employeeId));
+                }
+            });
+
+            for (const emp of employees) {
+                if (emp.active === false) continue;
+                if (!existingMap.has(String(emp.id))) {
+                    await syncEmployeePayroll(emp, periodStr);
+                }
+            }
         }
 
         function formatSalaryBadge(e) {
@@ -179,7 +205,7 @@
         async function generateCurrentMonthPayroll() {
             const now = new Date();
             const period = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-            UI.toast('جاري احتساب وتحديث الرواتب والعمولات وخصم أقساط السلف لشهر ' + period + '...', 'info');
+            UI.toast('جاري احتساب وتحديث الرواتب والعمولات وخصم أقساط السلف لكافة الموظفين لشهر ' + period + '...', 'info');
 
             let count = 0;
             for (const emp of _employees) {
@@ -187,14 +213,14 @@
                 await syncEmployeePayroll(emp, period);
                 count++;
             }
-            UI.toast(`تم تحديث مسير الرواتب لشهر ${period} لـ (${count}) موظفين`, 'ok');
+            UI.toast(`تم تحديث مسير الرواتب لشهر ${period} لجميع الموظفين (${count})`, 'ok');
             document.getElementById('filterPeriod').value = period;
             load();
         }
 
         async function calcEmpAdvDeduction(empId) {
             const advances = await ARDB.getAll('advances');
-            const active = (advances || []).filter(a => a.employeeId === empId && ((a.remainingAmount === undefined ? (a.amount - (a.paidAmount||0)) : a.remainingAmount) > 0));
+            const active = (advances || []).filter(a => String(a.employeeId) === String(empId) && ((a.remainingAmount === undefined ? (a.amount - (a.paidAmount||0)) : a.remainingAmount) > 0));
             
             let totalDeduct = 0;
             let details = [];
@@ -215,7 +241,7 @@
             const period = periodStr || (new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'));
 
             const allPay = await ARDB.getAll('payroll');
-            const existing = (allPay || []).find(p => p.employeeId === emp.id && p.period === period);
+            const existing = (allPay || []).find(p => String(p.employeeId) === String(emp.id) && p.period === period);
 
             if (existing && existing.paid) return;
 
@@ -318,7 +344,7 @@
                 return;
             }
 
-            const emp = _empById[empId];
+            const emp = _empById[String(empId)];
             if (!emp) return;
 
             const base = (emp.salaryType === 'commission') ? 0 : (Number(emp.salary) || 0);
@@ -392,7 +418,7 @@
             const net = base + additions - deductions;
 
             const allPay = await ARDB.getAll('payroll');
-            const dup = allPay.find(p => p.employeeId === employeeId && p.period === period && p.id !== editingPayId);
+            const dup = allPay.find(p => String(p.employeeId) === String(employeeId) && p.period === period && p.id !== editingPayId);
 
             const rec = { employeeId, period, base, additions, deductions, net, paid: false };
             if (editingPayId) {
@@ -421,7 +447,7 @@
             await ARDB.put('payroll', Object.assign({}, p, { id, paid: newPaidState }));
 
             if (newPaidState) {
-                const emp = _empById[p.employeeId];
+                const emp = _empById[String(p.employeeId)];
                 const empName = emp ? emp.name : 'موظف';
                 const date = Date.now();
 
@@ -448,7 +474,7 @@
 
                 // 2. تحديث وتسديد أقساط السلف النشطة لهذا الموظف
                 const advances = await ARDB.getAll('advances');
-                const activeAdvs = (advances || []).filter(a => a.employeeId === p.employeeId && ((a.remainingAmount === undefined ? (a.amount - (a.paidAmount||0)) : a.remainingAmount) > 0));
+                const activeAdvs = (advances || []).filter(a => String(a.employeeId) === String(p.employeeId) && ((a.remainingAmount === undefined ? (a.amount - (a.paidAmount||0)) : a.remainingAmount) > 0));
 
                 let remainingDeductToApply = Number(p.deductions || 0);
                 let countAdvPaid = 0;
