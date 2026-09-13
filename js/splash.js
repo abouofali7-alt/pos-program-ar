@@ -231,33 +231,36 @@ const ARSplash = (function () {
     }
 
     function startFilmSequence() {
-        // تشغيل صوت أزيز المحرك ونقر التروس بالتزامن مع بدء حركة التروس والمحرك بالفيلم السينمائي
+        // تشغيل المؤثرات الصوتية التزامنية للمحرك والتروس
         setTimeout(() => {
             if (_hasFinished) return;
-            ARSoundFX.playEngineHum(4.0);
+            ARSoundFX.playEngineHum(3.5);
             _gearSoundInterval = setInterval(() => {
                 if (_hasFinished) {
                     clearInterval(_gearSoundInterval);
                     return;
                 }
                 ARSoundFX.playGearClick();
-            }, 320);
+            }, 260);
 
             setTimeout(() => {
                 if (_gearSoundInterval) clearInterval(_gearSoundInterval);
-            }, 4200);
-        }, 5500);
+            }, 3200);
+        }, 4000);
 
-        // إضاءة الشعار الرئيسي والترحيب عند ذروة الفيلم السينمائي
+        // إضاءة الشعار الرئيسي والترحيب مع ظهور الشعار الرقمي في ختام الفيديو (7.8s)
         setTimeout(() => {
             if (_hasFinished) return;
             illuminateTitleLetters();
-        }, 12500);
+        }, 7600);
     }
 
     function illuminateTitleLetters() {
         const chars = document.querySelectorAll('.splash-char');
-        if (!chars.length) return;
+        if (!chars.length) {
+            showWelcomeAndRedirect();
+            return;
+        }
 
         let index = 0;
         const interval = setInterval(() => {
@@ -271,10 +274,9 @@ const ARSplash = (function () {
                 index++;
             } else {
                 clearInterval(interval);
-                // المرحلة الأخيرة: إظهار الرسالة الترحيبية والعد التنازلي للتحويل
-                setTimeout(showWelcomeAndRedirect, 500);
+                setTimeout(showWelcomeAndRedirect, 300);
             }
-        }, 280); // 10 حروف * 280ms = 2.8 ثانية
+        }, 120); // 10 حروف * 120ms = 1.2 ثانية
     }
 
     function showWelcomeAndRedirect() {
@@ -286,25 +288,16 @@ const ARSplash = (function () {
 
         if (welcomeModal) welcomeModal.classList.add('show');
         if (fillBar) {
-            fillBar.style.transition = 'width 3.5s linear';
+            fillBar.style.transition = 'width 1.8s linear';
             fillBar.style.width = '100%';
         }
 
-        let secondsLeft = 3;
-        if (subTxt) subTxt.innerHTML = `جاري التحويل لصفحة تسجيل الدخول خلال <b style="color:#38bdf8;font-size:1.05rem;">${secondsLeft}</b> ثوانٍ...`;
-
-        _countdownInterval = setInterval(() => {
-            secondsLeft--;
-            if (secondsLeft > 0 && subTxt) {
-                subTxt.innerHTML = `جاري التحويل لصفحة تسجيل الدخول خلال <b style="color:#38bdf8;font-size:1.05rem;">${secondsLeft}</b> ثوانٍ...`;
-            } else {
-                clearInterval(_countdownInterval);
-            }
-        }, 1000);
+        let secondsLeft = 2;
+        if (subTxt) subTxt.innerHTML = `مرحباً بك! جاري عرض صفحة تسجيل الدخول...`;
 
         _redirectTimer = setTimeout(() => {
             finishAndRedirect();
-        }, 3500); // 15s + 3.5s = 18.5s إجمالي الوقت السينمائي!
+        }, 1800);
     }
 
     function finishAndRedirect() {
