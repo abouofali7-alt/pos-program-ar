@@ -6,16 +6,6 @@
             var l = localStorage.getItem('ar_lang') || 'ar';
             document.documentElement.lang = l;
             document.documentElement.dir = (l === 'en') ? 'ltr' : 'rtl';
-            var s = localStorage.getItem('ar_session');
-            if (!s) {
-                window.location.href = 'pages/login.html';
-            } else {
-                var u = JSON.parse(s);
-                var isMgr = u && (u.roleId === 1 || u.roleName === 'مدير' || (u.username && u.username.toLowerCase() === 'admin'));
-                if (!isMgr) {
-                    window.location.href = 'pages/business/pos.html';
-                }
-            }
         } catch(e) {}
     </script>
     <meta charset="utf-8">
@@ -24,6 +14,7 @@
     <link rel="stylesheet" href="css/global.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/pages-css/splash.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
         .dash-container { display: flex; flex-direction: column; gap: 16px; padding: 18px; max-width: 1400px; margin: 0 auto; }
@@ -52,6 +43,190 @@
     </style>
 </head>
 <body class="dark-mode">
+
+    <!-- الشاشة التفاعلية الترحيبية والسينمائية (Splash Machinery Screen) -->
+    <div id="splashOverlay">
+        <button id="skipSplashBtn" class="splash-skip-btn" onclick="ARSplash.finishAndRedirect()">
+            <span>تخطي الانيميشن</span> <i class="fa-solid fa-forward"></i>
+        </button>
+
+        <div class="splash-stage">
+            <!-- عنوان الحروف المتسلسلة المضاءة (AR-PROGRAM) -->
+            <div class="splash-title-wrap">
+                <div class="splash-logo-title" id="splashLogoTitle">
+                    <span class="splash-char" data-idx="0">A</span>
+                    <span class="splash-char" data-idx="1">R</span>
+                    <span class="splash-char special-accent" data-idx="2">-</span>
+                    <span class="splash-char" data-idx="3">P</span>
+                    <span class="splash-char" data-idx="4">R</span>
+                    <span class="splash-char" data-idx="5">O</span>
+                    <span class="splash-char" data-idx="6">G</span>
+                    <span class="splash-char" data-idx="7">R</span>
+                    <span class="splash-char" data-idx="8">A</span>
+                    <span class="splash-char" data-idx="9">M</span>
+                </div>
+            </div>
+
+            <!-- الرسم التفاعلي الفيكتور SVG -->
+            <svg viewBox="0 0 1000 520" class="splash-svg">
+                <defs>
+                    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#0f2b48" stop-opacity="0.8"/>
+                        <stop offset="100%" stop-color="#060913" stop-opacity="1"/>
+                    </radialGradient>
+
+                    <linearGradient id="gearGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38bdf8"/>
+                        <stop offset="50%" stop-color="#0284c7"/>
+                        <stop offset="100%" stop-color="#0f172a"/>
+                    </linearGradient>
+
+                    <linearGradient id="gearGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#f59e0b"/>
+                        <stop offset="50%" stop-color="#d97706"/>
+                        <stop offset="100%" stop-color="#451a03"/>
+                    </linearGradient>
+
+                    <linearGradient id="gearGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#c084fc"/>
+                        <stop offset="50%" stop-color="#9333ea"/>
+                        <stop offset="100%" stop-color="#3b0764"/>
+                    </linearGradient>
+
+                    <filter id="dustFilter">
+                        <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" result="noise"/>
+                        <feDisplacementMap in="SourceGraphic" in2="noise" scale="12" xChannelSelector="R" yChannelSelector="G"/>
+                    </filter>
+                </defs>
+
+                <!-- خطوط موصلات الطاقة (المحرك -> العنوان) -->
+                <path id="conduitLeft" d="M 320 370 L 320 200 L 410 130" fill="none" stroke="#1e293b" stroke-width="6" stroke-linecap="round"/>
+                <path id="conduitRight" d="M 680 370 L 680 200 L 590 130" fill="none" stroke="#1e293b" stroke-width="6" stroke-linecap="round"/>
+                
+                <path id="energyPulseLeft" d="M 320 370 L 320 200 L 410 130" fill="none" stroke="#38bdf8" stroke-width="6" stroke-dasharray="30 150" stroke-dashoffset="180" stroke-linecap="round" opacity="0"/>
+                <path id="energyPulseRight" d="M 680 370 L 680 200 L 590 130" fill="none" stroke="#c084fc" stroke-width="6" stroke-dasharray="30 150" stroke-dashoffset="180" stroke-linecap="round" opacity="0"/>
+
+                <!-- منصة الورشة والآلة -->
+                <rect x="220" y="420" width="560" height="25" rx="6" fill="#1e293b" stroke="#334155" stroke-width="3"/>
+                <rect x="190" y="445" width="620" height="40" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="3"/>
+
+                <!-- المحرك الرئيسي (Engine Motor Group) -->
+                <g id="engineGroup" transform="translate(620, 310)">
+                    <rect x="0" y="0" width="115" height="110" rx="14" fill="#0f172a" stroke="#38bdf8" stroke-width="3" id="engineHousing"/>
+                    <!-- مكابس وقدرة المحرك -->
+                    <rect x="20" y="18" width="28" height="45" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="2" id="piston1"/>
+                    <rect x="67" y="18" width="28" height="45" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="2" id="piston2"/>
+                    <circle cx="58" cy="85" r="15" fill="#1e293b" stroke="#f59e0b" stroke-width="3"/>
+                    <circle cx="58" cy="85" r="6" fill="#38bdf8"/>
+                </g>
+
+                <!-- مجموعة التروس المتداخلة (Interlocking Gears Cluster) -->
+                <g id="gearsCluster">
+                    <!-- الترس الرئيسي الكبير 1 (المنتصف) -->
+                    <g id="gear1" transform="translate(430, 330)">
+                        <circle cx="0" cy="0" r="55" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="4"/>
+                        <circle cx="0" cy="0" r="22" fill="#0f172a" stroke="#38bdf8" stroke-width="3"/>
+                        <circle cx="0" cy="0" r="8" fill="#38bdf8"/>
+                        <!-- أسنان الترس -->
+                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(0)"/>
+                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(45)"/>
+                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(90)"/>
+                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(135)"/>
+                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(180)"/>
+                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(225)"/>
+                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(270)"/>
+                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(315)"/>
+                        <!-- أسلاك الترس الداخلي -->
+                        <line x1="-40" y1="0" x2="40" y2="0" stroke="#0f172a" stroke-width="5"/>
+                        <line x1="0" y1="-40" x2="0" y2="40" stroke="#0f172a" stroke-width="5"/>
+                    </g>
+
+                    <!-- الترس الأوسط 2 (يسار متداخل) -->
+                    <g id="gear2" transform="translate(320, 365)">
+                        <circle cx="0" cy="0" r="40" fill="url(#gearGrad2)" stroke="#d97706" stroke-width="3"/>
+                        <circle cx="0" cy="0" r="16" fill="#0f172a" stroke="#f59e0b" stroke-width="2"/>
+                        <circle cx="0" cy="0" r="6" fill="#f59e0b"/>
+                        <!-- 6 أسنان -->
+                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(0)"/>
+                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(60)"/>
+                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(120)"/>
+                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(180)"/>
+                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(240)"/>
+                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(300)"/>
+                    </g>
+
+                    <!-- الترس الصغير 3 (يمين متداخل متصل بالمحرك) -->
+                    <g id="gear3" transform="translate(540, 310)">
+                        <circle cx="0" cy="0" r="30" fill="url(#gearGrad3)" stroke="#9333ea" stroke-width="3"/>
+                        <circle cx="0" cy="0" r="12" fill="#0f172a" stroke="#c084fc" stroke-width="2"/>
+                        <circle cx="0" cy="0" r="5" fill="#c084fc"/>
+                        <!-- أسنان الترس -->
+                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(0)"/>
+                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(60)"/>
+                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(120)"/>
+                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(180)"/>
+                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(240)"/>
+                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(300)"/>
+                    </g>
+                </g>
+
+                <!-- بريق التماع التروس عند النظافة -->
+                <g id="sparkleGroup" opacity="0" transform="translate(430, 330)">
+                    <polygon points="0,-25 6,-6 25,0 6,6 0,25 -6,6 -25,0 -6,-6" fill="#ffffff"/>
+                    <polygon points="-80,20 -75,30 -60,35 -75,40 -80,50 -85,40 -100,35 -85,30" fill="#38bdf8"/>
+                </g>
+
+                <!-- طبقة الأتربة والغبار فوق التروس (Dust Overlay Layer) -->
+                <g id="dustLayer">
+                    <ellipse cx="430" cy="330" rx="145" ry="105" fill="#6d5847" opacity="0.82" filter="url(#dustFilter)"/>
+                    <ellipse cx="330" cy="370" rx="75" ry="60" fill="#544336" opacity="0.78" filter="url(#dustFilter)"/>
+                    <ellipse cx="535" cy="310" rx="65" ry="50" fill="#7a6350" opacity="0.75" filter="url(#dustFilter)"/>
+                </g>
+
+                <!-- شخص يرتدي زي الصيانة ومدي للمستخدم ضهره يمسح الأتربة (Technician Silhouette) -->
+                <g id="technicianGroup" transform="translate(370, 245)">
+                    <!-- القدمان والحذاء -->
+                    <path d="M 40 180 L 30 250 L 55 250 L 50 180 Z" fill="#0f172a" stroke="#1e293b"/>
+                    <path d="M 65 180 L 60 250 L 85 250 L 75 180 Z" fill="#0f172a" stroke="#1e293b"/>
+                    <ellipse cx="42" cy="250" rx="15" ry="6" fill="#1e293b"/>
+                    <ellipse cx="72" cy="250" rx="15" ry="6" fill="#1e293b"/>
+
+                    <!-- الجذع والسترة (من الخلف مع الأحزمة والتفاصيل) -->
+                    <path d="M 25 85 C 25 65, 90 65, 90 85 L 85 180 L 30 180 Z" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+                    <path d="M 42 85 L 42 180 M 73 85 L 73 180 M 30 125 L 85 125" stroke="#0f172a" stroke-width="3"/>
+                    <rect x="40" y="140" width="35" height="15" rx="3" fill="#0f172a" stroke="#334155"/>
+
+                    <!-- الرأس وقبعة الصيانة من الخلف -->
+                    <ellipse cx="57" cy="46" rx="21" ry="23" fill="#0f172a"/>
+                    <path d="M 35 44 C 35 22, 79 22, 79 44 Z" fill="#0284c7"/>
+                    <rect x="36" y="41" width="43" height="7" rx="3" fill="#0369a1"/>
+
+                    <!-- الذراع اليسرى مستندة على الخصر -->
+                    <path d="M 25 90 Q 5 125, 25 145" fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
+
+                    <!-- الذراع اليمنى المتحركة مع قماش مسح الغبار -->
+                    <g id="rightArmWipingGroup">
+                        <path d="M 85 90 Q 125 75, 115 45" fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
+                        <g id="handCloth" transform="translate(115, 45)">
+                            <circle cx="0" cy="0" r="7" fill="#d97706"/>
+                            <!-- قماش المسح White Dusting Cloth -->
+                            <path d="M -14 -12 C 12 -22, 28 10, 8 22 C -16 16, -22 -6, -14 -12 Z" fill="#f8fafc" opacity="0.95"/>
+                        </g>
+                    </g>
+                </g>
+            </svg>
+
+            <!-- نافذة الترحيب والتوجيه النهائي -->
+            <div class="splash-welcome-modal" id="welcomeModal">
+                <div class="splash-welcome-title"><i class="fa-solid fa-circle-check" style="color:var(--success, #22c55e);"></i> أهلاً بك في نظام AR-Program</div>
+                <div class="splash-welcome-sub">النظام الذكي لإدارة الحسابات، المبيعات، الرواتب، والمخزون</div>
+                <div class="splash-progress-bar">
+                    <div class="splash-progress-fill" id="splashProgressFill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="appHeaderHost"></div>
 
     <main class="dash-container">
@@ -70,19 +245,19 @@
         <!-- الصف الأول: كروت KPI الأربعة -->
         <div class="kpi-row">
             <div class="kpi-card">
-                <div class="kpi-value" id="kpiSales">438K</div>
+                <div class="kpi-value" id="kpiSales">0.00</div>
                 <div class="kpi-label">إجمالي المبيعات (Sum of Amount)</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-value" id="kpiProfit" style="color:var(--accent-cyan);">37K</div>
+                <div class="kpi-value" id="kpiProfit" style="color:var(--accent-cyan);">0.00</div>
                 <div class="kpi-label">إجمالي الأرباح (Sum of Profit)</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-value" id="kpiQty" style="color:var(--accent-purple);">5,615</div>
+                <div class="kpi-value" id="kpiQty" style="color:var(--accent-purple);">0</div>
                 <div class="kpi-label">الكميات المباعة (Sum of Quantity)</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-value" id="kpiAov" style="color:var(--accent-pink);">121K</div>
+                <div class="kpi-value" id="kpiAov" style="color:var(--accent-pink);">0.00</div>
                 <div class="kpi-label">متوسط قيمة الطلب (Sum of AOV)</div>
             </div>
         </div>
@@ -151,6 +326,7 @@
     <script src="js/db.js"></script>
     <script src="js/charts.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/splash.js"></script>
     <script>
         let _invoices = [], _products = [], _customers = [], _categories = [], _expenses = [];
 
@@ -397,39 +573,6 @@
                 }
             });
         }
-
-        function filterQuarter(qtrNum, btn) {
-            document.querySelectorAll('.qtr-btn').forEach(b => b.classList.remove('active'));
-            if (btn) btn.classList.add('active');
-
-            let filteredInvoices = _invoices || [];
-            let filteredExpenses = _expenses || [];
-
-            if (qtrNum !== null && qtrNum !== undefined) {
-                const startMonth = (qtrNum - 1) * 3;
-                const endMonth = startMonth + 2;
-
-                filteredInvoices = (_invoices || []).filter(inv => {
-                    if (!inv || !inv.date) return false;
-                    const m = new Date(inv.date).getMonth();
-                    return m >= startMonth && m <= endMonth;
-                });
-
-                filteredExpenses = (_expenses || []).filter(exp => {
-                    if (!exp || !exp.date) return false;
-                    const m = new Date(exp.date).getMonth();
-                    return m >= startMonth && m <= endMonth;
-                });
-            }
-
-            renderKPIs(filteredInvoices, _products);
-            renderCharts(filteredInvoices, _products, _categories, _customers, filteredExpenses);
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            initDashboard();
-            setTimeout(applyDashboardPermissions, 200);
-        });
     </script>
 </body>
 </html>
