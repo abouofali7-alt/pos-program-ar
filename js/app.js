@@ -268,6 +268,9 @@
         const isIndexPage = p.endsWith('index.html') || p === '/' || p.endsWith('/') || !p.includes('/pages/');
 
         if (!user && !isLoginPage) {
+            if (isIndexPage && document.getElementById('splashOverlay')) {
+                return { dbReady: true, user: null };
+            }
             window.location.href = relPrefix() + 'pages/login.html';
             return { dbReady: true, user: null };
         } else if (user && isLoginPage) {

@@ -1,6 +1,7 @@
 /* ============================================================
    AR-Program — Cinematic Machinery & Gear Splash Animation
    شاشة البداية التفاعلية: مسح التروس، تشغيل المحرك، وإضاءة الحروف
+   ممتدة لمدة 15 - 16 ثانية على الأقل
    ============================================================ */
 
 #splashOverlay {
@@ -31,7 +32,7 @@
     left: 24px;
     z-index: 10;
     background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     color: var(--text-secondary, #94a3b8);
     padding: 8px 18px;
     border-radius: 20px;
@@ -90,21 +91,21 @@
     display: inline-block;
     color: #1e293b;
     text-shadow: none;
-    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     transform: scale(0.85);
-    opacity: 0.35;
+    opacity: 0.3;
 }
 
 .splash-char.lit {
     color: #38bdf8;
     opacity: 1;
-    transform: scale(1.15);
-    text-shadow: 0 0 14px #38bdf8, 0 0 28px #0284c7, 0 0 45px #38bdf8;
+    transform: scale(1.18);
+    text-shadow: 0 0 16px #38bdf8, 0 0 32px #0284c7, 0 0 50px #38bdf8;
 }
 
 .splash-char.special-accent.lit {
     color: #c084fc;
-    text-shadow: 0 0 14px #c084fc, 0 0 28px #9333ea, 0 0 45px #c084fc;
+    text-shadow: 0 0 16px #c084fc, 0 0 32px #9333ea, 0 0 50px #c084fc;
 }
 
 /* رسالة الترحيب والشاشات المستقرة */
@@ -158,36 +159,38 @@
     width: 0%;
     background: linear-gradient(90deg, #38bdf8, #c084fc);
     border-radius: 10px;
-    transition: width 2.2s linear;
     box-shadow: 0 0 12px #38bdf8;
 }
 
 /* === Keyframe Animations === */
 
-/* تحريك يد وقماش المسح */
+/* تحريك يد وقماش المسح على مدار 4.5 ثوانٍ */
 @keyframes wipingHandMotion {
     0% { transform: translate(0, 0) rotate(0deg); }
-    20% { transform: translate(-80px, 20px) rotate(-15deg); }
-    40% { transform: translate(25px, -15px) rotate(10deg); }
-    60% { transform: translate(-65px, 25px) rotate(-10deg); }
-    80% { transform: translate(15px, -5px) rotate(5deg); }
+    15% { transform: translate(-85px, 22px) rotate(-15deg); }
+    30% { transform: translate(30px, -15px) rotate(12deg); }
+    45% { transform: translate(-70px, 28px) rotate(-12deg); }
+    60% { transform: translate(20px, -8px) rotate(8deg); }
+    75% { transform: translate(-50px, 15px) rotate(-8deg); }
+    90% { transform: translate(10px, -4px) rotate(4deg); }
     100% { transform: translate(0, 0) rotate(0deg); }
 }
 
 .wiping-arm {
     transform-origin: 85px 95px;
-    animation: wipingHandMotion 2.8s ease-in-out 1 forwards;
+    animation: wipingHandMotion 4.5s ease-in-out 1 forwards;
 }
 
-/* ذوبان الأتربة */
+/* ذوبان الأتربة على مدار 4.5 ثوانٍ */
 @keyframes dustFadeOut {
     0% { opacity: 0.85; }
-    70% { opacity: 0.25; }
+    50% { opacity: 0.5; }
+    80% { opacity: 0.2; }
     100% { opacity: 0; visibility: hidden; }
 }
 
 .dust-layer-anim {
-    animation: dustFadeOut 2.8s ease-in-out forwards;
+    animation: dustFadeOut 4.5s ease-in-out forwards;
 }
 
 /* دوران التروس */
@@ -251,16 +254,16 @@
 }
 
 .energy-line-anim {
-    animation: energyPulseFlow 1.2s ease-out forwards;
+    animation: energyPulseFlow 1.8s ease-out forwards;
 }
 
 /* شرار أو بريق نظافة التروس */
 @keyframes sparkleFlash {
     0% { opacity: 0; transform: scale(0.4); }
-    50% { opacity: 1; transform: scale(1.4); }
+    50% { opacity: 1; transform: scale(1.5); }
     100% { opacity: 0; transform: scale(0.4); }
 }
 
 .sparkle-anim {
-    animation: sparkleFlash 0.6s ease-out forwards;
+    animation: sparkleFlash 0.8s ease-out forwards;
 }
