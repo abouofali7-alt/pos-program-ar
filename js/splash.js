@@ -231,57 +231,26 @@ const ARSplash = (function () {
     }
 
     function startFilmSequence() {
-        const frame1 = document.getElementById('filmFrame1');
-        const frame2 = document.getElementById('filmFrame2');
-        const frame3 = document.getElementById('filmFrame3');
-        const frame4 = document.getElementById('filmFrame4');
-
-        // المشهد 1: إنسان يتقدم في الورشة باتجاه آلة التروس (0s - 4.5s)
-        if (frame1) frame1.classList.add('active');
-        setSceneCaption('المشهد الأول: التقدم نحو آلة الرواتب والمبيعات في الورشة الصناعية...');
-
-        // المشهد 2: نفض ومسح الأتربة عن التروس الماسية (4.5s - 8.5s)
+        // تشغيل صوت أزيز المحرك ونقر التروس بالتزامن مع بدء حركة التروس والمحرك بالفيلم السينمائي
         setTimeout(() => {
             if (_hasFinished) return;
-            if (frame1) frame1.classList.remove('active');
-            if (frame2) frame2.classList.add('active');
-            setSceneCaption('المشهد الثاني: نفض الأتربة وإعادة تجهيز التروس للعمل...');
-
-            // تشغيل مؤثر مسح الغبار 3 مرات متتالية
-            ARSoundFX.playWipeSwoosh();
-            setTimeout(() => { if (!_hasFinished) ARSoundFX.playWipeSwoosh(); }, 1200);
-            setTimeout(() => { if (!_hasFinished) ARSoundFX.playWipeSwoosh(); }, 2400);
-        }, 4500);
-
-        // المشهد 3: دوران التروس واشتعال المحرك وانطلاق الطاقة (8.5s - 12.5s)
-        setTimeout(() => {
-            if (_hasFinished) return;
-            if (frame2) frame2.classList.remove('active');
-            if (frame3) frame3.classList.add('active');
-            setSceneCaption('المشهد الثالث: انطلاق التروس واشتعال المحرك وتوليد الطاقة...');
-
-            // تشغيل صوت أزيز المحرك ونقر التروس
-            ARSoundFX.playEngineHum(3.8);
+            ARSoundFX.playEngineHum(4.0);
             _gearSoundInterval = setInterval(() => {
                 if (_hasFinished) {
                     clearInterval(_gearSoundInterval);
                     return;
                 }
                 ARSoundFX.playGearClick();
-            }, 300);
+            }, 320);
 
             setTimeout(() => {
                 if (_gearSoundInterval) clearInterval(_gearSoundInterval);
-            }, 3800);
-        }, 8500);
+            }, 4200);
+        }, 5500);
 
-        // المشهد 4: ظهور الشعار وتتابع إضاءة الحروف (12.5s)
+        // إضاءة الشعار الرئيسي والترحيب عند ذروة الفيلم السينمائي
         setTimeout(() => {
             if (_hasFinished) return;
-            if (frame3) frame3.classList.remove('active');
-            if (frame4) frame4.classList.add('active');
-            setSceneCaption('المشهد الرابع: جاهزية نظام AR-Program وإضاءة الشعار الرئيسي');
-
             illuminateTitleLetters();
         }, 12500);
     }
