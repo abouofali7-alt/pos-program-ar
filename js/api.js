@@ -124,11 +124,9 @@ const API = (function () {
             }
         } catch(e) {
             _pushQueue.unshift(...batch);
+            setTimeout(processPushQueue, 1500);
         } finally {
             _isPushing = false;
-            if (_pushQueue.length > 0) {
-                setTimeout(processPushQueue, 0);
-            }
         }
     }
 
@@ -301,12 +299,25 @@ const API = (function () {
 
         _syncTimer = setInterval(async () => {
             await pullCloudSync();
+            if (typeof _pushQueue !== 'undefined' && _pushQueue.length && !_isPushing) {
+                processPushQueue();
+            }
         }, 2000);
 
         if (typeof window !== 'undefined') {
-            window.addEventListener('focus', () => pullCloudSync(true));
+            window.addEventListener('focus', () => {
+                pullCloudSync(true);
+                if (typeof _pushQueue !== 'undefined' && _pushQueue.length) processPushQueue();
+            });
             document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) pullCloudSync(true);
+                if (!document.hidden) {
+                    pullCloudSync(true);
+                    if (typeof _pushQueue !== 'undefined' && _pushQueue.length) processPushQueue();
+                }
+            });
+            window.addEventListener('online', () => {
+                if (typeof _pushQueue !== 'undefined' && _pushQueue.length) processPushQueue();
+                pullCloudSync(true);
             });
         }
     }
@@ -327,7 +338,7 @@ const API = (function () {
                 item.id = Date.now() + Math.floor(Math.random() * 10000);
             }
         }
-        await ARDB.localPut(store, item);
+        await ARDB.localPut(store, item, true);
         const finalId = (item && item.id) ? item.id : Date.now();
         pushItemToCloud(store, item, 'save');
         return finalId;
@@ -337,13 +348,13 @@ const API = (function () {
         if (typeof item === 'object' && item !== null && !item.id) {
             item.id = Date.now() + Math.floor(Math.random() * 10000);
         }
-        await ARDB.localPut(store, item);
+        await ARDB.localPut(store, item, true);
         pushItemToCloud(store, item, 'save');
         return item;
     }
 
     async function remove(store, id) {
-        await ARDB.localRemove(store, id);
+        await ARDB.localRemove(store, id, true);
         pushItemToCloud(store, { id }, 'delete');
         return true;
     }

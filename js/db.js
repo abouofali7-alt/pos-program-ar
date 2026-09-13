@@ -261,7 +261,8 @@ const ARDB = (function () {
                             const merged = Object.assign({}, matched, patch, { id: matched.id, updatedAt: now });
                             return API.update(store, merged);
                         }
-                        throw new Error('record not found: ' + id);
+                        const created = Object.assign({}, patch, { id, updatedAt: now });
+                        return API.update(store, created);
                     });
                 }
                 const targetId = rec.id !== undefined ? rec.id : id;
@@ -332,13 +333,13 @@ const ARDB = (function () {
             { id: 4, name: 'موظف', description: 'الصلاحيات الأساسية', permissions: ['business'] },
             { id: 5, name: 'فني صيانة', description: 'إدارة وتتبع تذاكر الصيانة والأجهزة والمعدات', permissions: ['maintenance', 'inventory', 'business'] }
         ];
-        for (const r of roles) await localPut('roles', r);
+        for (const r of roles) await localPut('roles', r, true);
 
         // مستخدم مدير رئيسي — كلمة السر: admin123
         await localPut('users', {
             id: 1, username: 'admin', password: hashPassword('admin123'), name: 'مدير النظام',
             roleId: 1, roleName: 'مدير', active: true, createdAt: now
-        });
+        }, true);
 
         // الأقسام
         const deps = [
@@ -347,10 +348,10 @@ const ARDB = (function () {
             { id: 3, name: 'المخزون واللوجستيات', description: '' },
             { id: 4, name: 'فني صيانة', description: 'قسم صيانة الأجهزة والمنتجات والدعم الفني' }
         ];
-        for (const d of deps) await localPut('departments', d);
+        for (const d of deps) await localPut('departments', d, true);
 
         // المخازن
-        await localPut('warehouses', { id: 1, name: 'المخزن الرئيسي', location: '', manager: '', description: '' });
+        await localPut('warehouses', { id: 1, name: 'المخزن الرئيسي', location: '', manager: '', description: '' }, true);
 
         // شجرة الحسابات الأولية
         const accounts = [
@@ -369,11 +370,11 @@ const ARDB = (function () {
             { id: 13, code: '5100', name: 'المصروفات التشغيلية', type: 'expense', parentId: 12 },
             { id: 14, code: '5200', name: 'المشتريات', type: 'expense', parentId: 12 }
         ];
-        for (const a of accounts) await localPut('accounts', a);
+        for (const a of accounts) await localPut('accounts', a, true);
 
-        await localPut('settings', { key: 'companyName', value: 'AR-Program' });
-        await localPut('settings', { key: 'currency', value: 'ج.م' });
-        await localPut('settings', { key: 'seeded', value: String(now) });
+        await localPut('settings', { key: 'companyName', value: 'AR-Program' }, true);
+        await localPut('settings', { key: 'currency', value: 'ج.م' }, true);
+        await localPut('settings', { key: 'seeded', value: String(now) }, true);
     }
 
     /* ---------- حماية كلمة السر (Hash بسيط غير قابل للعكس) ---------- */
