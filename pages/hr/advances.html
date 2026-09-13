@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سُلف الموظفين — AR-Program</title>
+    <link rel="stylesheet" href="../../css/global.css">
+    <link rel="stylesheet" href="../../css/app.css">
+    <link rel="stylesheet" href="../../css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .stat-card { background: var(--card-dark); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 18px; box-shadow: var(--shadow-card); }
+        .stat-card .label { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .stat-card .value { font-size: 1.4rem; font-weight: 800; color: var(--text-primary); }
+        .stat-card .value.cyan { color: var(--accent-cyan); }
+        .stat-card .value.amber { color: var(--warning); }
+        .stat-card .value.green { color: var(--success); }
+        .stat-card .value.purple { color: var(--accent-purple); }
+    </style>
+</head>
+<body class="dark-mode">
+    <div id="appHeaderHost"></div>
+
+    <main class="pagewrap" style="padding:22px;max-width:1300px;margin:0 auto;">
+        <div class="page-head">
+            <div>
+                <h2><i class="fa-solid fa-hand-holding-dollar" style="color:var(--warning);"></i> سُلف وقروض الموظفين</h2>
+                <div class="sub">تسجيل السلف، تحديد الأقساط الشهريّة، وتتبع التسديد والخصم المباشر من الرواتب</div>
+            </div>
+            <div class="page-actions" style="display:flex;gap:8px;">
+                <button class="btn btn-secondary" onclick="ARExport.tableToCSV('advancesTable', 'سلف_الموظفين')"><i class="fa-solid fa-file-excel"></i> تصدير Excel</button>
+                <button class="btn btn-primary-soft" onclick="openAdvModal()"><i class="fa-solid fa-plus"></i> سُلفة جديدة</button>
+            </div>
+        </div>
+
+        <!-- إحصائيات سريعة -->
+        <div class="stat-grid">
+            <div class="stat-card"><div class="label">إجمالي السُلَف القائمة (المتبقي ذمة)</div><div class="value amber" id="stActiveBalance">0.00 ج.م</div></div>
+            <div class="stat-card"><div class="label">إجمالي السُلَف الممنوحة الكلية</div><div class="value cyan" id="stTotalGranted">0.00 ج.م</div></div>
+            <div class="stat-card"><div class="label">إجمالي المبالغ المسددة</div><div class="value green" id="stTotalPaid">0.00 ج.م</div></div>
+            <div class="stat-card"><div class="label">عدد السُلف النشطة</div><div class="value purple" id="stActiveCount">0</div></div>
+        </div>
+
+        <div class="table-card">
+            <div class="table-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 16px;">
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button class="btn btn-sm btn-secondary active" onclick="filterStatus('all', this)">الكل</button>
+                    <button class="btn btn-sm btn-secondary" onclick="filterStatus('active', this)">السلف النشطة</button>
+                    <button class="btn btn-sm btn-secondary" onclick="filterStatus('completed', this)">المسددة بالكامل</button>
+                </div>
+                <div style="position:relative;width:min(320px,100%);">
+                    <i class="fa-solid fa-magnifying-glass" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:0.85rem;"></i>
+                    <input type="text" id="advSearch" oninput="renderAdvances()" placeholder="بحث باسم الموظف أو الملاحظات..." style="width:100%;padding:6px 30px 6px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);font-size:0.85rem;">
+                </div>
+            </div>
+            <div class="table-scroll">
+                <table class="data-table" id="advancesTable">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>الموظف</th>
+                            <th>مبلغ السلفة الكلي</th>
+                            <th>طريقة / قسط السداد</th>
+                            <th>المسدد حتى الآن</th>
+                            <th>المتبقي (الذمة)</th>
+                            <th>الحالة</th>
+                            <th>ملاحظات</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="advBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal إضافة / تعديل سلفة -->
+    <div id="advModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closeAdvModal()">
+        <div class="modal-box" style="width:min(620px,94vw);">
+            <h3 id="advModalTitle"><i class="fa-solid fa-hand-holding-dollar" style="color:var(--warning);"></i> تسجيل سُلفة جديدة للموظف</h3>
+            <div class="form-grid">
+                <div class="form-item"><label>الموظف *</label><select id="aEmp"></select></div>
+                <div class="form-item"><label>تاريخ السلفة *</label><input type="date" id="aDate"></div>
+                <div class="form-item"><label>مبلغ السلفة الكلي (ج.م) *</label><input type="number" id="aAmount" step="0.01" min="0" placeholder="0.00"></div>
+                <div class="form-item">
+                    <label>قسط الخصم الشهري من الراتب (ج.م)</label>
+                    <input type="number" id="aInstallment" step="0.01" min="0" placeholder="اتركه 0 لخصم السلفة بالكامل دفعة واحدة">
+                </div>
+                <div class="form-item" style="grid-column:1/-1;"><label>ملاحظات / السبب</label><input id="aNotes" placeholder="سبب السلفة أو أية تفاصيل..."></div>
+                
+                <div class="form-item" style="grid-column:1/-1;margin-top:6px;" id="disburseWrap">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--success);">
+                        <input type="checkbox" id="aDisburseNow" checked style="width:17px;height:17px;accent-color:var(--success);">
+                        <span>صرف وإخراج المبلغ من الخزينة فوراً وتسجيل مصروف/قيد السلفة بالمحاسبة</span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+                <button class="btn btn-secondary" onclick="closeAdvModal()">إلغاء</button>
+                <button class="btn btn-primary-soft" onclick="saveAdv()"><i class="fa-solid fa-floppy-disk"></i> حفظ السلفة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal تسديد يدوي جزئي أو كلي للسلفة -->
+    <div id="payAdvModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closePayAdvModal()">
+        <div class="modal-box" style="width:min(480px,94vw);">
+            <h3><i class="fa-solid fa-receipt" style="color:var(--success);"></i> تسديد يدوي للسلفة</h3>
+            <div style="margin-bottom:12px;font-size:0.9rem;color:var(--text-secondary);" id="payAdvEmpInfo"></div>
+            <div class="form-grid" style="grid-template-columns:1fr;">
+                <div class="form-item"><label>المبلغ المراد تسديده الآن (ج.م) *</label><input type="number" id="pAdvAmount" step="0.01" min="0"></div>
+                <div class="form-item"><label>ملاحظات التسديد</label><input id="pAdvNotes" placeholder="مثال: تسديد نقدي خارج مسير الرواتب"></div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+                <button class="btn btn-secondary" onclick="closePayAdvModal()">إلغاء</button>
+                <button class="btn btn-primary-soft" onclick="confirmManualAdvPayment()"><i class="fa-solid fa-check"></i> تأكيد التسديد وإيداع بالخزينة</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/ui.js"></script>
+    <script src="../../js/db.js"></script>
+    <script src="../../js/export.js"></script>
+    <script src="../../js/app.js"></script>
+    <script>
+        let _advances = [];
+        let _employees = [];
+        let _empById = {};
+        let editingAdvId = null;
+        let activePayAdvId = null;
+        let selectedStatusFilter = 'all';
+
+        async function load() {
+            const [employees, advances] = await Promise.all([ARDB.getAll('employees'), ARDB.getAll('advances')]);
+            _employees = employees || [];
+            _advances = advances || [];
+            _empById = {};
+            _employees.forEach(e => _empById[e.id] = e);
+
+            const sel = document.getElementById('aEmp');
+            sel.innerHTML = '<option value="">— اختر الموظف —</option>' + _employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+
+            renderKPIs();
+            renderAdvances();
+        }
+
+        function renderKPIs() {
+            const activeList = _advances.filter(a => (a.remainingAmount === undefined ? (a.amount - (a.paidAmount || 0)) : a.remainingAmount) > 0);
+            const activeBalance = activeList.reduce((sum, a) => sum + (a.remainingAmount === undefined ? (a.amount - (a.paidAmount || 0)) : a.remainingAmount), 0);
+            const totalGranted = _advances.reduce((sum, a) => sum + Number(a.amount || 0), 0);
+            const totalPaid = _advances.reduce((sum, a) => sum + Number(a.paidAmount || 0), 0);
+            const activeEmpIds = new Set(activeList.map(a => a.employeeId));
+
+            document.getElementById('stActiveBalance').textContent = UI.money(activeBalance) + ' ج.م';
+            document.getElementById('stTotalGranted').textContent = UI.money(totalGranted) + ' ج.م';
+            document.getElementById('stTotalPaid').textContent = UI.money(totalPaid) + ' ج.م';
+            document.getElementById('stActiveCount').textContent = activeEmpIds.size;
+        }
+
+        function filterStatus(st, btn) {
+            selectedStatusFilter = st;
+            const btns = btn.parentElement.querySelectorAll('button');
+            btns.forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            renderAdvances();
+        }
+
+        function renderAdvances() {
+            const q = (document.getElementById('advSearch').value || '').trim().toLowerCase();
+            let filtered = _advances;
+
+            if (selectedStatusFilter === 'active') {
+                filtered = filtered.filter(a => (a.remainingAmount === undefined ? (a.amount - (a.paidAmount || 0)) : a.remainingAmount) > 0);
+            } else if (selectedStatusFilter === 'completed') {
+                filtered = filtered.filter(a => (a.remainingAmount === undefined ? (a.amount - (a.paidAmount || 0)) : a.remainingAmount) <= 0);
+            }
+
+            if (q) {
+                filtered = filtered.filter(a => {
+                    const empName = (_empById[a.employeeId] ? _empById[a.employeeId].name : '').toLowerCase();
+                    const notes = String(a.notes || '').toLowerCase();
+                    return empName.includes(q) || notes.includes(q);
+                });
+            }
+
+            filtered.sort((a, b) => (b.date || 0) - (a.date || 0));
+
+            const body = document.getElementById('advBody');
+            body.innerHTML = filtered.map(a => {
+                const empName = _empById[a.employeeId] ? _empById[a.employeeId].name : '—';
+                const totalAmt = Number(a.amount || 0);
+                const paidAmt = Number(a.paidAmount || 0);
+                const remAmt = Math.max(0, totalAmt - paidAmt);
+                const isCompleted = remAmt <= 0;
+                const installment = Number(a.monthlyInstallment || 0);
+
+                const installmentLabel = installment > 0
+                    ? `<span class="badge badge-blue">خصم شهري: ${UI.money(installment)}</span>`
+                    : `<span class="badge badge-secondary">خصم دفعة واحدة</span>`;
+
+                const stBadge = isCompleted
+                    ? `<span class="badge badge-green"><i class="fa-solid fa-check"></i> مسددة بالكامل</span>`
+                    : `<span class="badge badge-amber"><i class="fa-solid fa-clock"></i> نشطة (متبقي ${UI.money(remAmt)})</span>`;
+
+                return `<tr>
+                    <td>${UI.date(a.date)}</td>
+                    <td><b>${empName}</b></td>
+                    <td class="num" style="font-weight:700;">${UI.money(totalAmt)}</td>
+                    <td>${installmentLabel}</td>
+                    <td class="num" style="color:var(--success);">${UI.money(paidAmt)}</td>
+                    <td class="num" style="font-weight:800;color:${remAmt > 0 ? 'var(--warning)' : 'var(--text-muted)'};">${UI.money(remAmt)}</td>
+                    <td>${stBadge}</td>
+                    <td style="font-size:0.85rem;color:var(--text-secondary);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${a.notes || ''}">${a.notes || '—'}</td>
+                    <td style="text-align:left;white-space:nowrap;">
+                        ${!isCompleted ? `<button class="btn btn-sm btn-primary-soft" onclick="openPayAdvModal(${a.id})" title="تسديد جزء أو باقي السلفة"><i class="fa-solid fa-receipt"></i> تسديد</button> ` : ''}
+                        <button class="btn btn-sm" onclick="editAdv(${a.id})" title="تعديل"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="delAdv(${a.id})" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="9" class="empty-state">لا توجد سُلف مسجلة</td></tr>';
+        }
+
+        function openAdvModal() {
+            editingAdvId = null;
+            document.getElementById('advModalTitle').innerHTML = '<i class="fa-solid fa-hand-holding-dollar" style="color:var(--warning);"></i> تسجيل سُلفة جديدة للموظف';
+            document.getElementById('aEmp').value = '';
+            document.getElementById('aDate').value = UI.todayInput();
+            document.getElementById('aAmount').value = '';
+            document.getElementById('aInstallment').value = '';
+            document.getElementById('aNotes').value = '';
+            document.getElementById('aDisburseNow').checked = true;
+            document.getElementById('disburseWrap').style.display = 'block';
+
+            document.getElementById('advModal').style.visibility = 'visible';
+            document.getElementById('advModal').style.opacity = '1';
+        }
+
+        function closeAdvModal() {
+            document.getElementById('advModal').style.visibility = 'hidden';
+            document.getElementById('advModal').style.opacity = '0';
+        }
+
+        async function editAdv(id) {
+            const a = await ARDB.getById('advances', id);
+            if (!a) return;
+            editingAdvId = id;
+            document.getElementById('advModalTitle').innerHTML = '<i class="fa-solid fa-pen" style="color:var(--accent-cyan);"></i> تعديل بيانات السُلفة';
+            document.getElementById('aEmp').value = a.employeeId || '';
+            document.getElementById('aDate').value = a.date ? UI.todayInput(a.date) : UI.todayInput();
+            document.getElementById('aAmount').value = a.amount || '';
+            document.getElementById('aInstallment').value = a.monthlyInstallment || '';
+            document.getElementById('aNotes').value = a.notes || '';
+            document.getElementById('disburseWrap').style.display = 'none';
+
+            document.getElementById('advModal').style.visibility = 'visible';
+            document.getElementById('advModal').style.opacity = '1';
+        }
+
+        async function saveAdv() {
+            const employeeId = Number(document.getElementById('aEmp').value);
+            const dateStr = document.getElementById('aDate').value;
+            const amount = Number(document.getElementById('aAmount').value) || 0;
+            const monthlyInstallment = Number(document.getElementById('aInstallment').value) || 0;
+            const notes = document.getElementById('aNotes').value.trim();
+            const disburseNow = document.getElementById('aDisburseNow').checked;
+
+            if (!employeeId || !dateStr || amount <= 0) {
+                UI.toast('اختر الموظف وحدد المبلغ والتاريخ بصورة صحيحة', 'warn');
+                return;
+            }
+
+            const emp = _empById[employeeId];
+            const empName = emp ? emp.name : 'موظف';
+            const date = new Date(dateStr + 'T12:00:00').getTime();
+
+            if (editingAdvId) {
+                const old = await ARDB.getById('advances', editingAdvId);
+                const paidAmount = old ? (old.paidAmount || 0) : 0;
+                const remainingAmount = Math.max(0, amount - paidAmount);
+                const status = remainingAmount <= 0 ? 'completed' : 'active';
+
+                const rec = {
+                    ...old,
+                    employeeId,
+                    employeeName: empName,
+                    date,
+                    amount,
+                    monthlyInstallment,
+                    paidAmount,
+                    remainingAmount,
+                    status,
+                    notes
+                };
+                await ARDB.put('advances', rec);
+                UI.toast('تم تعديل بيانات السلفة بنجاح', 'ok');
+            } else {
+                const rec = {
+                    employeeId,
+                    employeeName: empName,
+                    date,
+                    amount,
+                    monthlyInstallment,
+                    paidAmount: 0,
+                    remainingAmount: amount,
+                    status: 'active',
+                    notes,
+                    createdAt: Date.now()
+                };
+                await ARDB.add('advances', rec);
+
+                // إخراج السلفة من الخزينة وتسجيل القيد إن طُلِب
+                if (disburseNow) {
+                    await ARDB.add('expenses', {
+                        date,
+                        accountId: 13,
+                        amount,
+                        note: 'صرف سلفة للموظف: ' + empName + (notes ? ' (' + notes + ')' : ''),
+                        createdAt: Date.now()
+                    });
+
+                    await ARDB.add('journalEntries', {
+                        number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
+                        date,
+                        desc: 'صرف سلفة للموظف: ' + empName,
+                        lines: [
+                            { accountId: 13, debit: amount, credit: 0 },
+                            { accountId: 3, debit: 0, credit: amount }
+                        ]
+                    });
+                }
+
+                UI.toast('تمتسجيل السلفة وصرف المبلغ من الخزينة بنجاح', 'ok');
+            }
+
+            closeAdvModal();
+            load();
+        }
+
+        function openPayAdvModal(id) {
+            const a = _advances.find(x => x.id === id);
+            if (!a) return;
+            activePayAdvId = id;
+
+            const rem = Math.max(0, (a.amount || 0) - (a.paidAmount || 0));
+            const empName = _empById[a.employeeId] ? _empById[a.employeeId].name : 'الموظف';
+
+            document.getElementById('payAdvEmpInfo').innerHTML = `تسديد سلفة الموظف: <b>${empName}</b> | الرصيد المتبقي المستحق: <b style="color:var(--warning);">${UI.money(rem)} ج.م</b>`;
+            document.getElementById('pAdvAmount').value = rem;
+            document.getElementById('pAdvNotes').value = 'تسديد نقدي خارج مسير الرواتب';
+
+            document.getElementById('payAdvModal').style.visibility = 'visible';
+            document.getElementById('payAdvModal').style.opacity = '1';
+        }
+
+        function closePayAdvModal() {
+            document.getElementById('payAdvModal').style.visibility = 'hidden';
+            document.getElementById('payAdvModal').style.opacity = '0';
+        }
+
+        async function confirmManualAdvPayment() {
+            if (!activePayAdvId) return;
+            const a = await ARDB.getById('advances', activePayAdvId);
+            if (!a) return;
+
+            const payAmt = Number(document.getElementById('pAdvAmount').value) || 0;
+            const notes = document.getElementById('pAdvNotes').value.trim();
+
+            if (payAmt <= 0) {
+                UI.toast('أدخل مبلغ التسديد بصورة صحيحة', 'warn');
+                return;
+            }
+
+            const currentPaid = Number(a.paidAmount || 0);
+            const newPaid = currentPaid + payAmt;
+            const newRem = Math.max(0, Number(a.amount || 0) - newPaid);
+            const newStatus = newRem <= 0 ? 'completed' : 'active';
+
+            await ARDB.put('advances', {
+                ...a,
+                paidAmount: newPaid,
+                remainingAmount: newRem,
+                status: newStatus
+            });
+
+            // إيداع المبلغ المحصل في الخزينة وتوليد قيد
+            const date = Date.now();
+            const empName = _empById[a.employeeId] ? _empById[a.employeeId].name : 'الموظف';
+            await ARDB.add('journalEntries', {
+                number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
+                date,
+                desc: 'تحصيل وتسديد سلفة للموظف: ' + empName + (notes ? ' (' + notes + ')' : ''),
+                lines: [
+                    { accountId: 3, debit: payAmt, credit: 0 },
+                    { accountId: 13, debit: 0, credit: payAmt }
+                ]
+            });
+
+            UI.toast('تم التسديد وإيداع المبلغ بالخزينة بنجاح', 'ok');
+            closePayAdvModal();
+            load();
+        }
+
+        async function delAdv(id) {
+            const ok = await UI.confirmBox('حذف تذكرة السلفة؟');
+            if (!ok) return;
+            await ARDB.remove('advances', id);
+            UI.toast('تم الحذف', 'ok');
+            load();
+        }
+
+        load();
+        window.addEventListener('ar_cloud_data_updated', load);
+    </script>
+</body>
+</html>

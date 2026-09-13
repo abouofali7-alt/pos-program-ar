@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الرواتب — AR-Program</title>
+    <title>الرواتب والعمولات — AR-Program</title>
     <link rel="stylesheet" href="../../css/global.css">
     <link rel="stylesheet" href="../../css/app.css">
     <link rel="stylesheet" href="../../css/responsive.css">
@@ -23,8 +23,8 @@
     <main class="pagewrap" style="padding:22px;max-width:1300px;margin:0 auto;">
         <div class="page-head">
             <div>
-                <h2><i class="fa-solid fa-money-bill-wave" style="color:var(--success);"></i> مسير وإدارة الرواتب والعمولات</h2>
-                <div class="sub">إعداد وتصفية رواتب الموظفين (الراتب الثابت + العمولات والنسب - الخصومات = الصافي)</div>
+                <h2><i class="fa-solid fa-money-bill-wave" style="color:var(--success);"></i> مسير وإدارة الرواتب والعمولات والسُلف</h2>
+                <div class="sub">إعداد وتصفية رواتب الموظفين (الراتب الثابت + العمولات والنسب - خصم السُلف والجزاءات = الصافي)</div>
             </div>
             <div class="page-actions" style="display:flex;gap:8px;">
                 <button class="btn btn-secondary" onclick="generateCurrentMonthPayroll()"><i class="fa-solid fa-rotate"></i> التحديث التلقائي للشهر الحالي</button>
@@ -56,7 +56,7 @@
                             <th>نظام الراتب</th>
                             <th>الأساسي</th>
                             <th>العمولات والإضافات</th>
-                            <th>الخصومات</th>
+                            <th>الخصومات والسُلف</th>
                             <th>الصافي المستحق</th>
                             <th>الحالة</th>
                             <th></th>
@@ -70,7 +70,7 @@
 
     <!-- Modal راتب جديد / تعديل -->
     <div id="payModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closePayModal()">
-        <div class="modal-box" style="width:min(650px,94vw);">
+        <div class="modal-box" style="width:min(680px,94vw);">
             <h3 id="payModalTitle"><i class="fa-solid fa-calculator" style="color:var(--accent-cyan);"></i> تسجيل مسير راتب</h3>
             <div class="form-grid">
                 <div class="form-item"><label>الموظف *</label><select id="payEmp" onchange="onEmpOrPeriodChange()"></select></div>
@@ -78,17 +78,17 @@
                 
                 <div class="form-item" style="grid-column:1/-1;" id="calcInfoBox">
                     <div style="background:var(--card-hover);border:1px solid var(--border-color);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--accent-cyan);">
-                        <i class="fa-solid fa-circle-info"></i> اختر الموظف والشهر لاحتساب العمولات والنسب والراتب تلقائياً.
+                        <i class="fa-solid fa-circle-info"></i> اختر الموظف والشهر لاحتساب العمولات، النسب، وخصم أقساط السُلف تلقائياً.
                     </div>
                 </div>
 
                 <div class="form-item"><label>الراتب الأساسي (ج.م)</label><input type="number" id="payBase" step="0.01" min="0"></div>
                 <div class="form-item"><label>العمولات والإضافات (ج.م)</label><input type="number" id="payAdd" step="0.01" min="0" value="0"></div>
-                <div class="form-item" style="grid-column:1/-1;"><label>الخصومات والجزاءات (ج.م)</label><input type="number" id="payDeduct" step="0.01" min="0" value="0"></div>
+                <div class="form-item" style="grid-column:1/-1;"><label>الخصومات وأقساط السُلف المستحقة (ج.م)</label><input type="number" id="payDeduct" step="0.01" min="0" value="0"></div>
             </div>
             
             <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 10px 0;padding:12px 16px;background:var(--card-hover);border-radius:8px;border:1px solid var(--border-color);">
-                <span style="font-size:1rem;color:var(--text-primary);">الصافي المستحق للترحيل: <b id="payNet" style="font-size:1.3rem;color:var(--success);margin-inline-start:6px;">0.00</b> ج.م</span>
+                <span style="font-size:1rem;color:var(--text-primary);">الصافي المستحق للترحيل والصرف: <b id="payNet" style="font-size:1.3rem;color:var(--success);margin-inline-start:6px;">0.00</b> ج.م</span>
                 <span id="payStatusWrap"></span>
             </div>
 
@@ -147,12 +147,12 @@
                     <td class="num" style="font-weight:800;font-size:1.05rem;color:var(--text-primary);">${UI.money(p.net || 0)}</td>
                     <td>${p.paid ? '<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> تم الصرف</span>' : '<span class="badge badge-amber"><i class="fa-solid fa-clock"></i> معلق</span>'}</td>
                     <td style="text-align:left;white-space:nowrap;">
-                        ${!p.paid ? '<button class="btn btn-sm btn-primary-soft" onclick="togglePay(' + p.id + ')" title="اعتماد وصرف الراتب من الخزينة"><i class="fa-solid fa-check"></i> صرف الراتب</button> ' : '<button class="btn btn-sm btn-secondary" onclick="togglePay(' + p.id + ')" title="إلغاء اعتماد الصرف"><i class="fa-solid fa-arrow-rotate-left"></i> إلغاء الصرف</button> '}
+                        ${!p.paid ? '<button class="btn btn-sm btn-primary-soft" onclick="togglePay(' + p.id + ')" title="اعتماد وصرف الراتب وخصم السلفة"><i class="fa-solid fa-check"></i> صرف الراتب</button> ' : '<button class="btn btn-sm btn-secondary" onclick="togglePay(' + p.id + ')" title="إلغاء اعتماد الصرف"><i class="fa-solid fa-arrow-rotate-left"></i> إلغاء الصرف</button> '}
                         <button class="btn btn-sm" onclick="editPay(' + p.id + ')" title="تعديل"><i class="fa-solid fa-pen"></i></button>
                         <button class="btn btn-sm btn-danger" onclick="delPay(' + p.id + ')" title="حذف"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 </tr>`;
-            }).join('') || '<tr><td colspan="9" class="empty-state">لا توجد رواتب مسجلة لشهر المكتوب</td></tr>';
+            }).join('') || '<tr><td colspan="9" class="empty-state">لا توجد رواتب مسجلة للشهر المكتوب</td></tr>';
         }
 
         function formatSalaryBadge(e) {
@@ -179,7 +179,7 @@
         async function generateCurrentMonthPayroll() {
             const now = new Date();
             const period = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-            UI.toast('جاري احتساب وتحديث الرواتب والعمولات لشهر ' + period + '...', 'info');
+            UI.toast('جاري احتساب وتحديث الرواتب والعمولات وخصم أقساط السلف لشهر ' + period + '...', 'info');
 
             let count = 0;
             for (const emp of _employees) {
@@ -190,6 +190,24 @@
             UI.toast(`تم تحديث مسير الرواتب لشهر ${period} لـ (${count}) موظفين`, 'ok');
             document.getElementById('filterPeriod').value = period;
             load();
+        }
+
+        async function calcEmpAdvDeduction(empId) {
+            const advances = await ARDB.getAll('advances');
+            const active = (advances || []).filter(a => a.employeeId === empId && ((a.remainingAmount === undefined ? (a.amount - (a.paidAmount||0)) : a.remainingAmount) > 0));
+            
+            let totalDeduct = 0;
+            let details = [];
+
+            for (const adv of active) {
+                const rem = (adv.remainingAmount === undefined ? (adv.amount - (adv.paidAmount||0)) : adv.remainingAmount);
+                if (rem <= 0) continue;
+                const inst = (adv.monthlyInstallment && adv.monthlyInstallment > 0) ? Math.min(adv.monthlyInstallment, rem) : rem;
+                totalDeduct += inst;
+                details.push({ advId: adv.id, inst, rem });
+            }
+
+            return { totalDeduct, details };
         }
 
         async function syncEmployeePayroll(emp, periodStr) {
@@ -203,9 +221,10 @@
 
             const base = (emp.salaryType === 'commission') ? 0 : (Number(emp.salary) || 0);
             const commAmount = await calcEmpCommission(emp, period);
+            const advInfo = await calcEmpAdvDeduction(emp.id);
 
             const additions = commAmount;
-            const deductions = existing ? Number(existing.deductions || 0) : 0;
+            const deductions = (existing ? Number(existing.deductions || 0) : 0) || advInfo.totalDeduct;
             const net = base + additions - deductions;
 
             const payRec = {
@@ -294,7 +313,7 @@
             const infoBox = document.getElementById('calcInfoBox');
 
             if (!empId || !period) {
-                infoBox.innerHTML = '<div style="background:var(--card-hover);border:1px solid var(--border-color);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--accent-cyan);"><i class="fa-solid fa-circle-info"></i> اختر الموظف والشهر لاحتساب العمولات والنسب والراتب تلقائياً.</div>';
+                infoBox.innerHTML = '<div style="background:var(--card-hover);border:1px solid var(--border-color);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--accent-cyan);"><i class="fa-solid fa-circle-info"></i> اختر الموظف والشهر لاحتساب العمولات، النسب، وخصم أقساط السُلف تلقائياً.</div>';
                 recalcNet();
                 return;
             }
@@ -304,9 +323,11 @@
 
             const base = (emp.salaryType === 'commission') ? 0 : (Number(emp.salary) || 0);
             const comm = await calcEmpCommission(emp, period);
+            const advInfo = await calcEmpAdvDeduction(empId);
 
             document.getElementById('payBase').value = base;
             document.getElementById('payAdd').value = comm;
+            document.getElementById('payDeduct').value = advInfo.totalDeduct;
 
             const targetMap = {
                 'sales_user': 'مبيعات الموظف الشخصية',
@@ -315,13 +336,21 @@
                 'maintenance_all': 'إجمالي أعمال الصيانة بالشركة'
             };
 
+            let msgs = [];
             if (emp.commissionRate && emp.commissionRate > 0) {
-                infoBox.innerHTML = `<div style="background:rgba(16,185,129,0.1);border:1px solid var(--success);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--success);">
-                    <i class="fa-solid fa-chart-line"></i> تم احتساب العمولة تلقائياً: <b>${emp.commissionRate}%</b> من (${targetMap[emp.commissionTarget] || 'المبيعات'}) لشهر ${period} = <b>${UI.money(comm)} ج.م</b>
+                msgs.push(`<i class="fa-solid fa-chart-line"></i> عمولة محسوبة تلقائياً: <b>${emp.commissionRate}%</b> من (${targetMap[emp.commissionTarget] || 'المبيعات'}) = <b>${UI.money(comm)} ج.م</b>`);
+            }
+            if (advInfo.totalDeduct > 0) {
+                msgs.push(`<i class="fa-solid fa-hand-holding-dollar"></i> خصم قسط سلفة مستحقة تلقائياً: <b>${UI.money(advInfo.totalDeduct)} ج.م</b>`);
+            }
+
+            if (msgs.length) {
+                infoBox.innerHTML = `<div style="background:rgba(16,185,129,0.1);border:1px solid var(--success);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--success);display:flex;flex-direction:column;gap:4px;">
+                    ${msgs.join('<br>')}
                 </div>`;
             } else {
                 infoBox.innerHTML = `<div style="background:var(--card-hover);border:1px solid var(--border-color);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--text-secondary);">
-                    نظام الراتب لهذا الموظف: <b>راتب ثابت (${UI.money(base)} ج.م)</b>
+                    نظام الراتب لهذا الموظف: <b>راتب ثابت (${UI.money(base)} ج.م)</b> - لا توجد سُلف قائمة
                 </div>`;
             }
 
@@ -391,33 +420,65 @@
             const newPaidState = !p.paid;
             await ARDB.put('payroll', Object.assign({}, p, { id, paid: newPaidState }));
 
-            if (newPaidState && p.net > 0) {
+            if (newPaidState) {
                 const emp = _empById[p.employeeId];
                 const empName = emp ? emp.name : 'موظف';
                 const date = Date.now();
 
-                // تسجيل مصروف الرواتب
-                await ARDB.add('expenses', {
-                    date,
-                    accountId: 13, // المصروفات التشغيلية / الرواتب
-                    amount: p.net,
-                    note: 'صرف راتب وعمولة: ' + empName + ' (' + (p.period || '') + ')',
-                    createdAt: date
-                });
+                // 1. تسجيل مصروف صافي الراتب والعمولات بالمالية إن وجد
+                if (p.net > 0) {
+                    await ARDB.add('expenses', {
+                        date,
+                        accountId: 13,
+                        amount: p.net,
+                        note: 'صرف راتب وعمولة: ' + empName + ' (' + (p.period || '') + ')',
+                        createdAt: date
+                    });
 
-                // قيد محاسبي
-                await ARDB.add('journalEntries', {
-                    number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
-                    date,
-                    desc: 'صرف راتب وعمولة: ' + empName + ' (' + (p.period || '') + ')',
-                    lines: [
-                        { accountId: 13, debit: p.net, credit: 0 },
-                        { accountId: 3, debit: 0, credit: p.net }
-                    ]
-                });
+                    await ARDB.add('journalEntries', {
+                        number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
+                        date,
+                        desc: 'صرف راتب وعمولة: ' + empName + ' (' + (p.period || '') + ')',
+                        lines: [
+                            { accountId: 13, debit: p.net, credit: 0 },
+                            { accountId: 3, debit: 0, credit: p.net }
+                        ]
+                    });
+                }
+
+                // 2. تحديث وتسديد أقساط السلف النشطة لهذا الموظف
+                const advances = await ARDB.getAll('advances');
+                const activeAdvs = (advances || []).filter(a => a.employeeId === p.employeeId && ((a.remainingAmount === undefined ? (a.amount - (a.paidAmount||0)) : a.remainingAmount) > 0));
+
+                let remainingDeductToApply = Number(p.deductions || 0);
+                let countAdvPaid = 0;
+
+                for (const adv of activeAdvs) {
+                    if (remainingDeductToApply <= 0) break;
+                    const rem = (adv.remainingAmount === undefined ? (adv.amount - (adv.paidAmount||0)) : adv.remainingAmount);
+                    if (rem <= 0) continue;
+
+                    const payStep = Math.min(rem, remainingDeductToApply);
+                    const newPaid = (adv.paidAmount || 0) + payStep;
+                    const newRem = Math.max(0, adv.amount - newPaid);
+                    const newStatus = newRem <= 0 ? 'completed' : 'active';
+
+                    await ARDB.put('advances', {
+                        ...adv,
+                        paidAmount: newPaid,
+                        remainingAmount: newRem,
+                        status: newStatus
+                    });
+
+                    remainingDeductToApply -= payStep;
+                    countAdvPaid++;
+                }
+
+                UI.toast('تم صرف الراتب وتسجيله بالمالية ' + (countAdvPaid > 0 ? 'وخصم قسط السلفة المستحق بنجاح' : ''), 'ok');
+            } else {
+                UI.toast('تم إلغاء حالة صرف الراتب', 'info');
             }
 
-            UI.toast('تم تحديث حالة الراتب ' + (newPaidState ? 'وخصم المصروف والتسجيل بالمالية' : ''), 'ok');
             load();
         }
 

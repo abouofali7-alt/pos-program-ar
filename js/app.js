@@ -31,7 +31,8 @@
             { href: 'hr/employees.html', label: 'الموظفون' },
             { href: 'hr/departments.html', label: 'الأقسام' },
             { href: 'hr/attendance.html', label: 'الحضور والانصراف' },
-            { href: 'hr/payroll.html', label: 'الرواتب' },
+            { href: 'hr/payroll.html', label: 'الرواتب والعمولات' },
+            { href: 'hr/advances.html', label: 'سُلف الموظفين' },
             { href: 'hr/leaves.html', label: 'الإجازات' }
         ]},
         business: { label: 'إدارة الأعمال', icon: 'fa-briefcase', pages: [

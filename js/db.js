@@ -42,6 +42,7 @@ const ARDB = (function () {
             case 'tasks': return { key: 'id', auto: true, idx: [{ name: 'status', key: 'status' }, { name: 'assigneeId', key: 'assigneeId' }] };
             case 'maintenanceTickets': return { key: 'id', auto: true, idx: [{ name: 'number', key: 'number', unique: true }, { name: 'customerId', key: 'customerId' }, { name: 'status', key: 'status' }] };
             case 'maintenanceDevices': return { key: 'id', auto: true, idx: [{ name: 'serialNumber', key: 'serialNumber' }] };
+            case 'advances': return { key: 'id', auto: true, idx: [{ name: 'employeeId', key: 'employeeId' }, { name: 'status', key: 'status' }, { name: 'date', key: 'date' }] };
             default: return { key: 'id', auto: true };
         }
     }
@@ -58,7 +59,7 @@ const ARDB = (function () {
                     'settings','sequences','roles','users','departments','employees','attendance','payroll','leaveRequests',
                     'customers','suppliers','categories','products','serials','warehouses','stockMovements',
                     'invoices','invoiceReturns','purchases','purchaseReturns','payments','expenses','quotations','offers',
-                    'accounts','journalEntries','projects','tasks','maintenanceTickets','maintenanceDevices'
+                    'accounts','journalEntries','projects','tasks','maintenanceTickets','maintenanceDevices','advances'
                 ];
                 STORES.forEach((s) => {
                     if (!db.objectStoreNames.contains(s)) {
@@ -476,7 +477,7 @@ const ARDB = (function () {
             'settings','sequences','roles','users','departments','employees','attendance','payroll','leaveRequests',
             'customers','suppliers','categories','products','serials','warehouses','stockMovements',
             'invoices','invoiceReturns','purchases','purchaseReturns','payments','expenses','quotations','offers',
-            'accounts','journalEntries','projects','tasks'
+            'accounts','journalEntries','projects','tasks','maintenanceTickets','maintenanceDevices','advances'
         ];
         for (const s of STORES) {
             try {
