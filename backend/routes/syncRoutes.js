@@ -6,20 +6,58 @@ const path = require('path');
 const SYNC_FILE = process.env.VERCEL ? '/tmp/ar_cloud_sync.json' : path.join(__dirname, '..', 'ar_cloud_sync.json');
 let _remoteObjectId = 'ff808181a067127101a0818dc3d24b44';
 
-if (!global._ar_cloud_data) {
-    global._ar_cloud_data = { lastUpdated: Date.now(), data: {}, deleted: {} };
-    try {
-        if (fs.existsSync(SYNC_FILE)) {
-            const raw = fs.readFileSync(SYNC_FILE, 'utf8');
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === 'object' && parsed.data) {
-                global._ar_cloud_data = parsed;
-            }
-        }
-    } catch(e) {}
-}
+let _isHydrated = false;
+let _hydrationPromise = null;
 
-let _isLoadedFromRemote = false;
+async function ensureHydrated() {
+    if (_isHydrated && global._ar_cloud_data && global._ar_cloud_data.lastUpdated) {
+        return global._ar_cloud_data;
+    }
+    if (_hydrationPromise) {
+        await _hydrationPromise;
+        return global._ar_cloud_data || { lastUpdated: Date.now(), resetTimestamp: 0, data: {}, deleted: {} };
+    }
+
+    _hydrationPromise = (async () => {
+        if (!global._ar_cloud_data) {
+            global._ar_cloud_data = { lastUpdated: Date.now(), resetTimestamp: 0, data: {}, deleted: {} };
+        }
+        try {
+            if (fs.existsSync(SYNC_FILE)) {
+                const raw = fs.readFileSync(SYNC_FILE, 'utf8');
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object' && parsed.lastUpdated) {
+                    global._ar_cloud_data = parsed;
+                }
+            }
+        } catch(e) {}
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
+            const res = await fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.data && json.data.lastUpdated) {
+                    const remoteData = json.data;
+                    const localTs = global._ar_cloud_data ? (global._ar_cloud_data.lastUpdated || 0) : 0;
+                    if (remoteData.lastUpdated >= localTs) {
+                        global._ar_cloud_data = remoteData;
+                        try { fs.writeFileSync(SYNC_FILE, JSON.stringify(remoteData), 'utf8'); } catch(e){}
+                    }
+                }
+            }
+        } catch(e) {}
+
+        _isHydrated = true;
+        return global._ar_cloud_data;
+    })();
+
+    await _hydrationPromise;
+    _hydrationPromise = null;
+    return global._ar_cloud_data;
+}
 
 async function createRemoteObject(cloudObj) {
     try {
@@ -43,42 +81,6 @@ async function createRemoteObject(cloudObj) {
     return false;
 }
 
-function getCloudData() {
-    if (!global._ar_cloud_data) {
-        global._ar_cloud_data = { lastUpdated: Date.now(), resetTimestamp: 0, data: {}, deleted: {} };
-        try {
-            if (fs.existsSync(SYNC_FILE)) {
-                const raw = fs.readFileSync(SYNC_FILE, 'utf8');
-                const parsed = JSON.parse(raw);
-                if (parsed && typeof parsed === 'object' && parsed.data) {
-                    global._ar_cloud_data = parsed;
-                }
-            }
-        } catch(e) {}
-    }
-    return global._ar_cloud_data;
-}
-
-function initRemoteHydration() {
-    if (_isLoadedFromRemote) return;
-    _isLoadedFromRemote = true;
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        fetch(`https://api.restful-api.dev/objects/${_remoteObjectId}`, { signal: controller.signal })
-            .then(r => r.ok ? r.json() : null)
-            .then(json => {
-                if (json && json.data && json.data.lastUpdated) {
-                    if (!global._ar_cloud_data || (json.data.lastUpdated > (global._ar_cloud_data.lastUpdated || 0))) {
-                        global._ar_cloud_data = json.data;
-                        try { fs.writeFileSync(SYNC_FILE, JSON.stringify(global._ar_cloud_data), 'utf8'); } catch(e){}
-                    }
-                }
-            }).catch(() => {});
-    } catch(e) {}
-}
-initRemoteHydration();
-
 async function saveToRemote(cloudObj) {
     try {
         const controller = new AbortController();
@@ -100,7 +102,7 @@ async function saveToRemote(cloudObj) {
 
 async function saveCloudData(cloudObj, awaitRemote = false) {
     global._ar_cloud_data = cloudObj;
-    _isLoadedFromRemote = true;
+    _isHydrated = true;
     try {
         fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
     } catch(e) {}
@@ -131,8 +133,8 @@ function isMatch(x, y) {
 // 1. POST /api/sync/push — أي جهاز يرفع معاملة أو صنف جديد
 router.post('/push', async (req, res) => {
     try {
+        const cloud = await ensureHydrated();
         const { store, item, action, fullData, batch, clientResetTs } = req.body || {};
-        const cloud = getCloudData();
 
         const cloudResetTs = Number(cloud.resetTimestamp || 0);
         const reqClientResetTs = Number(clientResetTs || 0);
@@ -170,7 +172,12 @@ router.post('/push', async (req, res) => {
                     }
                     const idx = cloud.data[s].findIndex(x => isMatch(x, it));
                     if (idx >= 0) {
-                        cloud.data[s][idx] = it;
+                        const existing = cloud.data[s][idx];
+                        const existingTs = Number(existing.updatedAt || existing.createdAt || 0);
+                        const incomingTs = Number(it.updatedAt || it.createdAt || 0);
+                        if (incomingTs >= existingTs) {
+                            cloud.data[s][idx] = it;
+                        }
                     } else {
                         cloud.data[s].push(it);
                     }
@@ -218,7 +225,7 @@ router.post('/push', async (req, res) => {
 // 2. GET /api/sync/pull — السحب السريع مع خاصية الدلتا والتأكد من عدم وجود تغييرات
 router.get('/pull', async (req, res) => {
     try {
-        const cloud = getCloudData();
+        const cloud = await ensureHydrated();
         const clientSince = Number(req.query.since || 0);
 
         if (clientSince > 0 && cloud.lastUpdated && cloud.lastUpdated <= clientSince && !cloud.reset) {
@@ -247,6 +254,7 @@ router.get('/pull', async (req, res) => {
 // 3. POST /api/sync/reset — تفريغ ورسترة كافة بيانات السيرفر والداتا بيز السحابية
 router.post('/reset', async (req, res) => {
     try {
+        await ensureHydrated();
         const now = Date.now();
         const resetObj = { lastUpdated: now, resetTimestamp: now, data: {}, deleted: {}, reset: false };
         await saveCloudData(resetObj, true);

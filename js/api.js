@@ -297,9 +297,7 @@ const API = (function () {
 
     function startAutoSync() {
         if (_syncTimer) return;
-        pullCloudSync(true).then(() => {
-            pushFullDataToCloud();
-        });
+        pullCloudSync(true);
 
         _syncTimer = setInterval(async () => {
             await pullCloudSync();
