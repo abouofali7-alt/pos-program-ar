@@ -8,47 +8,93 @@
     <link rel="stylesheet" href="../../css/app.css">
     <link rel="stylesheet" href="../../css/responsive.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .stat-card { background: var(--card-dark); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 18px; box-shadow: var(--shadow-card); }
+        .stat-card .label { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .stat-card .value { font-size: 1.4rem; font-weight: 800; color: var(--text-primary); }
+        .stat-card .value.cyan { color: var(--accent-cyan); }
+        .stat-card .value.green { color: var(--success); }
+        .stat-card .value.amber { color: var(--warning); }
+    </style>
 </head>
 <body class="dark-mode">
     <div id="appHeaderHost"></div>
-    <main class="pagewrap" style="padding:22px;max-width:1200px;margin:0 auto;">
+    <main class="pagewrap" style="padding:22px;max-width:1300px;margin:0 auto;">
         <div class="page-head">
             <div>
-                <h2>الرواتب</h2>
-                <div class="sub">الراتب الأساسي + الإضافات + الخصومات = الصافي</div>
+                <h2><i class="fa-solid fa-money-bill-wave" style="color:var(--success);"></i> مسير وإدارة الرواتب والعمولات</h2>
+                <div class="sub">إعداد وتصفية رواتب الموظفين (الراتب الثابت + العمولات والنسب - الخصومات = الصافي)</div>
             </div>
-            <div class="page-actions">
-                <button class="btn btn-primary-soft" onclick="openPayModal()"><i class="fa-solid fa-plus"></i> راتب جديد</button>
+            <div class="page-actions" style="display:flex;gap:8px;">
+                <button class="btn btn-secondary" onclick="generateCurrentMonthPayroll()"><i class="fa-solid fa-rotate"></i> التحديث التلقائي للشهر الحالي</button>
+                <button class="btn btn-primary-soft" onclick="openPayModal()"><i class="fa-solid fa-plus"></i> راتب / مسير جديد</button>
             </div>
         </div>
+
+        <!-- إحصائيات الرواتب -->
+        <div class="stat-grid">
+            <div class="stat-card"><div class="label">إجمالي الرواتب والعمولات المسجلة</div><div class="value cyan" id="stTotalPayroll">0.00 ج.م</div></div>
+            <div class="stat-card"><div class="label">إجمالي الرواتب المدفوعة</div><div class="value green" id="stPaidPayroll">0.00 ج.م</div></div>
+            <div class="stat-card"><div class="label">المتبقي غير المدفوع</div><div class="value amber" id="stUnpaidPayroll">0.00 ج.م</div></div>
+        </div>
+
         <div class="table-card">
-            <div class="table-head">سجل الرواتب</div>
+            <div class="table-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 16px;">
+                <span>سجل الرواتب والعمولات</span>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <label style="font-size:0.85rem;color:var(--text-secondary);">تصفية بالشهر:</label>
+                    <input type="month" id="filterPeriod" onchange="load()" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);font-size:0.85rem;">
+                </div>
+            </div>
             <div class="table-scroll">
-                <table class="data-table">
-                    <thead><tr><th>الموظف</th><th>الشهر</th><th>الأساسي</th><th>الإضافات</th><th>الخصومات</th><th>الصافي</th><th>الحالة</th><th></th></tr></thead>
+                <table class="data-table" id="payrollTable">
+                    <thead>
+                        <tr>
+                            <th>الموظف</th>
+                            <th>الشهر</th>
+                            <th>نظام الراتب</th>
+                            <th>الأساسي</th>
+                            <th>العمولات والإضافات</th>
+                            <th>الخصومات</th>
+                            <th>الصافي المستحق</th>
+                            <th>الحالة</th>
+                            <th></th>
+                        </tr>
+                    </thead>
                     <tbody id="payBody"></tbody>
                 </table>
             </div>
         </div>
     </main>
 
-    <div id="payModal" class="modal-mask" style="visibility:hidden;opacity:0;">
-        <div class="modal-box">
-            <h3>راتب جديد</h3>
+    <!-- Modal راتب جديد / تعديل -->
+    <div id="payModal" class="modal-mask" style="visibility:hidden;opacity:0;" onclick="if(event.target===this)closePayModal()">
+        <div class="modal-box" style="width:min(650px,94vw);">
+            <h3 id="payModalTitle"><i class="fa-solid fa-calculator" style="color:var(--accent-cyan);"></i> تسجيل مسير راتب</h3>
             <div class="form-grid">
-                <div class="form-item"><label>الموظف</label><select id="payEmp"></select></div>
-                <div class="form-item"><label>الشهر</label><input type="month" id="payPeriod"></div>
-                <div class="form-item"><label>الراتب الأساسي</label><input type="number" id="payBase" step="0.01" min="0"></div>
-                <div class="form-item"><label>الإضافات</label><input type="number" id="payAdd" step="0.01" min="0" value="0"></div>
-                <div class="form-item"><label>الخصومات</label><input type="number" id="payDeduct" step="0.01" min="0" value="0"></div>
+                <div class="form-item"><label>الموظف *</label><select id="payEmp" onchange="onEmpOrPeriodChange()"></select></div>
+                <div class="form-item"><label>الشهر *</label><input type="month" id="payPeriod" onchange="onEmpOrPeriodChange()"></div>
+                
+                <div class="form-item" style="grid-column:1/-1;" id="calcInfoBox">
+                    <div style="background:var(--card-hover);border:1px solid var(--border-color);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--accent-cyan);">
+                        <i class="fa-solid fa-circle-info"></i> اختر الموظف والشهر لاحتساب العمولات والنسب والراتب تلقائياً.
+                    </div>
+                </div>
+
+                <div class="form-item"><label>الراتب الأساسي (ج.م)</label><input type="number" id="payBase" step="0.01" min="0"></div>
+                <div class="form-item"><label>العمولات والإضافات (ج.م)</label><input type="number" id="payAdd" step="0.01" min="0" value="0"></div>
+                <div class="form-item" style="grid-column:1/-1;"><label>الخصومات والجزاءات (ج.م)</label><input type="number" id="payDeduct" step="0.01" min="0" value="0"></div>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                <span>الصافي: <b id="payNet">0.00</b></span>
+            
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 10px 0;padding:12px 16px;background:var(--card-hover);border-radius:8px;border:1px solid var(--border-color);">
+                <span style="font-size:1rem;color:var(--text-primary);">الصافي المستحق للترحيل: <b id="payNet" style="font-size:1.3rem;color:var(--success);margin-inline-start:6px;">0.00</b> ج.م</span>
                 <span id="payStatusWrap"></span>
             </div>
+
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button class="btn btn-secondary" onclick="closePayModal()">إلغاء</button>
-                <button class="btn btn-primary-soft" onclick="savePay()">حفظ الراتب</button>
+                <button class="btn btn-primary-soft" onclick="savePay()"><i class="fa-solid fa-floppy-disk"></i> حفظ المسير</button>
             </div>
         </div>
     </div>
@@ -57,76 +103,288 @@
     <script src="../../js/db.js"></script>
     <script src="../../js/app.js"></script>
     <script>
+        let _employees = [];
+        let _empById = {};
+        let editingPayId = null;
+
         async function load() {
             const [employees, payroll] = await Promise.all([ARDB.getAll('employees'), ARDB.getAll('payroll')]);
-            const empById = {}; employees.forEach(e => empById[e.id] = e);
-            const sel = document.getElementById('payEmp');
-            sel.innerHTML = '<option value="">— اختر —</option>' + employees.map(e => '<option value="' + e.id + '">' + e.name + '</option>').join('');
+            _employees = employees || [];
+            _empById = {};
+            _employees.forEach(e => _empById[e.id] = e);
 
-            const sorted = payroll.sort((a, b) => (b.period || '').localeCompare(a.period || ''));
-            document.getElementById('payBody').innerHTML = sorted.map(p =>
-                '<tr><td><b>' + (empById[p.employeeId] ? empById[p.employeeId].name : '—') + '</b></td>' +
-                '<td>' + (p.period || '') + '</td>' +
-                '<td class="num">' + UI.money(p.base || 0) + '</td>' +
-                '<td class="num" style="color:var(--success);">' + UI.money(p.additions || 0) + '</td>' +
-                '<td class="num" style="color:var(--danger);">' + UI.money(p.deductions || 0) + '</td>' +
-                '<td class="num" style="font-weight:800;">' + UI.money(p.net || 0) + '</td>' +
-                '<td>' + (p.paid
-                    ? '<span class="badge badge-green">مدفوع</span>'
-                    : '<span class="badge badge-amber">لم يُدفع</span>') + '</td>' +
-                '<td style="text-align:left;white-space:nowrap;">' +
-                '<button class="btn btn-sm" onclick="togglePay(' + p.id + ')"><i class="fa-solid fa-check"></i></button> ' +
-                '<button class="btn btn-sm btn-danger" onclick="delPay(' + p.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>'
-            ).join('') || '<tr><td colspan="8" class="empty-state">لا توجد رواتب</td></tr>';
+            const sel = document.getElementById('payEmp');
+            sel.innerHTML = '<option value="">— اختر الموظف —</option>' + _employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+
+            const filterPeriod = document.getElementById('filterPeriod').value;
+            let list = payroll || [];
+            if (filterPeriod) {
+                list = list.filter(p => p.period === filterPeriod);
+            }
+
+            // إحصائيات
+            const totalSum = list.reduce((sum, p) => sum + Number(p.net || 0), 0);
+            const paidSum = list.filter(p => p.paid).reduce((sum, p) => sum + Number(p.net || 0), 0);
+            const unpaidSum = totalSum - paidSum;
+
+            document.getElementById('stTotalPayroll').textContent = UI.money(totalSum) + ' ج.م';
+            document.getElementById('stPaidPayroll').textContent = UI.money(paidSum) + ' ج.م';
+            document.getElementById('stUnpaidPayroll').textContent = UI.money(unpaidSum) + ' ج.م';
+
+            const sorted = list.sort((a, b) => (b.period || '').localeCompare(a.period || ''));
+            document.getElementById('payBody').innerHTML = sorted.map(p => {
+                const emp = _empById[p.employeeId];
+                const empName = emp ? emp.name : '—';
+                const salaryBadge = emp ? formatSalaryBadge(emp) : '—';
+
+                return `<tr>
+                    <td><b>${empName}</b></td>
+                    <td class="num">${p.period || '—'}</td>
+                    <td>${salaryBadge}</td>
+                    <td class="num">${UI.money(p.base || 0)}</td>
+                    <td class="num" style="color:var(--success);font-weight:700;">+ ${UI.money(p.additions || 0)}</td>
+                    <td class="num" style="color:var(--danger);">- ${UI.money(p.deductions || 0)}</td>
+                    <td class="num" style="font-weight:800;font-size:1.05rem;color:var(--text-primary);">${UI.money(p.net || 0)}</td>
+                    <td>${p.paid ? '<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> تم الصرف</span>' : '<span class="badge badge-amber"><i class="fa-solid fa-clock"></i> معلق</span>'}</td>
+                    <td style="text-align:left;white-space:nowrap;">
+                        ${!p.paid ? '<button class="btn btn-sm btn-primary-soft" onclick="togglePay(' + p.id + ')" title="اعتماد وصرف الراتب من الخزينة"><i class="fa-solid fa-check"></i> صرف الراتب</button> ' : '<button class="btn btn-sm btn-secondary" onclick="togglePay(' + p.id + ')" title="إلغاء اعتماد الصرف"><i class="fa-solid fa-arrow-rotate-left"></i> إلغاء الصرف</button> '}
+                        <button class="btn btn-sm" onclick="editPay(' + p.id + ')" title="تعديل"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="delPay(' + p.id + ')" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="9" class="empty-state">لا توجد رواتب مسجلة لشهر المكتوب</td></tr>';
         }
 
-        let currentNet = 0;
+        function formatSalaryBadge(e) {
+            const type = e.salaryType || 'fixed';
+            const base = UI.money(e.salary || 0);
+            const rate = Number(e.commissionRate || 0);
+            const targetMap = {
+                'sales_user': 'مبيعاته',
+                'sales_all': 'إجمالي المبيعات',
+                'maintenance_user': 'صيانته',
+                'maintenance_all': 'إجمالي الصيانة'
+            };
+            const targetLabel = targetMap[e.commissionTarget] || 'المبيعات';
+
+            if (type === 'commission') {
+                return `<span class="badge badge-purple">${rate}% (${targetLabel})</span>`;
+            } else if (type === 'hybrid') {
+                return `<span class="badge badge-cyan">${base} + ${rate}% (${targetLabel})</span>`;
+            } else {
+                return `<span class="badge badge-blue">ثابت: ${base}</span>`;
+            }
+        }
+
+        async function generateCurrentMonthPayroll() {
+            const now = new Date();
+            const period = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            UI.toast('جاري احتساب وتحديث الرواتب والعمولات لشهر ' + period + '...', 'info');
+
+            let count = 0;
+            for (const emp of _employees) {
+                if (emp.active === false) continue;
+                await syncEmployeePayroll(emp, period);
+                count++;
+            }
+            UI.toast(`تم تحديث مسير الرواتب لشهر ${period} لـ (${count}) موظفين`, 'ok');
+            document.getElementById('filterPeriod').value = period;
+            load();
+        }
+
+        async function syncEmployeePayroll(emp, periodStr) {
+            if (!emp || !emp.id) return;
+            const period = periodStr || (new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'));
+
+            const allPay = await ARDB.getAll('payroll');
+            const existing = (allPay || []).find(p => p.employeeId === emp.id && p.period === period);
+
+            if (existing && existing.paid) return;
+
+            const base = (emp.salaryType === 'commission') ? 0 : (Number(emp.salary) || 0);
+            const commAmount = await calcEmpCommission(emp, period);
+
+            const additions = commAmount;
+            const deductions = existing ? Number(existing.deductions || 0) : 0;
+            const net = base + additions - deductions;
+
+            const payRec = {
+                employeeId: emp.id,
+                period: period,
+                base: base,
+                additions: additions,
+                deductions: deductions,
+                net: net,
+                paid: existing ? existing.paid : false
+            };
+
+            if (existing) {
+                payRec.id = existing.id;
+                await ARDB.put('payroll', payRec);
+            } else {
+                await ARDB.add('payroll', payRec);
+            }
+        }
+
+        async function calcEmpCommission(emp, periodStr) {
+            if (!emp || !emp.commissionRate || emp.commissionRate <= 0) return 0;
+            const [year, month] = (periodStr || '').split('-').map(Number);
+            if (!year || !month) return 0;
+
+            const startTs = new Date(year, month - 1, 1).getTime();
+            const endTs = new Date(year, month, 0, 23, 59, 59, 999).getTime();
+
+            const target = emp.commissionTarget || 'sales_all';
+            let totalBase = 0;
+
+            if (target.startsWith('sales')) {
+                const invoices = await ARDB.getAll('invoices');
+                const list = (invoices || []).filter(inv => {
+                    const date = Number(inv.date || 0);
+                    if (date < startTs || date > endTs) return false;
+                    if (target === 'sales_user' && emp.userId) {
+                        return String(inv.userId || inv.createdBy) === String(emp.userId);
+                    }
+                    return true;
+                });
+                totalBase = list.reduce((sum, i) => sum + Number(i.total || 0), 0);
+            } else if (target.startsWith('maintenance')) {
+                const tickets = await ARDB.getAll('maintenanceTickets');
+                const list = (tickets || []).filter(t => {
+                    const date = Number(t.date || 0);
+                    if (date < startTs || date > endTs) return false;
+                    if (t.status !== 'ready' && t.status !== 'delivered') return false;
+                    if (target === 'maintenance_user') {
+                        return String(t.techId) === String(emp.id);
+                    }
+                    return true;
+                });
+                totalBase = list.reduce((sum, t) => sum + Number(t.estimatedCost || 0), 0);
+            }
+
+            return Math.round((totalBase * (emp.commissionRate / 100)) * 100) / 100;
+        }
+
         function openPayModal() {
-            document.getElementById('payModal').style.visibility = 'visible';
-            document.getElementById('payModal').style.opacity = '1';
+            editingPayId = null;
+            document.getElementById('payModalTitle').innerHTML = '<i class="fa-solid fa-calculator" style="color:var(--accent-cyan);"></i> تسجيل مسير راتب جديد';
             document.getElementById('payEmp').value = '';
-            const pd = new Date(); document.getElementById('payPeriod').value = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0');
+            const pd = new Date();
+            document.getElementById('payPeriod').value = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0');
             document.getElementById('payBase').value = '';
             document.getElementById('payAdd').value = '0';
             document.getElementById('payDeduct').value = '0';
             recalcNet();
+            document.getElementById('payModal').style.visibility = 'visible';
+            document.getElementById('payModal').style.opacity = '1';
         }
+
         function closePayModal() {
             document.getElementById('payModal').style.visibility = 'hidden';
             document.getElementById('payModal').style.opacity = '0';
         }
+
         document.addEventListener('input', (ev) => {
             if (['payBase','payAdd','payDeduct'].includes(ev.target.id)) recalcNet();
         });
-        async function recalcNet() {
+
+        async function onEmpOrPeriodChange() {
             const empId = Number(document.getElementById('payEmp').value);
-            let base = Number(document.getElementById('payBase').value) || 0;
-            if (empId && !base) {
-                const emp = await ARDB.getById('employees', empId);
-                if (emp) { base = emp.salary || 0; document.getElementById('payBase').value = base; }
+            const period = document.getElementById('payPeriod').value;
+            const infoBox = document.getElementById('calcInfoBox');
+
+            if (!empId || !period) {
+                infoBox.innerHTML = '<div style="background:var(--card-hover);border:1px solid var(--border-color);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--accent-cyan);"><i class="fa-solid fa-circle-info"></i> اختر الموظف والشهر لاحتساب العمولات والنسب والراتب تلقائياً.</div>';
+                recalcNet();
+                return;
             }
+
+            const emp = _empById[empId];
+            if (!emp) return;
+
+            const base = (emp.salaryType === 'commission') ? 0 : (Number(emp.salary) || 0);
+            const comm = await calcEmpCommission(emp, period);
+
+            document.getElementById('payBase').value = base;
+            document.getElementById('payAdd').value = comm;
+
+            const targetMap = {
+                'sales_user': 'مبيعات الموظف الشخصية',
+                'sales_all': 'إجمالي مبيعات المنشأة',
+                'maintenance_user': 'أعمال صيانة الفني',
+                'maintenance_all': 'إجمالي أعمال الصيانة بالشركة'
+            };
+
+            if (emp.commissionRate && emp.commissionRate > 0) {
+                infoBox.innerHTML = `<div style="background:rgba(16,185,129,0.1);border:1px solid var(--success);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--success);">
+                    <i class="fa-solid fa-chart-line"></i> تم احتساب العمولة تلقائياً: <b>${emp.commissionRate}%</b> من (${targetMap[emp.commissionTarget] || 'المبيعات'}) لشهر ${period} = <b>${UI.money(comm)} ج.م</b>
+                </div>`;
+            } else {
+                infoBox.innerHTML = `<div style="background:var(--card-hover);border:1px solid var(--border-color);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:var(--text-secondary);">
+                    نظام الراتب لهذا الموظف: <b>راتب ثابت (${UI.money(base)} ج.م)</b>
+                </div>`;
+            }
+
+            recalcNet();
+        }
+
+        function recalcNet() {
+            const base = Number(document.getElementById('payBase').value) || 0;
             const add = Number(document.getElementById('payAdd').value) || 0;
             const ded = Number(document.getElementById('payDeduct').value) || 0;
-            currentNet = base + add - ded;
-            document.getElementById('payNet').textContent = currentNet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const net = base + add - ded;
+            document.getElementById('payNet').textContent = UI.money(net);
         }
-        document.getElementById('payEmp').addEventListener('change', recalcNet);
+
+        async function editPay(id) {
+            const p = await ARDB.getById('payroll', id);
+            if (!p) return;
+            editingPayId = id;
+            document.getElementById('payModalTitle').innerHTML = '<i class="fa-solid fa-pen" style="color:var(--accent-cyan);"></i> تعديل مسير راتب';
+            document.getElementById('payEmp').value = p.employeeId || '';
+            document.getElementById('payPeriod').value = p.period || '';
+            document.getElementById('payBase').value = p.base || 0;
+            document.getElementById('payAdd').value = p.additions || 0;
+            document.getElementById('payDeduct').value = p.deductions || 0;
+            recalcNet();
+
+            document.getElementById('payModal').style.visibility = 'visible';
+            document.getElementById('payModal').style.opacity = '1';
+        }
 
         async function savePay() {
             const employeeId = Number(document.getElementById('payEmp').value);
             const period = document.getElementById('payPeriod').value;
             if (!employeeId || !period) { UI.toast('اختر الموظف والشهر', 'warn'); return; }
+
             const base = Number(document.getElementById('payBase').value) || 0;
             const additions = Number(document.getElementById('payAdd').value) || 0;
             const deductions = Number(document.getElementById('payDeduct').value) || 0;
             const net = base + additions - deductions;
-            const dup = (await ARDB.getAll('payroll')).find(p => p.employeeId === employeeId && p.period === period);
+
+            const allPay = await ARDB.getAll('payroll');
+            const dup = allPay.find(p => p.employeeId === employeeId && p.period === period && p.id !== editingPayId);
+
             const rec = { employeeId, period, base, additions, deductions, net, paid: false };
-            if (dup) { rec.id = dup.id; await ARDB.put('payroll', rec); UI.toast('تم التحديث', 'ok'); }
-            else { await ARDB.add('payroll', rec); UI.toast('تم الحفظ', 'ok'); }
-            closePayModal(); load();
-        window.addEventListener('ar_cloud_data_updated', load);
+            if (editingPayId) {
+                const old = await ARDB.getById('payroll', editingPayId);
+                rec.id = editingPayId;
+                rec.paid = old ? old.paid : false;
+                await ARDB.put('payroll', rec);
+                UI.toast('تم تعديل مسير الراتب', 'ok');
+            } else if (dup) {
+                rec.id = dup.id;
+                rec.paid = dup.paid;
+                await ARDB.put('payroll', rec);
+                UI.toast('تم تحديث مسير الراتب لهذا الشهر', 'ok');
+            } else {
+                await ARDB.add('payroll', rec);
+                UI.toast('تم حفظ مسير الراتب', 'ok');
+            }
+            closePayModal();
+            load();
         }
+
         async function togglePay(id) {
             const p = await ARDB.getById('payroll', id);
             if (!p) return;
@@ -134,38 +392,45 @@
             await ARDB.put('payroll', Object.assign({}, p, { id, paid: newPaidState }));
 
             if (newPaidState && p.net > 0) {
-                const emp = await ARDB.getById('employees', p.employeeId);
+                const emp = _empById[p.employeeId];
                 const empName = emp ? emp.name : 'موظف';
                 const date = Date.now();
+
                 // تسجيل مصروف الرواتب
                 await ARDB.add('expenses', {
                     date,
-                    accountId: 18,
+                    accountId: 13, // المصروفات التشغيلية / الرواتب
                     amount: p.net,
-                    note: 'صرف راتب: ' + empName + ' (' + (p.period || '') + ')',
+                    note: 'صرف راتب وعمولة: ' + empName + ' (' + (p.period || '') + ')',
                     createdAt: date
                 });
+
                 // قيد محاسبي
                 await ARDB.add('journalEntries', {
                     number: await ARDB.nextSeq('journalAuto', 'JRN-', 6),
                     date,
-                    desc: 'صرف راتب: ' + empName + ' (' + (p.period || '') + ')',
+                    desc: 'صرف راتب وعمولة: ' + empName + ' (' + (p.period || '') + ')',
                     lines: [
-                        { accountId: 18, debit: p.net, credit: 0 }, // حساب الرواتب والأجور
-                        { accountId: 3, debit: 0, credit: p.net }   // الصندوق
+                        { accountId: 13, debit: p.net, credit: 0 },
+                        { accountId: 3, debit: 0, credit: p.net }
                     ]
                 });
             }
 
-            UI.toast('تم تحديث حالة الراتب ' + (newPaidState ? 'وخصم المصروف من الخزينة' : ''), 'ok'); load();
+            UI.toast('تم تحديث حالة الراتب ' + (newPaidState ? 'وخصم المصروف والتسجيل بالمالية' : ''), 'ok');
+            load();
         }
+
         async function delPay(id) {
             const ok = await UI.confirmBox('حذف الراتب؟');
             if (!ok) return;
             await ARDB.remove('payroll', id);
-            UI.toast('تم الحذف', 'ok'); load();
+            UI.toast('تم الحذف', 'ok');
+            load();
         }
+
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>

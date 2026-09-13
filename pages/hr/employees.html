@@ -15,7 +15,7 @@
         <div class="page-head">
             <div>
                 <h2>الموظفون</h2>
-                <div class="sub">إدارة سجل الموظفين والرواتب الأساسية</div>
+                <div class="sub">إدارة سجل الموظفين، الهياكل المخصصة للرواتب والعمولات</div>
             </div>
             <div class="page-actions" style="display:flex;gap:8px;">
                 <button class="btn btn-secondary" onclick="ARExport.tableToCSV('empTable', 'الموظفون')"><i class="fa-solid fa-file-excel"></i> تصدير Excel</button>
@@ -24,31 +24,78 @@
             </div>
         </div>
         <div class="table-card">
-            <div class="table-head">الموظفون</div>
+            <div class="table-head">الموظفون ونظام الرواتب</div>
             <div class="table-scroll">
                 <table class="data-table" id="empTable">
-                    <thead><tr><th>الاسم</th><th>القسم</th><th>الوظيفة</th><th>الهاتف</th><th>الراتب الأساسي</th><th>تاريخ التعيين</th><th>الحالة</th><th></th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>الاسم</th>
+                            <th>القسم</th>
+                            <th>الوظيفة</th>
+                            <th>الهاتف</th>
+                            <th>نظام وقيمة الراتب</th>
+                            <th>تاريخ التعيين</th>
+                            <th>الحالة</th>
+                            <th></th>
+                        </tr>
+                    </thead>
                     <tbody id="empBody"></tbody>
                 </table>
             </div>
         </div>
     </main>
 
+    <!-- Modal إضافة/تعديل موظف -->
     <div id="empModal" class="modal-mask" style="visibility:hidden;opacity:0;">
-        <div class="modal-box">
-            <h3 id="empModalTitle">إضافة موظف</h3>
+        <div class="modal-box" style="width:min(680px,94vw);">
+            <h3 id="empModalTitle">إضافة موظف جديد</h3>
             <div class="form-grid">
-                <div class="form-item"><label>الاسم</label><input id="eName"></div>
+                <div class="form-item"><label>الاسم *</label><input id="eName" placeholder="أدخل اسم الموظف..."></div>
                 <div class="form-item"><label>القسم</label><select id="eDept"></select></div>
-                <div class="form-item"><label>الوظيفة</label><input id="ePosition"></div>
-                <div class="form-item"><label>الهاتف</label><input id="ePhone"></div>
-                <div class="form-item"><label>الراتب الأساسي</label><input type="number" id="eSalary" step="0.01" min="0"></div>
+                <div class="form-item"><label>الوظيفة</label><input id="ePosition" placeholder="مثال: مهندس صيانة / كاشير"></div>
+                <div class="form-item"><label>الهاتف</label><input id="ePhone" placeholder="رقم الجوال..."></div>
+                
+                <div class="form-item" style="grid-column:1/-1;border-top:1px solid var(--border-color);padding-top:12px;margin-top:6px;">
+                    <label style="font-weight:700;color:var(--accent-cyan);font-size:0.95rem;">
+                        <i class="fa-solid fa-calculator"></i> نظام وهيكل احتساب الراتب
+                    </label>
+                </div>
+                
+                <div class="form-item">
+                    <label>نوع الراتب *</label>
+                    <select id="eSalaryType" onchange="toggleSalaryFields()">
+                        <option value="fixed">راتب ثابت فقط</option>
+                        <option value="commission">نسبة مئوية (عمولة) فقط</option>
+                        <option value="hybrid">متعدد (راتب ثابت + نسبة مئوية)</option>
+                    </select>
+                </div>
+                
+                <div class="form-item" id="wrapSalary">
+                    <label>الراتب الأساسي الثابت (ج.م)</label>
+                    <input type="number" id="eSalary" step="0.01" min="0" placeholder="0.00">
+                </div>
+                
+                <div class="form-item" id="wrapCommRate" style="display:none;">
+                    <label>نسبة العمولة (%)</label>
+                    <input type="number" id="eCommissionRate" step="0.1" min="0" placeholder="مثال: 5%">
+                </div>
+
+                <div class="form-item" id="wrapCommTarget" style="display:none;">
+                    <label>مصدر/أساس احتساب النسبة</label>
+                    <select id="eCommissionTarget">
+                        <option value="sales_user">نسبة من مبيعات الموظف الشخصية</option>
+                        <option value="sales_all">نسبة من إجمالي مبيعات المنشأة</option>
+                        <option value="maintenance_user">نسبة من تذاكر وأعمال صيانة الفني</option>
+                        <option value="maintenance_all">نسبة من إجمالي أعمال الصيانة بالشركة</option>
+                    </select>
+                </div>
+
                 <div class="form-item"><label>تاريخ التعيين</label><input type="date" id="eHireDate"></div>
-                <div class="form-item"><label>ملاحظات</label><input id="eNotes"></div>
+                <div class="form-item" style="grid-column:1/-1;"><label>ملاحظات</label><input id="eNotes" placeholder="أية ملاحظات إضافية..."></div>
             </div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
                 <button class="btn btn-secondary" onclick="closeEmpModal()">إلغاء</button>
-                <button class="btn btn-primary-soft" onclick="saveEmp()">حفظ</button>
+                <button class="btn btn-primary-soft" onclick="saveEmp()"><i class="fa-solid fa-floppy-disk"></i> حفظ الموظف والراتب</button>
             </div>
         </div>
     </div>
@@ -59,6 +106,49 @@
     <script src="../../js/app.js"></script>
     <script>
         let editingEid = null;
+
+        function toggleSalaryFields() {
+            const type = document.getElementById('eSalaryType').value;
+            const wrapSalary = document.getElementById('wrapSalary');
+            const wrapCommRate = document.getElementById('wrapCommRate');
+            const wrapCommTarget = document.getElementById('wrapCommTarget');
+
+            if (type === 'fixed') {
+                wrapSalary.style.display = 'block';
+                wrapCommRate.style.display = 'none';
+                wrapCommTarget.style.display = 'none';
+            } else if (type === 'commission') {
+                wrapSalary.style.display = 'none';
+                wrapCommRate.style.display = 'block';
+                wrapCommTarget.style.display = 'block';
+            } else if (type === 'hybrid') {
+                wrapSalary.style.display = 'block';
+                wrapCommRate.style.display = 'block';
+                wrapCommTarget.style.display = 'block';
+            }
+        }
+
+        function formatSalaryBadge(e) {
+            const type = e.salaryType || 'fixed';
+            const base = UI.money(e.salary || 0);
+            const rate = Number(e.commissionRate || 0);
+            const targetMap = {
+                'sales_user': 'مبيعات الموظف',
+                'sales_all': 'إجمالي المبيعات',
+                'maintenance_user': 'صيانة الفني',
+                'maintenance_all': 'إجمالي الصيانة'
+            };
+            const targetLabel = targetMap[e.commissionTarget] || 'المبيعات';
+
+            if (type === 'commission') {
+                return `<span class="badge badge-purple" style="font-weight:700;"><i class="fa-solid fa-percent"></i> ${rate}% (${targetLabel})</span>`;
+            } else if (type === 'hybrid') {
+                return `<span class="badge badge-cyan" style="font-weight:700;" title="راتب متعدد">${base} + ${rate}% (${targetLabel})</span>`;
+            } else {
+                return `<span style="font-weight:700;color:var(--success);">${base}</span>`;
+            }
+        }
+
         async function load() {
             const [employees, departments] = await Promise.all([ARDB.getAll('employees'), ARDB.getAll('departments')]);
             const deptById = {}; departments.forEach(d => deptById[d.id] = d);
@@ -70,7 +160,7 @@
                 '<td>' + (e.departmentId && deptById[e.departmentId] ? deptById[e.departmentId].name : '—') + '</td>' +
                 '<td>' + (e.position || '—') + '</td>' +
                 '<td class="num">' + (e.phone || '—') + '</td>' +
-                '<td class="num" style="font-weight:700;">' + UI.money(e.salary || 0) + '</td>' +
+                '<td class="num">' + formatSalaryBadge(e) + '</td>' +
                 '<td>' + (e.hireDate ? UI.date(new Date(e.hireDate + 'T12:00:00').getTime()) : '—') + '</td>' +
                 '<td>' + (e.active === false ? '<span class="badge badge-red">موقوف</span>' : '<span class="badge badge-green">نشط</span>') + '</td>' +
                 '<td style="text-align:left;white-space:nowrap;">' +
@@ -78,57 +168,172 @@
                 '<button class="btn btn-sm btn-danger" onclick="delEmp(' + e.id + ')"><i class="fa-solid fa-trash"></i></button></td></tr>'
             ).join('') || '<tr><td colspan="8" class="empty-state">لا يوجد موظفون</td></tr>';
         }
+
         function openEmpModal() {
             editingEid = null;
-            document.getElementById('empModalTitle').textContent = 'إضافة موظف';
-            ['eName','ePosition','ePhone','eSalary','eNotes','eHireDate'].forEach(i => document.getElementById(i).value = '');
+            document.getElementById('empModalTitle').textContent = 'إضافة موظف جديد';
+            ['eName','ePosition','ePhone','eSalary','eCommissionRate','eNotes','eHireDate'].forEach(i => {
+                if (document.getElementById(i)) document.getElementById(i).value = '';
+            });
+            document.getElementById('eSalaryType').value = 'fixed';
+            document.getElementById('eCommissionTarget').value = 'sales_user';
+            toggleSalaryFields();
             document.getElementById('empModal').style.visibility = 'visible';
             document.getElementById('empModal').style.opacity = '1';
         }
+
         function closeEmpModal() {
             document.getElementById('empModal').style.visibility = 'hidden';
             document.getElementById('empModal').style.opacity = '0';
         }
+
         async function editEmp(id) {
             const e = await ARDB.getById('employees', id);
             if (!e) return;
             editingEid = id;
-            document.getElementById('empModalTitle').textContent = 'تعديل موظف';
+            document.getElementById('empModalTitle').textContent = 'تعديل بيانات الموظف';
             document.getElementById('eName').value = e.name || '';
             document.getElementById('eDept').value = e.departmentId || '';
             document.getElementById('ePosition').value = e.position || '';
             document.getElementById('ePhone').value = e.phone || '';
-            document.getElementById('eSalary').value = e.salary || '';
+            document.getElementById('eSalaryType').value = e.salaryType || 'fixed';
+            document.getElementById('eSalary').value = e.salary !== undefined ? e.salary : '';
+            document.getElementById('eCommissionRate').value = e.commissionRate !== undefined ? e.commissionRate : '';
+            document.getElementById('eCommissionTarget').value = e.commissionTarget || 'sales_user';
             document.getElementById('eHireDate').value = e.hireDate || '';
             document.getElementById('eNotes').value = e.notes || '';
+
+            toggleSalaryFields();
             document.getElementById('empModal').style.visibility = 'visible';
             document.getElementById('empModal').style.opacity = '1';
         }
+
         async function saveEmp() {
             const name = document.getElementById('eName').value.trim();
             if (!name) { UI.toast('اسم الموظف مطلوب', 'warn'); return; }
+
+            const salaryType = document.getElementById('eSalaryType').value;
+            const salary = Number(document.getElementById('eSalary').value) || 0;
+            const commissionRate = Number(document.getElementById('eCommissionRate').value) || 0;
+            const commissionTarget = document.getElementById('eCommissionTarget').value;
+
             const rec = {
                 name,
                 departmentId: document.getElementById('eDept').value ? Number(document.getElementById('eDept').value) : null,
                 position: document.getElementById('ePosition').value.trim(),
                 phone: document.getElementById('ePhone').value.trim(),
-                salary: Number(document.getElementById('eSalary').value) || 0,
+                salaryType,
+                salary,
+                commissionRate,
+                commissionTarget,
                 hireDate: document.getElementById('eHireDate').value,
                 notes: document.getElementById('eNotes').value.trim(),
                 active: true, createdAt: Date.now()
             };
-            if (editingEid) { const old = await ARDB.getById('employees', editingEid); rec.active = old ? old.active : true; rec.id = editingEid; await ARDB.put('employees', rec); UI.toast('تم التعديل', 'ok'); }
-            else { await ARDB.add('employees', rec); UI.toast('تمت الإضافة', 'ok'); }
-            closeEmpModal(); load();
-        window.addEventListener('ar_cloud_data_updated', load);
+
+            let empId;
+            if (editingEid) {
+                const old = await ARDB.getById('employees', editingEid);
+                rec.active = old ? old.active : true;
+                rec.id = editingEid;
+                await ARDB.put('employees', rec);
+                empId = editingEid;
+                UI.toast('تم تعديل الموظف وهيكل الراتب', 'ok');
+            } else {
+                empId = await ARDB.add('employees', rec);
+                UI.toast('تم إضافة الموظف وتسجيله في مسير الرواتب تلقائياً', 'ok');
+            }
+
+            rec.id = empId;
+            await syncEmployeePayroll(rec);
+
+            closeEmpModal();
+            load();
         }
+
+        async function syncEmployeePayroll(emp) {
+            if (!emp || !emp.id) return;
+            const now = new Date();
+            const period = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+            const allPay = await ARDB.getAll('payroll');
+            const existing = (allPay || []).find(p => p.employeeId === emp.id && p.period === period);
+
+            if (existing && existing.paid) return;
+
+            const base = (emp.salaryType === 'commission') ? 0 : (Number(emp.salary) || 0);
+            const commAmount = await calcEmpCommission(emp, period);
+
+            const additions = commAmount;
+            const deductions = existing ? Number(existing.deductions || 0) : 0;
+            const net = base + additions - deductions;
+
+            const payRec = {
+                employeeId: emp.id,
+                period: period,
+                base: base,
+                additions: additions,
+                deductions: deductions,
+                net: net,
+                paid: existing ? existing.paid : false
+            };
+
+            if (existing) {
+                payRec.id = existing.id;
+                await ARDB.put('payroll', payRec);
+            } else {
+                await ARDB.add('payroll', payRec);
+            }
+        }
+
+        async function calcEmpCommission(emp, periodStr) {
+            if (!emp || !emp.commissionRate || emp.commissionRate <= 0) return 0;
+            const [year, month] = (periodStr || '').split('-').map(Number);
+            if (!year || !month) return 0;
+
+            const startTs = new Date(year, month - 1, 1).getTime();
+            const endTs = new Date(year, month, 0, 23, 59, 59, 999).getTime();
+
+            const target = emp.commissionTarget || 'sales_all';
+            let totalBase = 0;
+
+            if (target.startsWith('sales')) {
+                const invoices = await ARDB.getAll('invoices');
+                const list = (invoices || []).filter(inv => {
+                    const date = Number(inv.date || 0);
+                    if (date < startTs || date > endTs) return false;
+                    if (target === 'sales_user' && emp.userId) {
+                        return String(inv.userId || inv.createdBy) === String(emp.userId);
+                    }
+                    return true;
+                });
+                totalBase = list.reduce((sum, i) => sum + Number(i.total || 0), 0);
+            } else if (target.startsWith('maintenance')) {
+                const tickets = await ARDB.getAll('maintenanceTickets');
+                const list = (tickets || []).filter(t => {
+                    const date = Number(t.date || 0);
+                    if (date < startTs || date > endTs) return false;
+                    if (t.status !== 'ready' && t.status !== 'delivered') return false;
+                    if (target === 'maintenance_user') {
+                        return String(t.techId) === String(emp.id);
+                    }
+                    return true;
+                });
+                totalBase = list.reduce((sum, t) => sum + Number(t.estimatedCost || 0), 0);
+            }
+
+            return Math.round((totalBase * (emp.commissionRate / 100)) * 100) / 100;
+        }
+
         async function delEmp(id) {
             const ok = await UI.confirmBox('حذف الموظف؟ (لن تُحذف بيانات الحضور والرواتب المرتبطة)');
             if (!ok) return;
             await ARDB.remove('employees', id);
             UI.toast('تم الحذف', 'ok'); load();
         }
+
         load();
+        window.addEventListener('ar_cloud_data_updated', load);
     </script>
 </body>
 </html>
