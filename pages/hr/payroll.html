@@ -24,7 +24,7 @@
         <div class="page-head">
             <div>
                 <h2><i class="fa-solid fa-money-bill-wave" style="color:var(--success);"></i> مسير وإدارة الرواتب والعمولات والسُلف</h2>
-                <div class="sub">إعداد وتصفية رواتب الموظفين (الراتب الثابت + العمولات والنسب - خصم السُلف والجزاءات = الصافي)</div>
+                <div class="sub">إعداد وتصفية رواتب كافة الموظفين (الراتب الثابت + العمولات والنسب - خصم السُلف والجزاءات = الصافي)</div>
             </div>
             <div class="page-actions" style="display:flex;gap:8px;">
                 <button class="btn btn-secondary" onclick="generateCurrentMonthPayroll()"><i class="fa-solid fa-rotate"></i> تحديث وإعادة احتساب الشهر الحالي</button>
@@ -41,7 +41,7 @@
 
         <div class="table-card">
             <div class="table-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 16px;">
-                <span>مسير رواتب الموظفين للشهر المحدد</span>
+                <span>مسير كافة الموظفين للشهر المحدد</span>
                 <div style="display:flex;gap:10px;align-items:center;">
                     <label style="font-size:0.85rem;color:var(--text-secondary);">عرض رواتب شهر:</label>
                     <input type="month" id="filterPeriod" onchange="load()" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border-color);background:var(--card-hover);color:var(--text-primary);font-size:0.85rem;">
@@ -115,10 +115,17 @@
                 document.getElementById('filterPeriod').value = filterPeriod;
             }
 
-            // التأكد التلقائي من توليد وقراءة كافة الموظفين للشهر المحدد
-            await autoEnsureAllEmployeesPayroll(filterPeriod);
+            try {
+                await autoEnsureAllEmployeesPayroll(filterPeriod);
+            } catch(e) {
+                console.warn('Auto ensure payroll error:', e);
+            }
 
-            const [employees, payroll] = await Promise.all([ARDB.getAll('employees'), ARDB.getAll('payroll')]);
+            const [employees, payroll] = await Promise.all([
+                ARDB.getAll('employees'),
+                ARDB.getAll('payroll')
+            ]);
+
             _employees = employees || [];
             _empById = {};
             _employees.forEach(e => _empById[String(e.id)] = e);
@@ -126,39 +133,87 @@
             const sel = document.getElementById('payEmp');
             sel.innerHTML = '<option value="">— اختر الموظف —</option>' + _employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
 
-            let list = (payroll || []).filter(p => p.period === filterPeriod);
+            const monthPayroll = (payroll || []).filter(p => p.period === filterPeriod);
+            const payrollByEmpId = {};
+            monthPayroll.forEach(p => {
+                payrollByEmpId[String(p.employeeId)] = p;
+            });
 
-            // إحصائيات
-            const totalSum = list.reduce((sum, p) => sum + Number(p.net || 0), 0);
-            const paidSum = list.filter(p => p.paid).reduce((sum, p) => sum + Number(p.net || 0), 0);
+            // بناء مصفوفة صفوف كافة الموظفين بلا استثناء
+            const rows = [];
+            const processedEmpIds = new Set();
+
+            for (const emp of _employees) {
+                processedEmpIds.add(String(emp.id));
+                const p = payrollByEmpId[String(emp.id)];
+                rows.push({
+                    emp: emp,
+                    pay: p || null,
+                    empName: emp.name,
+                    salaryBadge: formatSalaryBadge(emp),
+                    base: p ? p.base : ((emp.salaryType === 'commission') ? 0 : (Number(emp.salary) || 0)),
+                    additions: p ? p.additions : 0,
+                    deductions: p ? p.deductions : 0,
+                    net: p ? p.net : ((emp.salaryType === 'commission') ? 0 : (Number(emp.salary) || 0)),
+                    paid: p ? p.paid : false,
+                    payId: p ? p.id : null,
+                    isSuspended: emp.active === false
+                });
+            }
+
+            // إدراج سجلات الموظفين السابقين/المحذوفين إن وُجِدت
+            for (const p of monthPayroll) {
+                if (!processedEmpIds.has(String(p.employeeId))) {
+                    rows.push({
+                        emp: null,
+                        pay: p,
+                        empName: '— (موظف سابق)',
+                        salaryBadge: '<span class="badge badge-secondary">سابق</span>',
+                        base: p.base || 0,
+                        additions: p.additions || 0,
+                        deductions: p.deductions || 0,
+                        net: p.net || 0,
+                        paid: p.paid || false,
+                        payId: p.id,
+                        isSuspended: false
+                    });
+                }
+            }
+
+            // الإحصائيات الكلية
+            const totalSum = rows.reduce((sum, r) => sum + Number(r.net || 0), 0);
+            const paidSum = rows.filter(r => r.paid).reduce((sum, r) => sum + Number(r.net || 0), 0);
             const unpaidSum = totalSum - paidSum;
 
             document.getElementById('stTotalPayroll').innerHTML = UI.money(totalSum) + ' ج.م';
             document.getElementById('stPaidPayroll').innerHTML = UI.money(paidSum) + ' ج.م';
             document.getElementById('stUnpaidPayroll').innerHTML = UI.money(unpaidSum) + ' ج.م';
 
-            const sorted = list.sort((a, b) => (b.period || '').localeCompare(a.period || ''));
-            document.getElementById('payBody').innerHTML = sorted.map(p => {
-                const emp = _empById[String(p.employeeId)];
-                const empName = emp ? emp.name : '— (موظف محذوف)';
-                const salaryBadge = emp ? formatSalaryBadge(emp) : '—';
+            const body = document.getElementById('payBody');
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="9" class="empty-state">لا يوجد موظفون مسجلون بالنظام. يرجى إضافة موظفين أولاً من شاشة الموظفين.</td></tr>';
+                return;
+            }
 
+            body.innerHTML = rows.map(r => {
                 return `<tr>
-                    <td><b>${empName}</b></td>
-                    <td class="num">${p.period || '—'}</td>
-                    <td>${salaryBadge}</td>
-                    <td class="num">${UI.money(p.base || 0)}</td>
-                    <td class="num" style="color:var(--success);font-weight:700;">+ ${UI.money(p.additions || 0)}</td>
-                    <td class="num" style="color:var(--danger);">- ${UI.money(p.deductions || 0)}</td>
-                    <td class="num" style="font-weight:800;font-size:1.05rem;color:var(--text-primary);">${UI.money(p.net || 0)}</td>
-                    <td>${p.paid ? '<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> تم الصرف</span>' : '<span class="badge badge-amber"><i class="fa-solid fa-clock"></i> معلق</span>'}</td>
+                    <td><b>${r.empName}</b> ${r.isSuspended ? '<span class="badge badge-red" style="font-size:0.7rem;">موقوف</span>' : ''}</td>
+                    <td class="num">${filterPeriod}</td>
+                    <td>${r.salaryBadge}</td>
+                    <td class="num">${UI.money(r.base || 0)}</td>
+                    <td class="num" style="color:var(--success);font-weight:700;">+ ${UI.money(r.additions || 0)}</td>
+                    <td class="num" style="color:var(--danger);">- ${UI.money(r.deductions || 0)}</td>
+                    <td class="num" style="font-weight:800;font-size:1.05rem;color:var(--text-primary);">${UI.money(r.net || 0)}</td>
+                    <td>${r.paid ? '<span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> تم الصرف</span>' : '<span class="badge badge-amber"><i class="fa-solid fa-clock"></i> معلق</span>'}</td>
                     <td style="text-align:left;white-space:nowrap;">
-                        ${!p.paid ? '<button class="btn btn-sm btn-primary-soft" onclick="togglePay(' + p.id + ')" title="اعتماد وصرف الراتب وخصم السلفة"><i class="fa-solid fa-check"></i> صرف الراتب</button> ' : '<button class="btn btn-sm btn-secondary" onclick="togglePay(' + p.id + ')" title="إلغاء اعتماد الصرف"><i class="fa-solid fa-arrow-rotate-left"></i> إلغاء الصرف</button> '}
-                        <button class="btn btn-sm" onclick="editPay(' + p.id + ')" title="تعديل"><i class="fa-solid fa-pen"></i></button>
-                        <button class="btn btn-sm btn-danger" onclick="delPay(' + p.id + ')" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                        ${!r.paid
+                            ? `<button class="btn btn-sm btn-primary-soft" onclick="payOrDisburseForEmp(${r.emp ? r.emp.id : null}, ${r.payId}, '${filterPeriod}')" title="صرف الراتب وخصم السلفة"><i class="fa-solid fa-check"></i> صرف الراتب</button> `
+                            : `<button class="btn btn-sm btn-secondary" onclick="togglePay(${r.payId})" title="إلغاء اعتماد الصرف"><i class="fa-solid fa-arrow-rotate-left"></i> إلغاء الصرف</button> `
+                        }
+                        <button class="btn btn-sm" onclick="editOrPreparePay(${r.emp ? r.emp.id : null}, ${r.payId}, '${filterPeriod}')" title="تعديل"><i class="fa-solid fa-pen"></i></button>
                     </td>
                 </tr>`;
-            }).join('') || '<tr><td colspan="9" class="empty-state">لا يوجد موظفون مسجلون للشهر المحدد</td></tr>';
+            }).join('');
         }
 
         async function autoEnsureAllEmployeesPayroll(periodStr) {
@@ -308,6 +363,41 @@
             }
 
             return Math.round((totalBase * (emp.commissionRate / 100)) * 100) / 100;
+        }
+
+        async function payOrDisburseForEmp(empId, payId, period) {
+            let targetPayId = payId;
+            if (!targetPayId && empId) {
+                const emp = _empById[String(empId)];
+                if (emp) {
+                    await syncEmployeePayroll(emp, period);
+                    const allPay = await ARDB.getAll('payroll');
+                    const created = (allPay || []).find(p => String(p.employeeId) === String(empId) && p.period === period);
+                    if (created) targetPayId = created.id;
+                }
+            }
+
+            if (targetPayId) {
+                await togglePay(targetPayId);
+            } else {
+                UI.toast('تعذر العثور على سجل الراتب للموظف', 'warn');
+            }
+        }
+
+        async function editOrPreparePay(empId, payId, period) {
+            if (payId) {
+                await editPay(payId);
+            } else if (empId) {
+                const emp = _empById[String(empId)];
+                if (emp) {
+                    await syncEmployeePayroll(emp, period);
+                    const allPay = await ARDB.getAll('payroll');
+                    const created = (allPay || []).find(p => String(p.employeeId) === String(empId) && p.period === period);
+                    if (created) {
+                        await editPay(created.id);
+                    }
+                }
+            }
         }
 
         function openPayModal() {
