@@ -8,5 +8,3 @@ scratch/
 backend/ar_cloud_sync.json
 *.db-shm
 *.db-wal
-
-.vercel
