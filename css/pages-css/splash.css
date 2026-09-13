@@ -104,16 +104,20 @@
     box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
 }
 
-/* مسرح الرسوم المتواصلة */
+/* مسرح الرسوم المتواصلة الميكانيكية 60FPS */
 .splash-stage {
-    position: relative;
-    z-index: 3;
-    width: min(960px, 98vw);
-    height: min(520px, 70vh);
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    width: min(980px, 98vw);
+    height: min(540px, 72vh);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    pointer-events: none;
 }
 
 .splash-svg {
