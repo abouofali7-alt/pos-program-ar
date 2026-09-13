@@ -211,17 +211,21 @@ router.post('/push', async (req, res) => {
         if (!USE_DB && ON_VERCEL) return unavailable(res);
 
         if (USE_DB) {
+            let staleInfo = null;
             const result = await withLockedBlob((cloud) => {
                 const out = processPush(cloud, req.body || {});
-                if (out.stale) return { __stale: out };
+                if (out.stale) {
+                    staleInfo = out;
+                    return cloud; // no-op write: keep blob unchanged
+                }
                 return out.blob;
             });
-            if (result && result.__stale) {
+            if (staleInfo) {
                 return res.json({
                     success: false,
                     reset: true,
-                    resetTimestamp: result.__stale.resetTimestamp,
-                    message: result.__stale.message
+                    resetTimestamp: staleInfo.resetTimestamp,
+                    message: staleInfo.message
                 });
             }
             return res.json({ success: true, lastUpdated: result.lastUpdated, deleted: result.deleted || {} });

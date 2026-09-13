@@ -92,6 +92,11 @@ const API = (function () {
         }
     }
 
+    restoreQueue();
+    if (_pushQueue.length > 0) {
+        setTimeout(processPushQueue, 0);
+    }
+
     try {
         if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
             _broadcastChannel = new BroadcastChannel('ar_pos_sync');
@@ -128,12 +133,13 @@ const API = (function () {
             if (res.ok) {
                 const json = await res.json();
                 if (json && json.reset) {
-                    _pushQueue = [];
+                    _pushQueue.unshift(...batch);
                     persistQueue();
                     if (json.resetTimestamp) {
                         localStorage.setItem('ar_last_reset_ts', String(json.resetTimestamp));
                     }
-                    pullCloudSync(true);
+                    await pullCloudSync(true);
+                    setTimeout(processPushQueue, 2000);
                     return;
                 }
                 if (json && json.lastUpdated) {
@@ -193,11 +199,10 @@ const API = (function () {
             if (res.ok) {
                 const json = await res.json();
                 if (json && json.reset) {
-                    _pushQueue = [];
                     if (json.resetTimestamp) {
                         localStorage.setItem('ar_last_reset_ts', String(json.resetTimestamp));
                     }
-                    pullCloudSync(true);
+                    await pullCloudSync(true);
                     return false;
                 }
                 if (json && json.lastUpdated) _lastSyncTimestamp = json.lastUpdated;
@@ -223,8 +228,6 @@ const API = (function () {
                 const localResetTs = Number(localStorage.getItem('ar_last_reset_ts') || 0);
 
                 if (cloudResetTs > 0 && cloudResetTs > localResetTs) {
-                    _pushQueue = []; // تفريغ ركام الرفع لمنع إرسال داتا قديمة للسيرفر
-                    persistQueue();
                     if (_pushTimer) clearTimeout(_pushTimer);
                     localStorage.setItem('ar_last_reset_ts', String(cloudResetTs));
                     _lastSyncTimestamp = json.lastUpdated || cloudResetTs;

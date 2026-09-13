@@ -139,6 +139,24 @@ async function api(method, path, body) {
     r = await api('GET', '/api/reports/cash-flow');
     ok('إلغاء: حذف مصروف يسحب من التدفقات (out 0)', r.json.data.sum_out === 0, 'out=' + r.json.data.sum_out);
 
+    // ===== مزامنة السحابة: الدفع القديم (stale) لا يمسح بيانات السحابة =====
+    const st = await api('POST', '/api/sync/reset');
+    const stRt = st.json.resetTimestamp;
+    ok('sync: reset يرجع resetTimestamp', !!stRt, JSON.stringify(st.json));
+
+    const keepItem = { id: 6600000000001, name: 'MARKER-KEEPME', salary: 1, active: true, updatedAt: Date.now() };
+    r = await api('POST', '/api/sync/push', { batch: [{ store: 'employees', item: keepItem, action: 'save' }], clientResetTs: stRt });
+    ok('sync: push جديد ينجح', r.json.success === true, JSON.stringify(r.json).slice(0, 150));
+
+    r = await api('POST', '/api/sync/push', { batch: [{ store: 'employees', item: { id: 6600000000002, name: 'NO-STORE', salary: 1 }, action: 'save' }], clientResetTs: 0 });
+    ok('sync: دفع قديم يُرفض (stale)', r.json.reset === true, JSON.stringify(r.json).slice(0, 150));
+
+    const pullAfter = await api('GET', '/api/sync/pull');
+    const pullNames = (pullAfter.json.data && pullAfter.json.data.employees || []).map(e => e.name);
+    ok('sync: البيانات بقيت سليمة بعد الدفع القديم', pullNames.includes('MARKER-KEEPME') && !pullNames.includes('NO-STORE'), 'names=' + pullNames.join(','));
+
+    await api('POST', '/api/sync/push', { batch: [{ store: 'employees', item: { id: 6600000000001 }, action: 'delete' }], clientResetTs: stRt });
+
     console.log('===============================================');
     console.log('النتيجة: ' + pass + ' نجحت، ' + fail + ' فشلت');
     server.close();
