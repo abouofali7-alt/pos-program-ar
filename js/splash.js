@@ -1,25 +1,77 @@
 /* ============================================================
    AR-Program — Cinematic Machinery Splash Animation Controller
-   المسار الزمني الممتد (مدة العرض الكاملة: 17 ثانية على الأقل قبل التوجيه):
-   1. 0.0s - 5.0s  : الفني يمسح الأتربة عن التروس بدقة وبحركة متكررة (5.0 ثوانٍ)
-   2. 5.0s - 9.0s  : التماع التروس وبدء دورانها المتشابك وتفعيل المحرك والكباسات (4.0 ثوانٍ)
-   3. 9.0s - 13.0s : انطلاق شبكة الطاقة وإضاءة حروف AR-PROGRAM حرفاً بحرف (4.0 ثوانٍ)
-   4. 13.0s - 17.0s: ظهور نافذة الترحيب الزجاجية والعد التنازلي واكتمال التحويل (4.0 ثوانٍ)
+   المسار الزمني الممتد والواقعي (18 ثانية على الأقل قبل التوجيه):
+   1. 0.0s - 3.5s : إنسان يمشي بخطوات واقعية باتجاه الآلة والتروس
+   2. 3.5s - 7.5s : الفني يمسح وينفض الأتربة الواقعية عن التروس
+   3. 7.5s - 11.5s: التماع التروس الماسي ودورانها المتشابك وتفعيل المحرك
+   4. 11.5s - 15.0s: تدفق الطاقة وإضاءة حروف AR-PROGRAM متتالية حرفاً بحرف
+   5. 15.0s - 18.5s: ظهور نافذة الترحيب الزجاجية والعد التنازلي واكتمال التحويل
    ============================================================ */
 
 const ARSplash = (function () {
     let _redirectTimer = null;
     let _countdownInterval = null;
     let _hasFinished = false;
+    let _particleAnimFrame = null;
 
     function initSplash() {
         const overlay = document.getElementById('splashOverlay');
         if (!overlay) return;
 
+        initParticleCanvas();
         startAnimationSequence();
     }
 
+    /* نظام جزيئات الهواء والغبار السابح ذو البُعد السينمائي */
+    function initParticleCanvas() {
+        const canvas = document.getElementById('splashParticlesCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        const particles = [];
+        const particleCount = 45;
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: Math.random() * 2 + 0.5,
+                color: Math.random() > 0.4 ? 'rgba(56, 189, 248, ' : 'rgba(245, 158, 11, ',
+                alpha: Math.random() * 0.5 + 0.2,
+                vx: (Math.random() - 0.5) * 0.4,
+                vy: -Math.random() * 0.5 - 0.2
+            });
+        }
+
+        function drawParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color + p.alpha + ')';
+                ctx.fill();
+
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.y < 0) p.y = canvas.height;
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+            });
+            _particleAnimFrame = requestAnimationFrame(drawParticles);
+        }
+        drawParticles();
+    }
+
     function startAnimationSequence() {
+        const personRig = document.getElementById('personWalkingRig');
         const dustLayer = document.getElementById('dustLayer');
         const armGroup = document.getElementById('rightArmWipingGroup');
         const gear1 = document.getElementById('gear1');
@@ -30,11 +82,17 @@ const ARSplash = (function () {
         const pulseLeft = document.getElementById('energyPulseLeft');
         const pulseRight = document.getElementById('energyPulseRight');
 
-        // المرحلة 1: مسح الأتربة (0s - 5.0s)
-        if (armGroup) armGroup.classList.add('wiping-arm');
-        if (dustLayer) dustLayer.classList.add('dust-layer-anim');
+        // المرحلة 1: الإنسان يمشي باتجاه الآلة (0.0s - 3.5s)
+        if (personRig) personRig.classList.add('person-walking-rig');
 
-        // المرحلة 2: دوران التروس والتماعها عند 5.0 ثوانٍ
+        // المرحلة 2: يقرر مسح الأتربة وينفض الغبار عند الوصول (3.5s - 7.5s)
+        setTimeout(() => {
+            if (_hasFinished) return;
+            if (armGroup) armGroup.classList.add('dusting-arm');
+            if (dustLayer) dustLayer.classList.add('dust-layer-anim');
+        }, 3500);
+
+        // المرحلة 3: دوران التروس الحقيقية والتماعها وتفعيل المحرك (7.5s)
         setTimeout(() => {
             if (_hasFinished) return;
             if (gear1) gear1.classList.add('gear-spin-cw');
@@ -43,9 +101,9 @@ const ARSplash = (function () {
 
             const sparkles = document.getElementById('sparkleGroup');
             if (sparkles) sparkles.classList.add('sparkle-anim');
-        }, 5000);
+        }, 7500);
 
-        // المرحلة 3: تشغيل المحرك والكباسات وانطلاق الطاقة عند 7.0 ثوانٍ
+        // تشغيل قدرة المحرك والكباسات ونبض خطوط الطاقة (9.5s)
         setTimeout(() => {
             if (_hasFinished) return;
             const engineGroup = document.getElementById('engineGroup');
@@ -55,13 +113,13 @@ const ARSplash = (function () {
 
             if (pulseLeft) pulseLeft.classList.add('energy-line-anim');
             if (pulseRight) pulseRight.classList.add('energy-line-anim');
-        }, 7000);
+        }, 9500);
 
-        // المرحلة 4: إضاءة حروف الاسم حرفاً بحرف عند 9.0 ثوانٍ
+        // المرحلة 4: إضاءة حروف الاسم حرفاً بحرف عند (11.5s)
         setTimeout(() => {
             if (_hasFinished) return;
             illuminateTitleLetters();
-        }, 9000);
+        }, 11500);
     }
 
     function illuminateTitleLetters() {
@@ -79,10 +137,10 @@ const ARSplash = (function () {
                 index++;
             } else {
                 clearInterval(interval);
-                // المرحلة 5: إظهار الرسالة الترحيبية والتحويل عند 13.0 ثانية
+                // المرحلة 5: إظهار الرسالة الترحيبية والتحويل عند (15.0s)
                 setTimeout(showWelcomeAndRedirect, 500);
             }
-        }, 380); // 10 حروف * 380ms = 3.8s
+        }, 350); // 10 حروف * 350ms = 3.5s
     }
 
     function showWelcomeAndRedirect() {
@@ -94,11 +152,11 @@ const ARSplash = (function () {
 
         if (welcomeModal) welcomeModal.classList.add('show');
         if (fillBar) {
-            fillBar.style.transition = 'width 4.0s linear';
+            fillBar.style.transition = 'width 3.5s linear';
             fillBar.style.width = '100%';
         }
 
-        let secondsLeft = 4;
+        let secondsLeft = 3;
         if (subTxt) subTxt.innerHTML = `جاري التحويل لصفحة تسجيل الدخول خلال <b style="color:#38bdf8;font-size:1.05rem;">${secondsLeft}</b> ثوانٍ...`;
 
         _countdownInterval = setInterval(() => {
@@ -112,7 +170,7 @@ const ARSplash = (function () {
 
         _redirectTimer = setTimeout(() => {
             finishAndRedirect();
-        }, 4000);
+        }, 3500); // 15s + 3.5s = 18.5s إجمالي الوقت السينمائي!
     }
 
     function finishAndRedirect() {
@@ -121,6 +179,7 @@ const ARSplash = (function () {
 
         if (_redirectTimer) clearTimeout(_redirectTimer);
         if (_countdownInterval) clearInterval(_countdownInterval);
+        if (_particleAnimFrame) cancelAnimationFrame(_particleAnimFrame);
 
         const overlay = document.getElementById('splashOverlay');
         if (overlay) {

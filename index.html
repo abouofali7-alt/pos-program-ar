@@ -44,8 +44,11 @@
 </head>
 <body class="dark-mode">
 
-    <!-- الشاشة التفاعلية الترحيبية والسينمائية (Splash Machinery Screen) -->
+    <!-- الشاشة التفاعلية والسينمائية (Cinematic Machinery Splash Screen) -->
     <div id="splashOverlay">
+        <div class="splash-spotlight"></div>
+        <canvas id="splashParticlesCanvas"></canvas>
+
         <button id="skipSplashBtn" class="splash-skip-btn" onclick="ARSplash.finishAndRedirect()">
             <span>تخطي الانيميشن</span> <i class="fa-solid fa-forward"></i>
         </button>
@@ -67,134 +70,155 @@
                 </div>
             </div>
 
-            <!-- الرسم التفاعلي الفيكتور SVG -->
+            <!-- الرسم التفاعلي الفيكتور SVG السينمائي -->
             <svg viewBox="0 0 1000 520" class="splash-svg">
                 <defs>
-                    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#0f2b48" stop-opacity="0.8"/>
-                        <stop offset="100%" stop-color="#060913" stop-opacity="1"/>
-                    </radialGradient>
-
+                    <!-- Metallic 3D Gradients & Filters -->
                     <linearGradient id="gearGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#38bdf8"/>
-                        <stop offset="50%" stop-color="#0284c7"/>
-                        <stop offset="100%" stop-color="#0f172a"/>
+                        <stop offset="0%" stop-color="#7dd3fc"/>
+                        <stop offset="35%" stop-color="#0284c7"/>
+                        <stop offset="70%" stop-color="#0369a1"/>
+                        <stop offset="100%" stop-color="#0c4a6e"/>
                     </linearGradient>
 
                     <linearGradient id="gearGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#f59e0b"/>
-                        <stop offset="50%" stop-color="#d97706"/>
+                        <stop offset="0%" stop-color="#fef08a"/>
+                        <stop offset="40%" stop-color="#f59e0b"/>
+                        <stop offset="75%" stop-color="#b45309"/>
                         <stop offset="100%" stop-color="#451a03"/>
                     </linearGradient>
 
                     <linearGradient id="gearGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#c084fc"/>
-                        <stop offset="50%" stop-color="#9333ea"/>
+                        <stop offset="0%" stop-color="#e9d5ff"/>
+                        <stop offset="40%" stop-color="#c084fc"/>
+                        <stop offset="75%" stop-color="#7e22ce"/>
                         <stop offset="100%" stop-color="#3b0764"/>
                     </linearGradient>
 
+                    <linearGradient id="metalBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#334155"/>
+                        <stop offset="50%" stop-color="#1e293b"/>
+                        <stop offset="100%" stop-color="#0f172a"/>
+                    </linearGradient>
+
                     <filter id="dustFilter">
-                        <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" result="noise"/>
-                        <feDisplacementMap in="SourceGraphic" in2="noise" scale="12" xChannelSelector="R" yChannelSelector="G"/>
+                        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="4" result="noise"/>
+                        <feDisplacementMap in="SourceGraphic" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+                    </filter>
+
+                    <filter id="dropShadowGears" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+                        <feOffset dx="4" dy="8" result="offsetblur"/>
+                        <feComponentTransfer>
+                            <feFuncA type="linear" slope="0.6"/>
+                        </feComponentTransfer>
+                        <feMerge> 
+                            <feMergeNode/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
                     </filter>
                 </defs>
 
                 <!-- خطوط موصلات الطاقة (المحرك -> العنوان) -->
-                <path id="conduitLeft" d="M 320 370 L 320 200 L 410 130" fill="none" stroke="#1e293b" stroke-width="6" stroke-linecap="round"/>
-                <path id="conduitRight" d="M 680 370 L 680 200 L 590 130" fill="none" stroke="#1e293b" stroke-width="6" stroke-linecap="round"/>
+                <path id="conduitLeft" d="M 320 370 L 320 200 L 410 130" fill="none" stroke="#1e293b" stroke-width="7" stroke-linecap="round"/>
+                <path id="conduitRight" d="M 680 370 L 680 200 L 590 130" fill="none" stroke="#1e293b" stroke-width="7" stroke-linecap="round"/>
                 
-                <path id="energyPulseLeft" d="M 320 370 L 320 200 L 410 130" fill="none" stroke="#38bdf8" stroke-width="6" stroke-dasharray="30 150" stroke-dashoffset="180" stroke-linecap="round" opacity="0"/>
-                <path id="energyPulseRight" d="M 680 370 L 680 200 L 590 130" fill="none" stroke="#c084fc" stroke-width="6" stroke-dasharray="30 150" stroke-dashoffset="180" stroke-linecap="round" opacity="0"/>
+                <path id="energyPulseLeft" d="M 320 370 L 320 200 L 410 130" fill="none" stroke="#38bdf8" stroke-width="7" stroke-dasharray="35 160" stroke-dashoffset="220" stroke-linecap="round" opacity="0"/>
+                <path id="energyPulseRight" d="M 680 370 L 680 200 L 590 130" fill="none" stroke="#c084fc" stroke-width="7" stroke-dasharray="35 160" stroke-dashoffset="220" stroke-linecap="round" opacity="0"/>
 
-                <!-- منصة الورشة والآلة -->
-                <rect x="220" y="420" width="560" height="25" rx="6" fill="#1e293b" stroke="#334155" stroke-width="3"/>
-                <rect x="190" y="445" width="620" height="40" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="3"/>
+                <!-- منصة الورشة والآلة الحقيقية -->
+                <rect x="200" y="420" width="600" height="28" rx="7" fill="url(#metalBodyGrad)" stroke="#475569" stroke-width="3"/>
+                <rect x="170" y="448" width="660" height="42" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="3"/>
+                <!-- مسامير وقواعد هيكل الآلة -->
+                <circle cx="220" cy="434" r="3" fill="#94a3b8"/>
+                <circle cx="780" cy="434" r="3" fill="#94a3b8"/>
 
                 <!-- المحرك الرئيسي (Engine Motor Group) -->
-                <g id="engineGroup" transform="translate(620, 310)">
-                    <rect x="0" y="0" width="115" height="110" rx="14" fill="#0f172a" stroke="#38bdf8" stroke-width="3" id="engineHousing"/>
+                <g id="engineGroup" transform="translate(620, 300)" filter="url(#dropShadowGears)">
+                    <rect x="0" y="0" width="120" height="120" rx="16" fill="url(#metalBodyGrad)" stroke="#38bdf8" stroke-width="3.5" id="engineHousing"/>
                     <!-- مكابس وقدرة المحرك -->
-                    <rect x="20" y="18" width="28" height="45" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="2" id="piston1"/>
-                    <rect x="67" y="18" width="28" height="45" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="2" id="piston2"/>
-                    <circle cx="58" cy="85" r="15" fill="#1e293b" stroke="#f59e0b" stroke-width="3"/>
-                    <circle cx="58" cy="85" r="6" fill="#38bdf8"/>
+                    <rect x="20" y="18" width="30" height="48" rx="5" fill="#0f172a" stroke="#38bdf8" stroke-width="2" id="piston1"/>
+                    <rect x="70" y="18" width="30" height="48" rx="5" fill="#0f172a" stroke="#38bdf8" stroke-width="2" id="piston2"/>
+                    <circle cx="60" cy="92" r="16" fill="#1e293b" stroke="#f59e0b" stroke-width="3"/>
+                    <circle cx="60" cy="92" r="7" fill="#38bdf8"/>
                 </g>
 
-                <!-- مجموعة التروس المتداخلة (Interlocking Gears Cluster) -->
-                <g id="gearsCluster">
+                <!-- مجموعة التروس المتداخلة ثلاثية الأبعاد (3D Metallic Gears Cluster) -->
+                <g id="gearsCluster" filter="url(#dropShadowGears)">
                     <!-- الترس الرئيسي الكبير 1 (المنتصف) -->
                     <g id="gear1" transform="translate(430, 330)">
-                        <circle cx="0" cy="0" r="55" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="4"/>
-                        <circle cx="0" cy="0" r="22" fill="#0f172a" stroke="#38bdf8" stroke-width="3"/>
-                        <circle cx="0" cy="0" r="8" fill="#38bdf8"/>
-                        <!-- أسنان الترس -->
-                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(0)"/>
-                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(45)"/>
-                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(90)"/>
-                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(135)"/>
-                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(180)"/>
-                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(225)"/>
-                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(270)"/>
-                        <rect x="-8" y="-68" width="16" height="16" rx="3" fill="url(#gearGrad1)" transform="rotate(315)"/>
-                        <!-- أسلاك الترس الداخلي -->
-                        <line x1="-40" y1="0" x2="40" y2="0" stroke="#0f172a" stroke-width="5"/>
-                        <line x1="0" y1="-40" x2="0" y2="40" stroke="#0f172a" stroke-width="5"/>
+                        <circle cx="0" cy="0" r="58" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="4"/>
+                        <circle cx="0" cy="0" r="44" fill="none" stroke="#e0f2fe" stroke-width="1.5" opacity="0.6"/>
+                        <circle cx="0" cy="0" r="24" fill="#0f172a" stroke="#38bdf8" stroke-width="3"/>
+                        <circle cx="0" cy="0" r="9" fill="#38bdf8"/>
+                        <!-- أسنان الترس الحرفية -->
+                        <rect x="-9" y="-72" width="18" height="17" rx="3" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="1" transform="rotate(0)"/>
+                        <rect x="-9" y="-72" width="18" height="17" rx="3" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="1" transform="rotate(45)"/>
+                        <rect x="-9" y="-72" width="18" height="17" rx="3" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="1" transform="rotate(90)"/>
+                        <rect x="-9" y="-72" width="18" height="17" rx="3" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="1" transform="rotate(135)"/>
+                        <rect x="-9" y="-72" width="18" height="17" rx="3" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="1" transform="rotate(180)"/>
+                        <rect x="-9" y="-72" width="18" height="17" rx="3" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="1" transform="rotate(225)"/>
+                        <rect x="-9" y="-72" width="18" height="17" rx="3" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="1" transform="rotate(270)"/>
+                        <rect x="-9" y="-72" width="18" height="17" rx="3" fill="url(#gearGrad1)" stroke="#0284c7" stroke-width="1" transform="rotate(315)"/>
+                        <!-- أسلاك وحواف الترس الداخلي -->
+                        <line x1="-42" y1="0" x2="42" y2="0" stroke="#0f172a" stroke-width="6"/>
+                        <line x1="0" y1="-42" x2="0" y2="42" stroke="#0f172a" stroke-width="6"/>
                     </g>
 
                     <!-- الترس الأوسط 2 (يسار متداخل) -->
-                    <g id="gear2" transform="translate(320, 365)">
-                        <circle cx="0" cy="0" r="40" fill="url(#gearGrad2)" stroke="#d97706" stroke-width="3"/>
-                        <circle cx="0" cy="0" r="16" fill="#0f172a" stroke="#f59e0b" stroke-width="2"/>
-                        <circle cx="0" cy="0" r="6" fill="#f59e0b"/>
-                        <!-- 6 أسنان -->
-                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(0)"/>
-                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(60)"/>
-                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(120)"/>
-                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(180)"/>
-                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(240)"/>
-                        <rect x="-7" y="-50" width="14" height="13" rx="2" fill="url(#gearGrad2)" transform="rotate(300)"/>
+                    <g id="gear2" transform="translate(315, 365)">
+                        <circle cx="0" cy="0" r="42" fill="url(#gearGrad2)" stroke="#d97706" stroke-width="3"/>
+                        <circle cx="0" cy="0" r="18" fill="#0f172a" stroke="#f59e0b" stroke-width="2"/>
+                        <circle cx="0" cy="0" r="7" fill="#f59e0b"/>
+                        <!-- 6 أسنان 3D -->
+                        <rect x="-8" y="-53" width="16" height="14" rx="3" fill="url(#gearGrad2)" stroke="#b45309" stroke-width="1" transform="rotate(0)"/>
+                        <rect x="-8" y="-53" width="16" height="14" rx="3" fill="url(#gearGrad2)" stroke="#b45309" stroke-width="1" transform="rotate(60)"/>
+                        <rect x="-8" y="-53" width="16" height="14" rx="3" fill="url(#gearGrad2)" stroke="#b45309" stroke-width="1" transform="rotate(120)"/>
+                        <rect x="-8" y="-53" width="16" height="14" rx="3" fill="url(#gearGrad2)" stroke="#b45309" stroke-width="1" transform="rotate(180)"/>
+                        <rect x="-8" y="-53" width="16" height="14" rx="3" fill="url(#gearGrad2)" stroke="#b45309" stroke-width="1" transform="rotate(240)"/>
+                        <rect x="-8" y="-53" width="16" height="14" rx="3" fill="url(#gearGrad2)" stroke="#b45309" stroke-width="1" transform="rotate(300)"/>
                     </g>
 
                     <!-- الترس الصغير 3 (يمين متداخل متصل بالمحرك) -->
-                    <g id="gear3" transform="translate(540, 310)">
-                        <circle cx="0" cy="0" r="30" fill="url(#gearGrad3)" stroke="#9333ea" stroke-width="3"/>
-                        <circle cx="0" cy="0" r="12" fill="#0f172a" stroke="#c084fc" stroke-width="2"/>
+                    <g id="gear3" transform="translate(540, 305)">
+                        <circle cx="0" cy="0" r="32" fill="url(#gearGrad3)" stroke="#9333ea" stroke-width="3"/>
+                        <circle cx="0" cy="0" r="13" fill="#0f172a" stroke="#c084fc" stroke-width="2"/>
                         <circle cx="0" cy="0" r="5" fill="#c084fc"/>
                         <!-- أسنان الترس -->
-                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(0)"/>
-                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(60)"/>
-                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(120)"/>
-                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(180)"/>
-                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(240)"/>
-                        <rect x="-6" y="-38" width="12" height="11" rx="2" fill="url(#gearGrad3)" transform="rotate(300)"/>
+                        <rect x="-7" y="-40" width="14" height="12" rx="2" fill="url(#gearGrad3)" stroke="#7e22ce" stroke-width="1" transform="rotate(0)"/>
+                        <rect x="-7" y="-40" width="14" height="12" rx="2" fill="url(#gearGrad3)" stroke="#7e22ce" stroke-width="1" transform="rotate(60)"/>
+                        <rect x="-7" y="-40" width="14" height="12" rx="2" fill="url(#gearGrad3)" stroke="#7e22ce" stroke-width="1" transform="rotate(120)"/>
+                        <rect x="-7" y="-40" width="14" height="12" rx="2" fill="url(#gearGrad3)" stroke="#7e22ce" stroke-width="1" transform="rotate(180)"/>
+                        <rect x="-7" y="-40" width="14" height="12" rx="2" fill="url(#gearGrad3)" stroke="#7e22ce" stroke-width="1" transform="rotate(240)"/>
+                        <rect x="-7" y="-40" width="14" height="12" rx="2" fill="url(#gearGrad3)" stroke="#7e22ce" stroke-width="1" transform="rotate(300)"/>
                     </g>
                 </g>
 
-                <!-- بريق التماع التروس عند النظافة -->
+                <!-- بريق التماع التروس الماسي عند النظافة -->
                 <g id="sparkleGroup" opacity="0" transform="translate(430, 330)">
-                    <polygon points="0,-25 6,-6 25,0 6,6 0,25 -6,6 -25,0 -6,-6" fill="#ffffff"/>
-                    <polygon points="-80,20 -75,30 -60,35 -75,40 -80,50 -85,40 -100,35 -85,30" fill="#38bdf8"/>
+                    <polygon points="0,-28 7,-7 28,0 7,7 0,28 -7,7 -28,0 -7,-7" fill="#ffffff"/>
+                    <polygon points="-85,20 -80,30 -65,35 -80,40 -85,50 -90,40 -105,35 -90,30" fill="#38bdf8"/>
                 </g>
 
-                <!-- طبقة الأتربة والغبار فوق التروس (Dust Overlay Layer) -->
+                <!-- طبقة الأتربة الغزيرة فوق التروس (Real Heavy Dust Layer) -->
                 <g id="dustLayer">
-                    <ellipse cx="430" cy="330" rx="145" ry="105" fill="#6d5847" opacity="0.82" filter="url(#dustFilter)"/>
-                    <ellipse cx="330" cy="370" rx="75" ry="60" fill="#544336" opacity="0.78" filter="url(#dustFilter)"/>
-                    <ellipse cx="535" cy="310" rx="65" ry="50" fill="#7a6350" opacity="0.75" filter="url(#dustFilter)"/>
+                    <ellipse cx="430" cy="330" rx="155" ry="110" fill="#5c493a" opacity="0.88" filter="url(#dustFilter)"/>
+                    <ellipse cx="320" cy="370" rx="80" ry="65" fill="#47372b" opacity="0.82" filter="url(#dustFilter)"/>
+                    <ellipse cx="535" cy="305" rx="70" ry="55" fill="#6e5746" opacity="0.8" filter="url(#dustFilter)"/>
                 </g>
 
-                <!-- شخص يرتدي زي الصيانة ومدي للمستخدم ضهره يمسح الأتربة (Technician Silhouette) -->
-                <g id="technicianGroup" transform="translate(370, 245)">
-                    <!-- القدمان والحذاء -->
-                    <path d="M 40 180 L 30 250 L 55 250 L 50 180 Z" fill="#0f172a" stroke="#1e293b"/>
-                    <path d="M 65 180 L 60 250 L 85 250 L 75 180 Z" fill="#0f172a" stroke="#1e293b"/>
-                    <ellipse cx="42" cy="250" rx="15" ry="6" fill="#1e293b"/>
-                    <ellipse cx="72" cy="250" rx="15" ry="6" fill="#1e293b"/>
+                <!-- إنسان يمشي باتجاه الآلة ومدي ضهره يمسح وينفض الأتربة (Walking Human Rig) -->
+                <g id="personWalkingRig" transform="translate(370, 245)">
+                    <!-- القدمان والحذاء الواقعي مع حركة المشي -->
+                    <path class="leg-left-walk" d="M 42 180 L 32 250 L 58 250 L 52 180 Z" fill="#0f172a" stroke="#1e293b"/>
+                    <path class="leg-right-walk" d="M 68 180 L 63 250 L 88 250 L 78 180 Z" fill="#0f172a" stroke="#1e293b"/>
+                    <ellipse cx="45" cy="250" rx="16" ry="7" fill="#1e293b"/>
+                    <ellipse cx="75" cy="250" rx="16" ry="7" fill="#1e293b"/>
 
-                    <!-- الجذع والسترة (من الخلف مع الأحزمة والتفاصيل) -->
+                    <!-- الجذع والسترة (من الخلف مع أحزمة ورسم الحجم) -->
                     <path d="M 25 85 C 25 65, 90 65, 90 85 L 85 180 L 30 180 Z" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
                     <path d="M 42 85 L 42 180 M 73 85 L 73 180 M 30 125 L 85 125" stroke="#0f172a" stroke-width="3"/>
-                    <rect x="40" y="140" width="35" height="15" rx="3" fill="#0f172a" stroke="#334155"/>
+                    <rect x="40" y="140" width="36" height="16" rx="3" fill="#0f172a" stroke="#334155"/>
 
                     <!-- الرأس وقبعة الصيانة من الخلف -->
                     <ellipse cx="57" cy="46" rx="21" ry="23" fill="#0f172a"/>
@@ -204,19 +228,19 @@
                     <!-- الذراع اليسرى مستندة على الخصر -->
                     <path d="M 25 90 Q 5 125, 25 145" fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
 
-                    <!-- الذراع اليمنى المتحركة مع قماش مسح الغبار -->
+                    <!-- الذراع اليمنى المتحركة مع قماش المسح ونفض الغبار -->
                     <g id="rightArmWipingGroup">
                         <path d="M 85 90 Q 125 75, 115 45" fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
                         <g id="handCloth" transform="translate(115, 45)">
                             <circle cx="0" cy="0" r="7" fill="#d97706"/>
-                            <!-- قماش المسح White Dusting Cloth -->
-                            <path d="M -14 -12 C 12 -22, 28 10, 8 22 C -16 16, -22 -6, -14 -12 Z" fill="#f8fafc" opacity="0.95"/>
+                            <!-- قماش نفض الغبار Dusting Cloth -->
+                            <path d="M -15 -12 C 14 -22, 30 10, 8 22 C -18 16, -24 -6, -15 -12 Z" fill="#f8fafc" opacity="0.95"/>
                         </g>
                     </g>
                 </g>
             </svg>
 
-            <!-- نافذة الترحيب والتوجيه النهائي -->
+            <!-- نافذة الترحيب والتوجيه النهائي السينمائي -->
             <div class="splash-welcome-modal" id="welcomeModal">
                 <div class="splash-welcome-title"><i class="fa-solid fa-circle-check" style="color:var(--success, #22c55e);"></i> أهلاً بك في نظام AR-Program</div>
                 <div class="splash-welcome-sub" id="splashWelcomeSub">النظام الذكي لإدارة الحسابات، المبيعات، الرواتب، والمخزون</div>
