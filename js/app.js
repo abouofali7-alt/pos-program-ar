@@ -571,8 +571,12 @@
             refreshCurrentPage();
             API.startAutoSync();
         }
+        if (typeof ARNotifications !== 'undefined') {
+            ARNotifications.loadNotifications();
+        }
         window.addEventListener('ar_cloud_data_updated', () => {
             refreshCurrentPage();
+            if (typeof ARNotifications !== 'undefined') ARNotifications.loadNotifications();
         });
     }
 
@@ -590,6 +594,7 @@
                 if (typeof UI !== 'undefined') UI.toast('البيانات الحالية محدثة ومطابقة أونلاين', 'ok');
             }
             refreshCurrentPage();
+            if (typeof ARNotifications !== 'undefined') ARNotifications.loadNotifications();
         } catch(e) {
             if (typeof UI !== 'undefined') UI.toast('تعذر الاتصال بالسيرفر حالياً', 'warn');
         } finally {

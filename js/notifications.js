@@ -1,6 +1,6 @@
 /* ============================================================
    AR-Program — مركز الإشعارات والتنبيهات الذكي (Smart Notifications)
-   فحص المخزون المنخفض، الفواتير المتأخرة، والمهام المستحقة
+   فحص المخزون المنخفض، الفواتير المتأخرة، والمهام، ورواتب وسلف الموظفين وميعاد تصفية الرواتب
    ============================================================ */
 
 const ARNotifications = (function () {
@@ -9,11 +9,14 @@ const ARNotifications = (function () {
     async function loadNotifications() {
         _notifications = [];
         try {
-            const [products, movements, invoices, tasks] = await Promise.all([
-                ARDB.getAll('products'),
-                ARDB.getAll('stockMovements'),
-                ARDB.getAll('invoices'),
-                ARDB.getAll('tasks')
+            const [products, movements, invoices, tasks, employees, payroll, advances] = await Promise.all([
+                ARDB.getAll('products').catch(() => []),
+                ARDB.getAll('stockMovements').catch(() => []),
+                ARDB.getAll('invoices').catch(() => []),
+                ARDB.getAll('tasks').catch(() => []),
+                ARDB.getAll('employees').catch(() => []),
+                ARDB.getAll('payroll').catch(() => []),
+                ARDB.getAll('advances').catch(() => [])
             ]);
 
             // 1. تنبيهات المخزون المنخفض
@@ -52,6 +55,99 @@ const ARNotifications = (function () {
                 }
             });
 
+            // 3. تنبيهات متابعة الرواتب وميعاد التصفية
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+            const currentPeriod = `${currentYear}-${currentMonth}`;
+            const dayOfMonth = now.getDate();
+
+            const activeEmployees = (employees || []).filter(e => e.status !== 'inactive');
+            const totalEmps = activeEmployees.length;
+
+            if (totalEmps > 0) {
+                const monthPayrolls = (payroll || []).filter(p => p.period === currentPeriod);
+                const paidPayrolls = monthPayrolls.filter(p => p.status === 'paid' || p.paid);
+                const unpaidEmpCount = Math.max(0, totalEmps - paidPayrolls.length);
+
+                // أ. تنبيه اقتراب/حلول ميعاد تصفية الرواتب (بدءاً من يوم 25 في الشهر)
+                if (dayOfMonth >= 25 && unpaidEmpCount > 0) {
+                    _notifications.push({
+                        id: 'pay_settle_due_' + currentPeriod,
+                        type: 'warning',
+                        icon: 'fa-calendar-check',
+                        title: 'موعد تصفية الرواتب الشهرية',
+                        msg: `اقتربت نهاية شهر (${currentPeriod})، حان موعد تصفية الرواتب. متبقي ${unpaidEmpCount} موظف لم يتم تسديد رواتبهم بعد`,
+                        href: 'hr/payroll.html'
+                    });
+                }
+
+                // ب. تنبيه مسيرات الرواتب المعلقة وغير الصادرة
+                const totalUnpaidNet = monthPayrolls.reduce((sum, p) => {
+                    if (p.status !== 'paid' && !p.paid) {
+                        return sum + Number(p.netSalary || p.net || 0);
+                    }
+                    return sum;
+                }, 0);
+
+                if (totalUnpaidNet > 0) {
+                    _notifications.push({
+                        id: 'pay_pending_' + currentPeriod,
+                        type: 'info',
+                        icon: 'fa-money-bill-wave',
+                        title: 'مسير رواتب قيد الصرف والتصفية',
+                        msg: `رواتب شهر (${currentPeriod}): يوجد مبالغ رواتب مستحقة الصرف بقيمة إجمالية ${totalUnpaidNet.toFixed(2)} ج.م`,
+                        href: 'hr/payroll.html'
+                    });
+                }
+            }
+
+            // 4. تنبيهات متابعة سُلف الموظفين القائمة والأقساط المستحقة
+            const activeAdvances = (advances || []).filter(a => {
+                const amt = Number(a.amount || 0);
+                const pd = Number(a.paidAmount || 0);
+                return (amt - pd) > 0.01;
+            });
+
+            if (activeAdvances.length > 0) {
+                const empMap = {};
+                (employees || []).forEach(e => empMap[String(e.id)] = e.name);
+
+                let totalRemaining = 0;
+                activeAdvances.forEach(a => {
+                    totalRemaining += (Number(a.amount || 0) - Number(a.paidAmount || 0));
+                });
+
+                // تنبيه عام لملخص السلف النشطة الذمة
+                _notifications.push({
+                    id: 'adv_active_summary',
+                    type: 'warning',
+                    icon: 'fa-hand-holding-dollar',
+                    title: 'سُلف وقروض قائمة للموظفين',
+                    msg: `يوجد عدد ${activeAdvances.length} سُلفة قائمة بمبلغ متبقي إجمالي ${totalRemaining.toFixed(2)} ج.م يتطلب الخصم والمتابعة`,
+                    href: 'hr/advances.html'
+                });
+
+                // تنبيهات تفصيلية للأقساط الشهريّة المستحقة
+                activeAdvances.forEach(a => {
+                    const rem = Number(a.amount || 0) - Number(a.paidAmount || 0);
+                    const inst = Number(a.installment || 0);
+                    const empName = empMap[String(a.employeeId)] || 'موظف';
+
+                    if (inst > 0) {
+                        const currentDeduct = Math.min(inst, rem);
+                        _notifications.push({
+                            id: 'adv_inst_' + a.id,
+                            type: 'info',
+                            icon: 'fa-file-signature',
+                            title: `قسط سُلفة مستحق — ${empName}`,
+                            msg: `مستحق خصم قسط شهري بقيمة ${currentDeduct.toFixed(2)} ج.م من راتب الموظف (المتبقي الكلي: ${rem.toFixed(2)} ج.م)`,
+                            href: 'hr/advances.html'
+                        });
+                    }
+                });
+            }
+
         } catch (e) {
             console.warn('[Notifications] Error loading alerts:', e);
         }
@@ -72,7 +168,7 @@ const ARNotifications = (function () {
         }
     }
 
-    function toggleNotificationPanel() {
+    async function toggleNotificationPanel() {
         let panel = document.getElementById('notifPanel');
         if (!panel) {
             panel = document.createElement('div');
@@ -86,7 +182,10 @@ const ARNotifications = (function () {
             return;
         }
 
-        const prefix = ARUI ? ARUI.assetUrl('') : '';
+        // تحديث الإشعارات فوراً عند الفتح
+        await loadNotifications();
+
+        const prefix = (typeof ARUI !== 'undefined') ? ARUI.assetUrl('') : '';
         let listHtml = '';
         if (!_notifications.length) {
             listHtml = '<div style="padding:30px;text-align:center;color:var(--text-secondary);"><i class="fa-solid fa-bell-slash" style="font-size:2rem;margin-bottom:8px;opacity:0.5;"></i><div>لا توجد تنبيهات جديدة</div></div>';
