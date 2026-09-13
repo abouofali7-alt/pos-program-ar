@@ -420,7 +420,8 @@
                     '<button id="appNavBtn" class="icon-btn"><i class="fa-solid fa-bars"></i></button>' +
                     '<a class="brand" href="' + homeHref + '"><i class="fa-solid fa-cubes"></i> AR-Program</a>' +
                     '<a href="' + homeHref + '" class="btn btn-secondary topbar-home-btn" style="margin-inline-start:6px;padding:4px 10px;font-size:0.82rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;" title="' + homeTxt + '"><i class="fa-solid fa-house"></i> <span>' + homeTxt + '</span></a>' +
-                    '<span id="apiStatusBadge" style="font-size:0.75rem;padding:4px 10px;border-radius:20px;margin-inline-start:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><i class="fa-solid fa-spinner fa-spin"></i> ...</span>' +
+                    '<button id="syncNowBtn" onclick="forceCloudSync()" class="btn btn-secondary" style="margin-inline-start:6px;padding:4px 10px;font-size:0.82rem;display:inline-flex;align-items:center;gap:6px;" title="تحديث وسحب أحدث البيانات أونلاين"><i class="fa-solid fa-rotate"></i> <span>مزامنة</span></button>' +
+                    '<span id="apiStatusBadge" onclick="forceCloudSync()" style="font-size:0.75rem;padding:4px 10px;border-radius:20px;margin-inline-start:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;"><i class="fa-solid fa-spinner fa-spin"></i> ...</span>' +
                 '</div>' +
                 '<div class="topbar-left">' +
                     '<select id="currSelect" onchange="if(typeof ARCurrency!=\'undefined\')ARCurrency.setActiveCurrency(this.value)" style="background:var(--card-dark);border:1px solid var(--border-color);color:var(--text-primary);padding:4px 8px;border-radius:6px;font-size:0.78rem;outline:none;cursor:pointer;">' +
@@ -574,6 +575,27 @@
             refreshCurrentPage();
         });
     }
+
+    window.forceCloudSync = async function() {
+        if (typeof API === 'undefined') return;
+        const btn = document.getElementById('syncNowBtn');
+        const icon = btn ? btn.querySelector('i') : null;
+        if (icon) icon.classList.add('fa-spin');
+        try {
+            if (typeof UI !== 'undefined') UI.toast('جاري سحب وتحديث البيانات أونلاين من السيرفر...', 'info');
+            const updated = await API.pullCloudSync(true);
+            if (updated) {
+                if (typeof UI !== 'undefined') UI.toast('تم سحب وتحديث البيانات بنجاح!', 'ok');
+            } else {
+                if (typeof UI !== 'undefined') UI.toast('البيانات الحالية محدثة ومطابقة أونلاين', 'ok');
+            }
+            refreshCurrentPage();
+        } catch(e) {
+            if (typeof UI !== 'undefined') UI.toast('تعذر الاتصال بالسيرفر حالياً', 'warn');
+        } finally {
+            if (icon) icon.classList.remove('fa-spin');
+        }
+    };
 
     window.confirmResetAllSystemData = async function() {
         const ok = await UI.confirmBox(
