@@ -189,9 +189,13 @@ const API = (function () {
 
     async function pullCloudSync(force = false) {
         try {
-            const res = await fetch(`${getBaseUrl()}/sync/pull`, { headers: getAuthHeaders() });
+            const syncUrl = `${getBaseUrl()}/sync/pull${(!force && _lastSyncTimestamp) ? `?since=${_lastSyncTimestamp}` : ''}`;
+            const res = await fetch(syncUrl, { headers: getAuthHeaders() });
             if (res.ok) {
                 const json = await res.json();
+                if (json && json.unchanged && !force) {
+                    return false;
+                }
                 const cloudResetTs = json.resetTimestamp || 0;
                 const localResetTs = Number(localStorage.getItem('ar_last_reset_ts') || 0);
 
@@ -299,7 +303,7 @@ const API = (function () {
 
         _syncTimer = setInterval(async () => {
             await pullCloudSync();
-        }, 250);
+        }, 2000);
 
         if (typeof window !== 'undefined') {
             window.addEventListener('focus', () => pullCloudSync(true));

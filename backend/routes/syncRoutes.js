@@ -98,16 +98,20 @@ async function saveToRemote(cloudObj) {
     }
 }
 
-async function saveCloudData(cloudObj, awaitRemote = true) {
+async function saveCloudData(cloudObj, awaitRemote = false) {
     global._ar_cloud_data = cloudObj;
     _isLoadedFromRemote = true;
     try {
         fs.writeFileSync(SYNC_FILE, JSON.stringify(cloudObj), 'utf8');
     } catch(e) {}
 
-    try {
-        await saveToRemote(cloudObj);
-    } catch(e) {}
+    if (awaitRemote || (cloudObj && cloudObj.resetTimestamp)) {
+        try {
+            await saveToRemote(cloudObj);
+        } catch(e) {}
+    } else {
+        saveToRemote(cloudObj).catch(() => {});
+    }
 }
 
 function getItemId(x) {
@@ -133,7 +137,6 @@ router.post('/push', async (req, res) => {
         const cloudResetTs = Number(cloud.resetTimestamp || 0);
         const reqClientResetTs = Number(clientResetTs || 0);
 
-        // حماية ضد استرجاع البيانات القديمة بعد عملية الحذف الكلي: نرفض أي رفع محلي قديم سُجل قبل وقت الرسترة
         if (cloudResetTs > 0 && reqClientResetTs < cloudResetTs) {
             return res.json({
                 success: false,
@@ -163,7 +166,6 @@ router.post('/push', async (req, res) => {
                     if (!it) continue;
                     const itId = getItemId(it);
                     if (itId && cloud.deleted[s] && cloud.deleted[s].some(id => String(id) === String(itId))) {
-                        // عنصر محذوف صراحة من قبل، لا تقم بإعادة إحيائه من النسخ المحلية الأقدم
                         continue;
                     }
                     const idx = cloud.data[s].findIndex(x => isMatch(x, it));
@@ -213,12 +215,24 @@ router.post('/push', async (req, res) => {
     }
 });
 
-// 2. GET /api/sync/pull — الأجهزة الأخرى تسحب أحدث حركة فوراً
+// 2. GET /api/sync/pull — السحب السريع مع خاصية الدلتا والتأكد من عدم وجود تغييرات
 router.get('/pull', async (req, res) => {
     try {
         const cloud = getCloudData();
+        const clientSince = Number(req.query.since || 0);
+
+        if (clientSince > 0 && cloud.lastUpdated && cloud.lastUpdated <= clientSince && !cloud.reset) {
+            return res.json({
+                success: true,
+                unchanged: true,
+                lastUpdated: cloud.lastUpdated,
+                resetTimestamp: cloud.resetTimestamp || 0
+            });
+        }
+
         res.json({
             success: true,
+            unchanged: false,
             lastUpdated: cloud.lastUpdated || Date.now(),
             resetTimestamp: cloud.resetTimestamp || 0,
             reset: !!cloud.reset,
