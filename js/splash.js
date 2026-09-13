@@ -1,21 +1,154 @@
 /* ============================================================
-   AR-Program — Photorealistic Live-Action Movie Video Splash Controller
-   عرض فيديو سينمائي حقيقي MP4 بنظام محاكاة الفيلم الواقعي (18.5 ثانية)
+   AR-Program — Photorealistic Live-Action Movie Video Splash & Sound Engine
+   عرض فيديو سينمائي حقيقي MP4 بنظام محاكاة الفيلم الواقعي والمؤثرات الصوتية (18.5 ثانية)
    المشهد 1 (0s - 4.5s): الإنسان يتقدم في الورشة باتجاه آلة التروس
-   المشهد 2 (4.5s - 8.5s): لقطة مقربة ليد تمسح الأتربة والغبار عن التروس
-   المشهد 3 (8.5s - 12.5s): دوران التروس واشتعال المحرك وانطلاق الطاقة
-   المشهد 4 (12.5s - 18.5s): إضاءة الشعار AR-PROGRAM والترحيب والتوجيه
+   المشهد 2 (4.5s - 8.5s): لقطة مقربة ليد تمسح الأتربة والغبار عن التروس + صوت مسح الغبار
+   المشهد 3 (8.5s - 12.5s): دوران التروس واشتعال المحرك وانطلاق الطاقة + صوت التروس والمحرك
+   المشهد 4 (12.5s - 18.5s): إضاءة الشعار AR-PROGRAM والترحيب والتوجيه + رنين نغمات الحروف
    ============================================================ */
+
+/* محرك المؤثرات الصوتية التخليقية التفاعلية باستخدام Web Audio API */
+const ARSoundFX = (function () {
+    let audioCtx = null;
+
+    function getAudioContext() {
+        if (!audioCtx) {
+            const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtxClass) {
+                audioCtx = new AudioCtxClass();
+            }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        return audioCtx;
+    }
+
+    // 1. صوت مسح ونفض الغبار (Swoosh/Wipe Noise Sweep)
+    function playWipeSwoosh() {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        try {
+            const bufferSize = ctx.sampleRate * 0.35;
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(350, ctx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(1600, ctx.currentTime + 0.3);
+
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.34);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+
+            noise.start(ctx.currentTime);
+        } catch (e) {
+            console.warn('[SoundFX] playWipeSwoosh blocked:', e);
+        }
+    }
+
+    // 2. صوت نقرة أو طقطقة التروس الميكانيكية Metal Gear Click
+    function playGearClick() {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        try {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(140 + Math.random() * 90, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.08);
+
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.085);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.085);
+        } catch (e) {}
+    }
+
+    // 3. صوت أزيز واشتعال المحرك الكهربائي Engine Hum & Spark
+    function playEngineHum(durationSec = 3.8) {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        try {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(50, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + durationSec);
+
+            gain.gain.setValueAtTime(0.02, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + durationSec * 0.4);
+            gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + durationSec);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + durationSec);
+        } catch (e) {}
+    }
+
+    // 4. نغمة رنين جرس الملاحظات لإضاءة الحروف sequential Letter Chime
+    function playLetterChime(index) {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        try {
+            const freqs = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51];
+            const freq = freqs[index % freqs.length] || 880;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+            gain.gain.setValueAtTime(0.35, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.4);
+        } catch (e) {}
+    }
+
+    return { getAudioContext, playWipeSwoosh, playGearClick, playEngineHum, playLetterChime };
+})();
+
 
 const ARSplash = (function () {
     let _redirectTimer = null;
     let _countdownInterval = null;
     let _hasFinished = false;
     let _particleAnimFrame = null;
+    let _gearSoundInterval = null;
 
     function initSplash() {
         const overlay = document.getElementById('splashOverlay');
         if (!overlay) return;
+
+        // تفعيل الصوت عند أول تفاعل للمستخدم على أي مكان في الشاشة
+        const unlockAudio = () => {
+            ARSoundFX.getAudioContext();
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+        };
+        window.addEventListener('click', unlockAudio, { once: true });
+        window.addEventListener('touchstart', unlockAudio, { once: true });
 
         initParticleCanvas();
         setupVideoPlayer();
@@ -106,6 +239,11 @@ const ARSplash = (function () {
             if (frame1) frame1.classList.remove('active');
             if (frame2) frame2.classList.add('active');
             setSceneCaption('المشهد الثاني: نفض الأتربة وإعادة تجهيز التروس للعمل...');
+
+            // تشغيل مؤثر مسح الغبار 3 مرات متتالية
+            ARSoundFX.playWipeSwoosh();
+            setTimeout(() => { if (!_hasFinished) ARSoundFX.playWipeSwoosh(); }, 1200);
+            setTimeout(() => { if (!_hasFinished) ARSoundFX.playWipeSwoosh(); }, 2400);
         }, 4500);
 
         // المشهد 3: دوران التروس واشتعال المحرك وانطلاق الطاقة (8.5s - 12.5s)
@@ -114,6 +252,20 @@ const ARSplash = (function () {
             if (frame2) frame2.classList.remove('active');
             if (frame3) frame3.classList.add('active');
             setSceneCaption('المشهد الثالث: انطلاق التروس واشتعال المحرك وتوليد الطاقة...');
+
+            // تشغيل صوت أزيز المحرك ونقر التروس
+            ARSoundFX.playEngineHum(3.8);
+            _gearSoundInterval = setInterval(() => {
+                if (_hasFinished) {
+                    clearInterval(_gearSoundInterval);
+                    return;
+                }
+                ARSoundFX.playGearClick();
+            }, 300);
+
+            setTimeout(() => {
+                if (_gearSoundInterval) clearInterval(_gearSoundInterval);
+            }, 3800);
         }, 8500);
 
         // المشهد 4: ظهور الشعار وتتابع إضاءة الحروف (12.5s)
@@ -139,6 +291,7 @@ const ARSplash = (function () {
             }
             if (index < chars.length) {
                 chars[index].classList.add('lit');
+                ARSoundFX.playLetterChime(index);
                 index++;
             } else {
                 clearInterval(interval);
@@ -184,6 +337,7 @@ const ARSplash = (function () {
 
         if (_redirectTimer) clearTimeout(_redirectTimer);
         if (_countdownInterval) clearInterval(_countdownInterval);
+        if (_gearSoundInterval) clearInterval(_gearSoundInterval);
         if (_particleAnimFrame) cancelAnimationFrame(_particleAnimFrame);
 
         const video = document.getElementById('splashVideoPlayer');

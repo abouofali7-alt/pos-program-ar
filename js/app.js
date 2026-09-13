@@ -281,8 +281,12 @@
 
         if (user && !isLoginPage) {
             if (isIndexPage && !isManagerUser(user)) {
-                window.location.href = relPrefix() + 'pages/business/pos.html';
-                return { dbReady: true, user, forbidden: true };
+                const splash = document.getElementById('splashOverlay');
+                const splashActive = splash && splash.style.display !== 'none' && !splash.classList.contains('fade-out');
+                if (!splashActive) {
+                    window.location.href = relPrefix() + 'pages/business/pos.html';
+                    return { dbReady: true, user, forbidden: true };
+                }
             }
 
             // مزامنة مصفوفة الصلاحيات للجلسات القديمة التي لم تتضمن permissions
