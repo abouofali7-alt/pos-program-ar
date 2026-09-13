@@ -1,10 +1,10 @@
 /* ============================================================
    AR-Program — Cinematic Machinery Splash Animation Controller
-   المسار الزمني الممتد (مدة العرض الكاملة: 16 ثانية على الأقل):
-   1. 0s - 4.5s  : الفني يمسح الأتربة عن التروس بدقة وبحركة متكررة (4.5 ثانية)
-   2. 4.5s - 8.0s : التماع التروس وبدء دورانها المتشابك وتفعيل المحرك والكباسات (3.5 ثانية)
-   3. 8.0s - 12.0s: انطلاق شبكة الطاقة وإضاءة حروف AR-PROGRAM حرفاً بحرف (4.0 ثوانٍ)
-   4. 12.0s - 16.5s: ظهور نافذة الترحيب الزجاجية والعد التنازلي واكتمال التحويل (4.5 ثانية)
+   المسار الزمني الممتد (مدة العرض الكاملة: 17 ثانية على الأقل قبل التوجيه):
+   1. 0.0s - 5.0s  : الفني يمسح الأتربة عن التروس بدقة وبحركة متكررة (5.0 ثوانٍ)
+   2. 5.0s - 9.0s  : التماع التروس وبدء دورانها المتشابك وتفعيل المحرك والكباسات (4.0 ثوانٍ)
+   3. 9.0s - 13.0s : انطلاق شبكة الطاقة وإضاءة حروف AR-PROGRAM حرفاً بحرف (4.0 ثوانٍ)
+   4. 13.0s - 17.0s: ظهور نافذة الترحيب الزجاجية والعد التنازلي واكتمال التحويل (4.0 ثوانٍ)
    ============================================================ */
 
 const ARSplash = (function () {
@@ -30,11 +30,11 @@ const ARSplash = (function () {
         const pulseLeft = document.getElementById('energyPulseLeft');
         const pulseRight = document.getElementById('energyPulseRight');
 
-        // المرحلة 1: مسح الأتربة (0s - 4.5s)
+        // المرحلة 1: مسح الأتربة (0s - 5.0s)
         if (armGroup) armGroup.classList.add('wiping-arm');
         if (dustLayer) dustLayer.classList.add('dust-layer-anim');
 
-        // المرحلة 2: دوران التروس والتماعها عند 4.5 ثانية
+        // المرحلة 2: دوران التروس والتماعها عند 5.0 ثوانٍ
         setTimeout(() => {
             if (_hasFinished) return;
             if (gear1) gear1.classList.add('gear-spin-cw');
@@ -43,9 +43,9 @@ const ARSplash = (function () {
 
             const sparkles = document.getElementById('sparkleGroup');
             if (sparkles) sparkles.classList.add('sparkle-anim');
-        }, 4500);
+        }, 5000);
 
-        // المرحلة 3: تشغيل المحرك والكباسات وانطلاق الطاقة عند 6.2 ثانية
+        // المرحلة 3: تشغيل المحرك والكباسات وانطلاق الطاقة عند 7.0 ثوانٍ
         setTimeout(() => {
             if (_hasFinished) return;
             const engineGroup = document.getElementById('engineGroup');
@@ -55,13 +55,13 @@ const ARSplash = (function () {
 
             if (pulseLeft) pulseLeft.classList.add('energy-line-anim');
             if (pulseRight) pulseRight.classList.add('energy-line-anim');
-        }, 6200);
+        }, 7000);
 
-        // المرحلة 4: إضاءة حروف الاسم حرفاً بحرف عند 8.0 ثوانٍ
+        // المرحلة 4: إضاءة حروف الاسم حرفاً بحرف عند 9.0 ثوانٍ
         setTimeout(() => {
             if (_hasFinished) return;
             illuminateTitleLetters();
-        }, 8000);
+        }, 9000);
     }
 
     function illuminateTitleLetters() {
@@ -79,10 +79,10 @@ const ARSplash = (function () {
                 index++;
             } else {
                 clearInterval(interval);
-                // المرحلة 5: إظهار الرسالة الترحيبية والتحويل عند 12.0 ثانية
+                // المرحلة 5: إظهار الرسالة الترحيبية والتحويل عند 13.0 ثانية
                 setTimeout(showWelcomeAndRedirect, 500);
             }
-        }, 360); // 10 حروف * 360ms = 3.6s
+        }, 380); // 10 حروف * 380ms = 3.8s
     }
 
     function showWelcomeAndRedirect() {
@@ -94,17 +94,17 @@ const ARSplash = (function () {
 
         if (welcomeModal) welcomeModal.classList.add('show');
         if (fillBar) {
-            fillBar.style.transition = 'width 4.5s linear';
+            fillBar.style.transition = 'width 4.0s linear';
             fillBar.style.width = '100%';
         }
 
         let secondsLeft = 4;
-        if (subTxt) subTxt.innerHTML = `جاري التحويل لصفحة تسجيل الدخول خلال <b style="color:#38bdf8;font-size:1rem;">${secondsLeft}</b> ثوانٍ...`;
+        if (subTxt) subTxt.innerHTML = `جاري التحويل لصفحة تسجيل الدخول خلال <b style="color:#38bdf8;font-size:1.05rem;">${secondsLeft}</b> ثوانٍ...`;
 
         _countdownInterval = setInterval(() => {
             secondsLeft--;
             if (secondsLeft > 0 && subTxt) {
-                subTxt.innerHTML = `جاري التحويل لصفحة تسجيل الدخول خلال <b style="color:#38bdf8;font-size:1rem;">${secondsLeft}</b> ثوانٍ...`;
+                subTxt.innerHTML = `جاري التحويل لصفحة تسجيل الدخول خلال <b style="color:#38bdf8;font-size:1.05rem;">${secondsLeft}</b> ثوانٍ...`;
             } else {
                 clearInterval(_countdownInterval);
             }
@@ -112,7 +112,7 @@ const ARSplash = (function () {
 
         _redirectTimer = setTimeout(() => {
             finishAndRedirect();
-        }, 4500);
+        }, 4000);
     }
 
     function finishAndRedirect() {

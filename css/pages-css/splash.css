@@ -1,7 +1,7 @@
 /* ============================================================
    AR-Program — Cinematic Machinery & Gear Splash Animation
    شاشة البداية التفاعلية: مسح التروس، تشغيل المحرك، وإضاءة الحروف
-   ممتدة لمدة 15 - 16 ثانية على الأقل
+   ممتدة لمدة 16 - 17 ثانية كاملة
    ============================================================ */
 
 #splashOverlay {
@@ -91,7 +91,7 @@
     display: inline-block;
     color: #1e293b;
     text-shadow: none;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     transform: scale(0.85);
     opacity: 0.3;
 }
@@ -100,12 +100,12 @@
     color: #38bdf8;
     opacity: 1;
     transform: scale(1.18);
-    text-shadow: 0 0 16px #38bdf8, 0 0 32px #0284c7, 0 0 50px #38bdf8;
+    text-shadow: 0 0 18px #38bdf8, 0 0 35px #0284c7, 0 0 55px #38bdf8;
 }
 
 .splash-char.special-accent.lit {
     color: #c084fc;
-    text-shadow: 0 0 16px #c084fc, 0 0 32px #9333ea, 0 0 50px #c084fc;
+    text-shadow: 0 0 18px #c084fc, 0 0 35px #9333ea, 0 0 55px #c084fc;
 }
 
 /* رسالة الترحيب والشاشات المستقرة */
@@ -164,33 +164,33 @@
 
 /* === Keyframe Animations === */
 
-/* تحريك يد وقماش المسح على مدار 4.5 ثوانٍ */
+/* تحريك يد وقماش المسح على مدار 5 ثوانٍ كاملة */
 @keyframes wipingHandMotion {
     0% { transform: translate(0, 0) rotate(0deg); }
     15% { transform: translate(-85px, 22px) rotate(-15deg); }
     30% { transform: translate(30px, -15px) rotate(12deg); }
-    45% { transform: translate(-70px, 28px) rotate(-12deg); }
-    60% { transform: translate(20px, -8px) rotate(8deg); }
-    75% { transform: translate(-50px, 15px) rotate(-8deg); }
-    90% { transform: translate(10px, -4px) rotate(4deg); }
+    45% { transform: translate(-75px, 28px) rotate(-12deg); }
+    60% { transform: translate(25px, -8px) rotate(8deg); }
+    75% { transform: translate(-55px, 18px) rotate(-8deg); }
+    90% { transform: translate(15px, -4px) rotate(4deg); }
     100% { transform: translate(0, 0) rotate(0deg); }
 }
 
 .wiping-arm {
     transform-origin: 85px 95px;
-    animation: wipingHandMotion 4.5s ease-in-out 1 forwards;
+    animation: wipingHandMotion 5.0s ease-in-out 1 forwards;
 }
 
-/* ذوبان الأتربة على مدار 4.5 ثوانٍ */
+/* ذوبان الأتربة على مدار 5 ثوانٍ كاملة */
 @keyframes dustFadeOut {
     0% { opacity: 0.85; }
-    50% { opacity: 0.5; }
-    80% { opacity: 0.2; }
+    40% { opacity: 0.6; }
+    75% { opacity: 0.25; }
     100% { opacity: 0; visibility: hidden; }
 }
 
 .dust-layer-anim {
-    animation: dustFadeOut 4.5s ease-in-out forwards;
+    animation: dustFadeOut 5.0s ease-in-out forwards;
 }
 
 /* دوران التروس */

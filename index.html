@@ -338,9 +338,12 @@
 
         async function initDashboard() {
             try {
-                if (typeof window.ARUI !== 'undefined' && window.ARUI.isManagerUser) {
+                const splash = document.getElementById('splashOverlay');
+                const splashActive = splash && splash.style.display !== 'none' && !splash.classList.contains('fade-out');
+
+                if (!splashActive && typeof window.ARUI !== 'undefined' && window.ARUI.isManagerUser) {
                     const u = JSON.parse(localStorage.getItem('ar_session') || 'null');
-                    if (!window.ARUI.isManagerUser(u)) {
+                    if (!u || !window.ARUI.isManagerUser(u)) {
                         window.location.href = 'pages/business/pos.html';
                         return;
                     }
