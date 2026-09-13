@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مركز التقارير الشامل — AR-Program</title>
+    <link rel="stylesheet" href="../../css/global.css">
+    <link rel="stylesheet" href="../../css/app.css">
+    <link rel="stylesheet" href="../../css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        .report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; margin-top: 20px; }
+        .report-card { background: var(--card-dark); border: 1px solid var(--border-color); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; text-decoration: none; color: var(--text-primary); box-shadow: var(--shadow-card); }
+        .report-card:hover { transform: translateY(-3px); border-color: var(--accent-cyan); box-shadow: 0 10px 24px rgba(0,162,255,0.15); }
+        .report-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 14px; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 22px; }
+        .stat-card { background: var(--card-dark); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; box-shadow: var(--shadow-card); }
+        .stat-card .label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .stat-card .value { font-size: 1.4rem; font-weight: 800; }
+    </style>
+</head>
+<body class="dark-mode">
+    <div id="appHeaderHost"></div>
+
+    <main class="pagewrap" style="padding:22px;max-width:1300px;margin:0 auto;">
+        <div class="page-head">
+            <div>
+                <h2><i class="fa-solid fa-chart-pie" style="color:var(--warning);"></i> مركز التقارير الشامل</h2>
+                <div class="sub">مراقبة وتقارير الأداء المالي، المبيعات، المخزون، وحسابات الشركاء</div>
+            </div>
+            <div class="page-actions">
+                <button class="btn btn-secondary" onclick="ARExport.printTable('reportSummaryTable', 'ملخص_التقارير')"><i class="fa-solid fa-print"></i> طباعة ملخص</button>
+            </div>
+        </div>
+
+        <!-- ملخص KPIs السريع -->
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="label"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--success);"></i> إجمالي المبيعات</div>
+                <div class="value" style="color:var(--success);" id="repTotalSales">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><i class="fa-solid fa-coins" style="color:var(--accent-cyan);"></i> صافي أرباح المبيعات</div>
+                <div class="value" style="color:var(--accent-cyan);" id="repTotalProfit">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><i class="fa-solid fa-boxes-stacked" style="color:var(--accent-purple);"></i> قيمة المخزون (التكلفة)</div>
+                <div class="value" style="color:var(--accent-purple);" id="repStockValue">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="label"><i class="fa-solid fa-hand-holding-dollar" style="color:var(--danger);"></i> إجمالي المصروفات</div>
+                <div class="value" style="color:var(--danger);" id="repExpenses">0.00</div>
+            </div>
+        </div>
+
+        <!-- شبكة التقارير المجمعة -->
+        <div style="font-weight:700;font-size:1.1rem;margin-bottom:10px;"><i class="fa-solid fa-folder-tree" style="color:var(--accent-cyan);"></i> أقسام التقارير المتخصصة</div>
+        <div class="report-grid">
+            <a class="report-card" href="../business/sales_report.html">
+                <div>
+                    <div class="report-icon" style="background:rgba(34,197,94,0.12);color:var(--success);"><i class="fa-solid fa-chart-line"></i></div>
+                    <h3 style="margin:0 0 6px 0;font-size:1.1rem;">تقرير المبيعات والتحليلات</h3>
+                    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary);line-height:1.5;">تحليل حجم المبيعات الإجمالي، الأرباح، الخصومات، المبيعات حسب الصنف والعميل، وتقارير الكاشير.</p>
+                </div>
+                <div style="margin-top:16px;font-size:0.85rem;font-weight:700;color:var(--success);display:flex;align-items:center;gap:6px;">
+                    عرض تقرير المبيعات <i class="fa-solid fa-arrow-left"></i>
+                </div>
+            </a>
+
+            <a class="report-card" href="../inventory/stock_report.html">
+                <div>
+                    <div class="report-icon" style="background:rgba(0,162,255,0.12);color:var(--accent-cyan);"><i class="fa-solid fa-boxes-stacked"></i></div>
+                    <h3 style="margin:0 0 6px 0;font-size:1.1rem;">تقرير الأرصدة والمخزون</h3>
+                    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary);line-height:1.5;">تقييم الكميات المتاحة بالمستودعات، الأصناف المنخفضة، تكلفة المخزون، وحركات الوارد والمنصرف.</p>
+                </div>
+                <div style="margin-top:16px;font-size:0.85rem;font-weight:700;color:var(--accent-cyan);display:flex;align-items:center;gap:6px;">
+                    عرض تقرير المخزون <i class="fa-solid fa-arrow-left"></i>
+                </div>
+            </a>
+
+            <a class="report-card" href="../accounting/profit_loss.html">
+                <div>
+                    <div class="report-icon" style="background:rgba(245,158,11,0.12);color:var(--warning);"><i class="fa-solid fa-scale-balanced"></i></div>
+                    <h3 style="margin:0 0 6px 0;font-size:1.1rem;">تقرير الأرباح والخسائر (قائمة الدخل)</h3>
+                    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary);line-height:1.5;">قائمة الدخل الشاملة، تكلفة البضاعة المباعة، المصروفات التشغيلية، وصافي ربح النشاط المحاسبي.</p>
+                </div>
+                <div style="margin-top:16px;font-size:0.85rem;font-weight:700;color:var(--warning);display:flex;align-items:center;gap:6px;">
+                    عرض قائمة الدخل <i class="fa-solid fa-arrow-left"></i>
+                </div>
+            </a>
+
+            <a class="report-card" href="../business/partner_ledger.html">
+                <div>
+                    <div class="report-icon" style="background:rgba(168,85,247,0.12);color:var(--accent-purple);"><i class="fa-solid fa-users-between-lines"></i></div>
+                    <h3 style="margin:0 0 6px 0;font-size:1.1rem;">حركات العملاء والموردين (كشف حساب)</h3>
+                    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary);line-height:1.5;">كشوف حسابات تفصيلية للعملاء والموردين، الفواتير، الدفعات المسددة، والديون والمستحقات المتبقية.</p>
+                </div>
+                <div style="margin-top:16px;font-size:0.85rem;font-weight:700;color:var(--accent-purple);display:flex;align-items:center;gap:6px;">
+                    عرض كشوف الحسابات <i class="fa-solid fa-arrow-left"></i>
+                </div>
+            </a>
+
+            <a class="report-card" href="../accounting/cash_flow.html">
+                <div>
+                    <div class="report-icon" style="background:rgba(236,72,153,0.12);color:var(--accent-pink);"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                    <h3 style="margin:0 0 6px 0;font-size:1.1rem;">تقرير التدفقات النقدية والتحصيلات</h3>
+                    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary);line-height:1.5;">متابعة حركة السيولة النقدية في الخزينة والبنوك، المقبوضات والمدفوعات اليومية.</p>
+                </div>
+                <div style="margin-top:16px;font-size:0.85rem;font-weight:700;color:var(--accent-pink);display:flex;align-items:center;gap:6px;">
+                    عرض التدفقات النقدية <i class="fa-solid fa-arrow-left"></i>
+                </div>
+            </a>
+
+            <a class="report-card" href="../accounting/expenses.html">
+                <div>
+                    <div class="report-icon" style="background:rgba(239,68,68,0.12);color:var(--danger);"><i class="fa-solid fa-receipt"></i></div>
+                    <h3 style="margin:0 0 6px 0;font-size:1.1rem;">تقرير المصروفات والمدفوعات</h3>
+                    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary);line-height:1.5;">تحليل بنود المصروفات الإدارية والعمومية، وتوزيع التكاليف التشغيلية على الفئات.</p>
+                </div>
+                <div style="margin-top:16px;font-size:0.85rem;font-weight:700;color:var(--danger);display:flex;align-items:center;gap:6px;">
+                    عرض المصروفات <i class="fa-solid fa-arrow-left"></i>
+                </div>
+            </a>
+        </div>
+    </main>
+
+    <script src="../../js/ui.js"></script>
+    <script src="../../js/db.js"></script>
+    <script src="../../js/export.js"></script>
+    <script src="../../js/app.js"></script>
+    <script>
+        async function load() {
+            const [invoices, products, expenses, movements] = await Promise.all([
+                ARDB.getAll('invoices'),
+                ARDB.getAll('products'),
+                ARDB.getAll('expenses'),
+                ARDB.getAll('stockMovements')
+            ]);
+
+            const totSales = (invoices || []).reduce((s, inv) => s + (inv.total || 0), 0);
+            let totProfit = 0;
+            (invoices || []).forEach(inv => {
+                (inv.items || []).forEach(it => {
+                    const price = Number(it.price) || 0;
+                    const cost = Number(it.cost) || 0;
+                    const qty = Number(it.quantity || it.qty) || 1;
+                    totProfit += (price - cost) * qty;
+                });
+            });
+
+            const stockQty = {};
+            (products || []).forEach(p => stockQty[p.id] = 0);
+            (movements || []).forEach(m => {
+                if (m && m.productId != null) {
+                    const matchedKey = Object.keys(stockQty).find(k => String(k) === String(m.productId));
+                    if (matchedKey !== undefined) {
+                        stockQty[matchedKey] += (m.quantity || 0) * (m.direction === 'in' ? 1 : -1);
+                    }
+                }
+            });
+
+            let stockVal = 0;
+            (products || []).forEach(p => {
+                const q = stockQty[p.id] || 0;
+                stockVal += q * (p.cost || 0);
+            });
+
+            const totExp = (expenses || []).reduce((s, exp) => s + (exp.amount || 0), 0);
+
+            document.getElementById('repTotalSales').innerHTML = UI.money(totSales);
+            document.getElementById('repTotalProfit').innerHTML = UI.money(totProfit);
+            document.getElementById('repStockValue').innerHTML = UI.money(stockVal);
+            document.getElementById('repExpenses').innerHTML = UI.money(totExp);
+        }
+
+        load();
+        window.addEventListener('ar_cloud_data_updated', load);
+    </script>
+</body>
+</html>

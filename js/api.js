@@ -149,7 +149,7 @@ const API = (function () {
                 'settings','sequences','roles','users','departments','employees','attendance','payroll','leaveRequests',
                 'customers','suppliers','categories','products','serials','warehouses','stockMovements',
                 'invoices','invoiceReturns','purchases','purchaseReturns','payments','expenses','quotations','offers',
-                'accounts','journalEntries','projects','tasks'
+                'accounts','journalEntries','projects','tasks','maintenanceTickets','maintenanceDevices'
             ];
             const fullData = {};
             let hasAnyLocalData = false;

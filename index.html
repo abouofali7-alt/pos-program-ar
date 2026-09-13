@@ -141,6 +141,8 @@
             <a class="module-card" href="pages/inventory/products.html"><i class="fa-solid fa-boxes-stacked" style="color:var(--success);"></i><h4>المخزون</h4><p>المنتجات، الأرصدة، المشتريات ومرتجعاتها، الموردون، العروض</p></a>
             <a class="module-card" href="pages/hr/employees.html"><i class="fa-solid fa-users" style="color:var(--accent-purple);"></i><h4>الموارد البشرية</h4><p>الموظفون، الحضور، الرواتب، الإجازات، الأقسام</p></a>
             <a class="module-card" href="pages/business/customers.html"><i class="fa-solid fa-briefcase" style="color:var(--warning);"></i><h4>إدارة الأعمال</h4><p>العملاء، الفواتير ومرتجعاتها، عروض الأسعار، المشاريع والمهام</p></a>
+            <a class="module-card" href="pages/maintenance/maintenance_tickets.html"><i class="fa-solid fa-wrench" style="color:var(--accent-cyan);"></i><h4>أعمال الصيانة</h4><p>تذاكر إصلاح أجهزة العملاء، السريالات، ومعدات المنشأة</p></a>
+            <a class="module-card" href="pages/reports/reports_dashboard.html"><i class="fa-solid fa-chart-pie" style="color:var(--warning);"></i><h4>التقارير الشاملة</h4><p>تقرير المبيعات، المخزون، قائمة الدخل، وكشوف الحسابات</p></a>
             <a class="module-card" href="pages/settings/company.html"><i class="fa-solid fa-gear" style="color:var(--accent-pink);"></i><h4>الإعدادات</h4><p>المستخدمون، الصلاحيات، بيانات المنشأة</p></a>
         </div>
     </main>
@@ -381,6 +383,8 @@
                 else if (href.includes('inventory/')) modKey = 'inventory';
                 else if (href.includes('hr/')) modKey = 'hr';
                 else if (href.includes('business/')) modKey = 'business';
+                else if (href.includes('maintenance/')) modKey = 'maintenance';
+                else if (href.includes('reports/')) modKey = 'reports';
                 else if (href.includes('settings/')) modKey = 'settings';
 
                 if (modKey && typeof window.ARUI !== 'undefined' && window.ARUI.userHasModulePermission) {

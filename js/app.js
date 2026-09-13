@@ -45,6 +45,18 @@
             { href: 'business/tasks.html', label: 'المهام' },
             { href: 'business/sales_report.html', label: 'تقرير المبيعات' }
         ]},
+        maintenance: { label: 'أعمال الصيانة', icon: 'fa-wrench', pages: [
+            { href: 'maintenance/maintenance_tickets.html', label: 'أوامر وتذاكر الصيانة' },
+            { href: 'maintenance/devices.html', label: 'صيانة ومعدات المنشأة' }
+        ]},
+        reports: { label: 'التقارير', icon: 'fa-chart-pie', pages: [
+            { href: 'reports/reports_dashboard.html', label: 'مركز التقارير الشامل' },
+            { href: 'business/sales_report.html', label: 'تقرير المبيعات والتحليلات' },
+            { href: 'inventory/stock_report.html', label: 'تقرير الأرصدة والمخزون' },
+            { href: 'accounting/profit_loss.html', label: 'تقرير الأرباح والخسائر' },
+            { href: 'business/partner_ledger.html', label: 'كشف حساب الشركاء' },
+            { href: 'accounting/cash_flow.html', label: 'التدفقات النقدية' }
+        ]},
         settings: { label: 'الإعدادات', icon: 'fa-gear', pages: [
             { href: 'settings/users.html', label: 'المستخدمون' },
             { href: 'settings/roles.html', label: 'الصلاحيات' },
@@ -234,7 +246,7 @@
     function getUserPermissions(user) {
         if (!user) return [];
         if (isManagerUser(user)) {
-            return ['accounting', 'inventory', 'hr', 'business', 'settings'];
+            return ['accounting', 'inventory', 'hr', 'business', 'maintenance', 'reports', 'settings'];
         }
         if (Array.isArray(user.permissions)) return user.permissions;
         return [];
@@ -289,6 +301,8 @@
             else if (p.includes('/pages/inventory/')) currentModule = 'inventory';
             else if (p.includes('/pages/hr/')) currentModule = 'hr';
             else if (p.includes('/pages/business/')) currentModule = 'business';
+            else if (p.includes('/pages/maintenance/')) currentModule = 'maintenance';
+            else if (p.includes('/pages/reports/')) currentModule = 'reports';
             else if (p.includes('/pages/settings/')) currentModule = 'settings';
 
             if (currentModule && !userHasModulePermission(user, currentModule)) {
@@ -297,6 +311,8 @@
                     inventory: 'المخزون',
                     hr: 'الموارد البشرية',
                     business: 'إدارة الأعمال',
+                    maintenance: 'أعمال الصيانة',
+                    reports: 'التقارير',
                     settings: 'الإعدادات'
                 };
                 const nameAr = moduleNames[currentModule] || currentModule;
@@ -350,6 +366,9 @@
             'projects.html': 'projects',
             'tasks.html': 'tasks',
             'sales_report.html': 'sales_report',
+            'maintenance_tickets.html': 'maintenance_tickets',
+            'devices.html': 'devices',
+            'reports_dashboard.html': 'reports_dashboard',
             'users.html': 'users',
             'roles.html': 'roles',
             'company.html': 'company',
